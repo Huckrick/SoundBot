@@ -82,18 +82,20 @@
         <!-- Center: Menu -->
         <nav class="flex items-center gap-1">
             <button class="menu-btn px-3 py-1.5 rounded-md text-sm font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5">文件</button>
-            <button id="importBtn" class="menu-btn px-3 py-1.5 rounded-md text-sm font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-1.5">
-                <i data-lucide="upload" class="w-4 h-4"></i>导入
-            </button>
-            <!-- 导入下拉菜单 -->
-            <div id="importDropdown" class="dropdown-menu hidden absolute top-full left-0 mt-2 w-48 rounded-lg shadow-xl border py-2 z-50"
-                 style="background-color: var(--bg-secondary); border-color: var(--border-color);">
-                <button id="importFileBtn" class="w-full px-4 py-2 text-sm text-left hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2">
-                    <i data-lucide="file-audio" class="w-4 h-4"></i>导入音频文件
+            <div class="relative">
+                <button id="importBtn" class="menu-btn px-3 py-1.5 rounded-md text-sm font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-1.5">
+                    <i data-lucide="upload" class="w-4 h-4"></i>导入
                 </button>
-                <button id="importFolderBtn" class="w-full px-4 py-2 text-sm text-left hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2">
-                    <i data-lucide="folder-plus" class="w-4 h-4"></i>导入文件夹
-                </button>
+                <!-- 导入下拉菜单 -->
+                <div id="importDropdown" class="dropdown-menu hidden absolute top-full left-0 mt-2 w-48 rounded-lg shadow-xl border py-2 z-50"
+                     style="background-color: var(--bg-secondary); border-color: var(--border-color);">
+                    <button id="importFileBtn" class="w-full px-4 py-2 text-sm text-left hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2">
+                        <i data-lucide="file-audio" class="w-4 h-4"></i>导入音频文件
+                    </button>
+                    <button id="importFolderBtn" class="w-full px-4 py-2 text-sm text-left hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2">
+                        <i data-lucide="folder-plus" class="w-4 h-4"></i>导入文件夹
+                    </button>
+                </div>
             </div>
             <div class="relative">
                 <button id="settingsBtn" class="menu-btn px-3 py-1.5 rounded-md text-sm font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-1.5">
@@ -865,10 +867,27 @@
                 toggleSettings();
             });
             
+            // 导入按钮 - 显示下拉菜单
+            document.getElementById('importBtn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                const dropdown = document.getElementById('importDropdown');
+                dropdown.classList.toggle('hidden');
+                dropdown.classList.toggle('visible');
+                
+                // 隐藏设置下拉菜单
+                document.getElementById('settingsDropdown').classList.add('hidden');
+                document.getElementById('settingsDropdown').classList.remove('visible');
+            });
+            
+            // 点击其他地方关闭下拉菜单
             document.addEventListener('click', (e) => {
-                if (!e.target.closest('#settingsDropdown')) {
+                if (!e.target.closest('#settingsDropdown') && !e.target.closest('#settingsBtn')) {
                     document.getElementById('settingsDropdown').classList.add('hidden');
                     document.getElementById('settingsDropdown').classList.remove('visible');
+                }
+                if (!e.target.closest('#importDropdown') && !e.target.closest('#importBtn')) {
+                    document.getElementById('importDropdown').classList.add('hidden');
+                    document.getElementById('importDropdown').classList.remove('visible');
                 }
             });
             
@@ -1060,26 +1079,6 @@
             }, 100);
 
             // ==================== 文件导入功能 ====================
-            
-            // 导入按钮 - 显示下拉菜单
-            document.getElementById('importBtn').addEventListener('click', (e) => {
-                e.stopPropagation();
-                const dropdown = document.getElementById('importDropdown');
-                dropdown.classList.toggle('hidden');
-                dropdown.classList.toggle('visible');
-                
-                // 隐藏设置下拉菜单
-                document.getElementById('settingsDropdown').classList.add('hidden');
-                document.getElementById('settingsDropdown').classList.remove('visible');
-            });
-            
-            // 点击其他地方关闭导入菜单
-            document.addEventListener('click', (e) => {
-                if (!e.target.closest('#importDropdown') && !e.target.closest('#importBtn')) {
-                    document.getElementById('importDropdown').classList.add('hidden');
-                    document.getElementById('importDropdown').classList.remove('visible');
-                }
-            });
             
             // 导入单个音频文件
             document.getElementById('importFileBtn').addEventListener('click', async () => {
