@@ -1,8 +1,12 @@
 const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { spawn } = require('child_process');
 
 let mainWindow;
+let backendProcess = null;
+const BACKEND_PORT = 8000;
+const API_BASE_URL = `http://127.0.0.1:${BACKEND_PORT}/api/v1`;
 
 function createWindow() {
   // 创建浏览器窗口
@@ -214,13 +218,197 @@ function setupIpcHandlers() {
       return { success: false, error: error.message };
     }
   });
+
+  // 处理后端 API 请求
+  ipcMain.handle('backend-api', async (event, action, data) => {
+    try {
+      switch (action) {
+        case 'health': {
+          const response = await fetch(`${API_BASE_URL}/health`);
+          return await response.json();
+        }
+
+        case 'scan': {
+          const response = await fetch(`${API_BASE_URL}/scan`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              folder_path: data.folderPath,
+              recursive: data.recursive
+            })
+          });
+          return await response.json();
+        }
+
+        case 'search': {
+          const response = await fetch(`${API_BASE_URL}/search`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: data.query,
+              top_k: data.topK,
+              threshold: data.threshold
+            })
+          });
+          return await response.json();
+        }
+
+        case 'index-status': {
+          const response = await fetch(`${API_BASE_URL}/index/status`);
+          return await response.json();
+        }
+
+        case 'indexed-files': {
+          const response = await fetch(`${API_BASE_URL}/files`);
+          return await response.json();
+        }
+
+        case 'audio-url': {
+          // 返回音频文件的 API URL
+          const encodedPath = encodeURIComponent(data);
+          return `${API_BASE_URL}/audio/${encodedPath}`;
+        }
+
+        case 'start-server': {
+          return await startBackendServer();
+        }
+
+        case 'stop-server': {
+          return await stopBackendServer();
+        }
+
+        default:
+          return { success: false, error: '未知操作' };
+      }
+    } catch (error) {
+      console.error('后端 API 错误:', error);
+      return { success: false, error: error.message };
+    }
+  });
+}
+
+// 启动后端服务器
+async function startBackendServer() {
+  if (backendProcess) {
+    return { success: true, message: '后端服务已在运行' };
+  }
+
+  try {
+    // 查找后端路径
+    const backendPath = path.join(__dirname, 'backend');
+    const mainPy = path.join(backendPath, 'main.py');
+
+    // 检查后端文件是否存在
+    if (!fs.existsSync(mainPy)) {
+      // 尝试找 main.py 或检查是否有 venv
+      const files = fs.readdirSync(backendPath);
+      console.log('Backend files:', files);
+      return { success: false, error: '后端文件不存在' };
+    }
+
+    // 确定 Python 解释器
+    const venvPython = path.join(backendPath, 'venv', 'bin', 'python');
+    const pythonCmd = fs.existsSync(venvPython) ? venvPython : 'python';
+
+    // 启动后端进程
+    backendProcess = spawn(pythonCmd, [mainPy], {
+      cwd: backendPath,
+      env: { ...process.env, PYTHONUNBUFFERED: '1' },
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+
+    backendProcess.stdout.on('data', (data) => {
+      console.log('[Backend]', data.toString());
+    });
+
+    backendProcess.stderr.on('data', (data) => {
+      console.error('[Backend Error]', data.toString());
+    });
+
+    backendProcess.on('error', (error) => {
+      console.error('后端进程启动失败:', error);
+      backendProcess = null;
+    });
+
+    backendProcess.on('exit', (code) => {
+      console.log(`后端进程退出，代码: ${code}`);
+      backendProcess = null;
+    });
+
+    // 等待服务启动
+    await new Promise((resolve, reject) => {
+      let retries = 0;
+      const maxRetries = 30;
+
+      const checkServer = setInterval(() => {
+        fetch(`${API_BASE_URL}/health`)
+          .then(() => {
+            clearInterval(checkServer);
+            resolve();
+          })
+          .catch(() => {
+            retries++;
+            if (retries >= maxRetries) {
+              clearInterval(checkServer);
+              reject(new Error('服务启动超时'));
+            }
+          });
+      }, 1000);
+    });
+
+    return { success: true, message: '后端服务已启动' };
+  } catch (error) {
+    console.error('启动后端服务失败:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// 停止后端服务器
+async function stopBackendServer() {
+  if (!backendProcess) {
+    return { success: true, message: '后端服务未在运行' };
+  }
+
+  return new Promise((resolve) => {
+    backendProcess.once('exit', () => {
+      backendProcess = null;
+      resolve({ success: true, message: '后端服务已停止' });
+    });
+
+    backendProcess.kill('SIGTERM');
+    setTimeout(() => {
+      if (backendProcess) {
+        backendProcess.kill('SIGKILL');
+      }
+      resolve({ success: true, message: '后端服务已强制停止' });
+    }, 5000);
+  });
 }
 
 // 应用准备就绪时创建窗口
-app.whenReady().then(createWindow);
+app.whenReady().then(async () => {
+  createWindow();
+  
+  // 自动启动后端服务
+  try {
+    const result = await startBackendServer();
+    if (result.success) {
+      console.log('后端服务启动成功');
+    } else {
+      console.warn('后端服务启动失败:', result.error);
+    }
+  } catch (error) {
+    console.error('启动后端服务时出错:', error);
+  }
+});
 
 // 所有窗口关闭时退出应用（macOS 除外）
-app.on('window-all-closed', () => {
+app.on('window-all-closed', async () => {
+  // 停止后端服务
+  if (backendProcess) {
+    await stopBackendServer();
+  }
+  
   if (process.platform !== 'darwin') {
     app.quit();
   }

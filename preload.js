@@ -99,6 +99,35 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 通知
   notifications: {
     show: (title, body, options) => ipcRenderer.invoke('notification-show', { title, body, options })
+  },
+
+  // 后端 API（与 FastAPI 服务通信）
+  backendAPI: {
+    // 健康检查
+    healthCheck: () => ipcRenderer.invoke('backend-api', 'health'),
+
+    // 扫描并索引音频文件夹
+    scanFolder: (folderPath, recursive = true) => 
+      ipcRenderer.invoke('backend-api', 'scan', { folderPath, recursive }),
+
+    // 语义搜索音频
+    searchAudio: (query, topK = 20, threshold = 0.15) => 
+      ipcRenderer.invoke('backend-api', 'search', { query, topK, threshold }),
+
+    // 获取索引状态
+    getIndexStatus: () => ipcRenderer.invoke('backend-api', 'index-status'),
+
+    // 获取已索引的文件列表
+    getIndexedFiles: () => ipcRenderer.invoke('backend-api', 'indexed-files'),
+
+    // 获取音频文件 URL
+    getAudioUrl: (filePath) => ipcRenderer.invoke('backend-api', 'audio-url', filePath),
+
+    // 启动后端服务
+    startServer: () => ipcRenderer.invoke('backend-api', 'start-server'),
+
+    // 停止后端服务
+    stopServer: () => ipcRenderer.invoke('backend-api', 'stop-server')
   }
 });
 
