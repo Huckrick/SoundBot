@@ -442,10 +442,16 @@
                         audioSrc = await window.electronAPI.backendAPI.getAudioUrl(sound.filePath);
                     } catch (urlError) {
                         console.warn('获取音频 URL 失败，使用原始路径:', urlError.message);
-                        // 在 Electron 环境中，尝试使用 file:// 协议
-                        if (sound.filePath && !sound.filePath.startsWith('file://')) {
-                            audioSrc = 'file://' + sound.filePath;
-                        }
+                    }
+                }
+                
+                // 如果没有获取到有效的音频 URL，使用 file:// 协议
+                if (!audioSrc || audioSrc === sound.filePath) {
+                    if (sound.filePath && !sound.filePath.startsWith('file://') && !sound.filePath.startsWith('http')) {
+                        // 对路径进行编码处理
+                        audioSrc = 'file://' + encodeURIComponent(sound.filePath).replace(/%2F/g, '/');
+                    } else {
+                        audioSrc = sound.filePath;
                     }
                 }
                 
