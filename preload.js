@@ -18,6 +18,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     exportProject: (data, options) => ipcRenderer.invoke('file-operation', 'export', { data, options })
   },
 
+  // 文件导入（专门为导入按钮设计）
+  fileImport: {
+    // 打开音频文件选择对话框
+    selectAudioFiles: (options = {}) => ipcRenderer.invoke('file-import', 'select-audio', options),
+    // 打开文件夹选择对话框
+    selectFolder: (options = {}) => ipcRenderer.invoke('file-import', 'select-folder', options),
+    // 处理拖放的文件
+    handleDropFiles: (files) => ipcRenderer.invoke('file-import', 'handle-drop', files),
+    // 获取文件信息
+    getFileInfo: (filePath) => ipcRenderer.invoke('file-import', 'get-info', filePath),
+    // 验证文件类型
+    validateFileType: (filePath) => ipcRenderer.invoke('file-import', 'validate-type', filePath)
+  },
+
   // 应用设置
   appSettings: {
     get: (key) => ipcRenderer.invoke('app-settings', { action: 'get', key }),

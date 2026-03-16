@@ -1,5 +1,6 @@
-const { app, BrowserWindow, Menu, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 let mainWindow;
 
@@ -150,6 +151,68 @@ function setupIpcHandlers() {
     // 这里可以保存应用设置
     console.log('App settings:', settings);
     return { success: true };
+  });
+
+  // 处理文件导入
+  ipcMain.handle('file-import', async (event, action, data) => {
+    try {
+      switch (action) {
+        case 'select-audio': {
+          const result = await dialog.showOpenDialog(mainWindow, {
+            title: '选择音频文件',
+            filters: [
+              { name: '音频文件', extensions: ['wav', 'mp3', 'aac', 'flac', 'ogg', 'm4a'] },
+              { name: '所有文件', extensions: ['*'] }
+            ],
+            properties: ['openFile', 'multiSelections']
+          });
+
+          if (!result.canceled && result.filePaths.length > 0) {
+            const fileInfo = await Promise.all(
+              result.filePaths.map(async (filePath) => {
+                const stats = fs.statSync(filePath);
+                return {
+                  path: filePath,
+                  name: path.basename(filePath),
+                  size: stats.size,
+                  type: path.extname(filePath).toLowerCase(),
+                  lastModified: stats.mtime
+                };
+              })
+            );
+
+            // 发送文件选择结果到渲染进程
+            mainWindow.webContents.send('files-selected', fileInfo);
+            return { success: true, files: fileInfo };
+          }
+          return { success: false, canceled: true };
+        }
+
+        case 'select-folder': {
+          const result = await dialog.showOpenDialog(mainWindow, {
+            title: '选择文件夹',
+            properties: ['openDirectory']
+          });
+
+          if (!result.canceled && result.filePaths.length > 0) {
+            return { success: true, folder: result.filePaths[0] };
+          }
+          return { success: false, canceled: true };
+        }
+
+        case 'validate-type': {
+          const supportedTypes = ['.wav', '.mp3', '.aac', '.flac', '.ogg', '.m4a'];
+          const ext = path.extname(data).toLowerCase();
+          return { success: supportedTypes.includes(ext), type: ext };
+        }
+
+        default:
+          return { success: false, error: '未知操作' };
+      }
+    } catch (error) {
+      console.error('文件导入错误:', error);
+      return { success: false, error: error.message };
+    }
   });
 }
 

@@ -898,6 +898,172 @@
                     drawMainWaveform();
                 }
             }, 100);
+
+            // ==================== 文件导入功能 ====================
+            
+            // 导入按钮事件
+            document.querySelector('button:has(i[data-lucide="upload"])').addEventListener('click', async () => {
+                try {
+                    // 检查 Electron API 是否可用
+                    if (window.electronAPI && window.electronAPI.fileImport) {
+                        const result = await window.electronAPI.fileImport.selectAudioFiles({
+                            title: '选择音频文件',
+                            filters: [
+                                { name: '音频文件', extensions: ['wav', 'mp3', 'aac', 'flac', 'ogg', 'm4a'] },
+                                { name: '所有文件', extensions: ['*'] }
+                            ]
+                        });
+
+                        if (result.success && result.files) {
+                            // 处理选中的文件
+                            await handleImportedFiles(result.files);
+                        } else if (result.canceled) {
+                            console.log('用户取消了文件选择');
+                        } else {
+                            console.error('文件选择失败:', result.error);
+                        }
+                    } else {
+                        // 在浏览器环境中使用原生文件选择
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = '.wav,.mp3,.aac,.flac,.ogg,.m4a';
+                        input.multiple = true;
+                        input.onchange = (e) => {
+                            const files = Array.from(e.target.files);
+                            handleBrowserFiles(files);
+                        };
+                        input.click();
+                    }
+                } catch (error) {
+                    console.error('导入文件时出错:', error);
+                    showNotification('导入文件失败: ' + error.message, 'error');
+                }
+            });
+
+            // 监听文件选择事件（来自主进程）
+            if (window.electronAPI) {
+                window.electronAPI.onMenuEvent((event, action) => {
+                    if (action === 'menu-import-file') {
+                        document.querySelector('button:has(i[data-lucide="upload"])').click();
+                    }
+                });
+
+                // 监听文件选择结果
+                window.electronAPI.removeAllListeners('files-selected');
+                window.electronAPI.onMenuEvent((event, fileInfo) => {
+                    if (event.channel === 'files-selected') {
+                        handleImportedFiles(fileInfo);
+                    }
+                });
+            }
+
+            // 处理导入的文件
+            async function handleImportedFiles(files) {
+                try {
+                    showNotification(`成功导入 ${files.length} 个文件`, 'success');
+                    
+                    // 将文件添加到音效列表
+                    const newSounds = files.map((file, index) => {
+                        const soundId = Date.now() + index;
+                        return {
+                            id: soundId,
+                            name: file.name,
+                            category: '导入文件',
+                            duration: 0, // 需要后续分析音频时长
+                            tags: ['导入'],
+                            filePath: file.path,
+                            size: file.size,
+                            type: file.type,
+                            lastModified: file.lastModified
+                        };
+                    });
+
+                    // 添加到现有音效数据
+                    soundData.push(...newSounds);
+                    
+                    // 更新界面
+                    renderSoundList();
+                    renderFolderTree();
+                    renderCategoryTree();
+                    
+                    // 显示导入成功消息
+                    showNotification(`成功添加 ${newSounds.length} 个音效文件`, 'success');
+                    
+                } catch (error) {
+                    console.error('处理导入文件时出错:', error);
+                    showNotification('处理文件时出错: ' + error.message, 'error');
+                }
+            }
+
+            // 浏览器环境文件处理
+            function handleBrowserFiles(files) {
+                const filePromises = files.map(file => {
+                    return new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            resolve({
+                                name: file.name,
+                                size: file.size,
+                                type: file.type,
+                                lastModified: new Date(file.lastModified),
+                                data: e.target.result
+                            });
+                        };
+                        reader.readAsDataURL(file);
+                    });
+                });
+
+                Promise.all(filePromises).then(handleImportedFiles);
+            }
+
+            // 显示通知
+            function showNotification(message, type = 'info') {
+                // 创建通知元素
+                const notification = document.createElement('div');
+                notification.className = `notification ${type}`;
+                notification.textContent = message;
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    padding: 12px 16px;
+                    border-radius: 8px;
+                    background-color: var(--bg-secondary);
+                    border: 1px solid var(--border-color);
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                    z-index: 1000;
+                    animation: slideIn 0.3s ease;
+                `;
+
+                document.body.appendChild(notification);
+
+                // 3秒后自动移除
+                setTimeout(() => {
+                    notification.style.animation = 'slideOut 0.3s ease';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 300);
+                }, 3000);
+            }
+
+            // 添加动画样式
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes slideIn {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes slideOut {
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(100%); opacity: 0; }
+                }
+                .notification.success { border-left: 4px solid #10b981; }
+                .notification.error { border-left: 4px solid #ef4444; }
+                .notification.info { border-left: 4px solid #3b82f6; }
+            `;
+            document.head.appendChild(style);
         });
     </script>
 </body>
