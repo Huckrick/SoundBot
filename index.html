@@ -82,7 +82,7 @@
         <!-- Center: Menu -->
         <nav class="flex items-center gap-1">
             <button class="menu-btn px-3 py-1.5 rounded-md text-sm font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5">文件</button>
-            <button class="menu-btn px-3 py-1.5 rounded-md text-sm font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-1.5">
+            <button id="importBtn" class="menu-btn px-3 py-1.5 rounded-md text-sm font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-1.5">
                 <i data-lucide="upload" class="w-4 h-4"></i>导入
             </button>
             <div class="relative">
@@ -902,7 +902,7 @@
             // ==================== 文件导入功能 ====================
             
             // 导入按钮事件
-            document.querySelector('button:has(i[data-lucide="upload"])').addEventListener('click', async () => {
+            document.getElementById('importBtn').addEventListener('click', async () => {
                 try {
                     // 检查 Electron API 是否可用
                     if (window.electronAPI && window.electronAPI.fileImport) {
