@@ -344,6 +344,55 @@
         let isMuted = false;
         let activeCategory = 'tag-all';
         
+        // ==================== NOTIFICATIONS ====================
+        function showNotification(message, type = 'info') {
+            // 创建通知元素
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 12px 16px;
+                border-radius: 8px;
+                background-color: var(--bg-secondary);
+                border: 1px solid var(--border-color);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                z-index: 1000;
+                animation: slideIn 0.3s ease;
+            `;
+
+            document.body.appendChild(notification);
+
+            // 3秒后自动移除
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+        
+        // 添加动画样式
+        const notificationStyle = document.createElement('style');
+        notificationStyle.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+            .notification.success { border-left: 4px solid #10b981; }
+            .notification.error { border-left: 4px solid #ef4444; }
+            .notification.info { border-left: 4px solid #3b82f6; }
+        `;
+        document.head.appendChild(notificationStyle);
+        
         // ==================== AUDIO PLAYER ====================
         let audioPlayer = null;
         
@@ -386,11 +435,21 @@
             try {
                 let audioSrc = sound.filePath;
                 
-                // 如果是 Electron 环境且有后端 API，转换文件路径为 API URL
+                // 尝试使用后端 API 获取音频 URL（需要后端服务运行）
+                // 如果失败则使用原始文件路径
                 if (sound.filePath && window.electronAPI && window.electronAPI.backendAPI && !sound.filePath.startsWith('http')) {
-                    audioSrc = await window.electronAPI.backendAPI.getAudioUrl(sound.filePath);
+                    try {
+                        audioSrc = await window.electronAPI.backendAPI.getAudioUrl(sound.filePath);
+                    } catch (urlError) {
+                        console.warn('获取音频 URL 失败，使用原始路径:', urlError.message);
+                        // 在 Electron 环境中，尝试使用 file:// 协议
+                        if (sound.filePath && !sound.filePath.startsWith('file://')) {
+                            audioSrc = 'file://' + sound.filePath;
+                        }
+                    }
                 }
                 
+                console.log('播放音频:', audioSrc);
                 audioPlayer.src = audioSrc;
                 audioPlayer.volume = currentVolume / 100;
                 audioPlayer.muted = isMuted;
@@ -402,7 +461,12 @@
                 renderSoundList(document.getElementById('searchInput').value);
             } catch (error) {
                 console.error('播放失败:', error);
-                showNotification('播放失败: ' + error.message, 'error');
+                // 使用 alert 作为后备通知方式
+                if (typeof showNotification === 'function') {
+                    showNotification('播放失败: ' + error.message, 'error');
+                } else {
+                    alert('播放失败: ' + error.message);
+                }
             }
         }
 
@@ -851,7 +915,56 @@
             });
         }
 
-        // ==================== EVENT LISTENERS ====================
+            // 显示通知（提前定义，确保在 initAudioPlayer 之前可用）
+            function showNotification(message, type = 'info') {
+                // 创建通知元素
+                const notification = document.createElement('div');
+                notification.className = `notification ${type}`;
+                notification.textContent = message;
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    padding: 12px 16px;
+                    border-radius: 8px;
+                    background-color: var(--bg-secondary);
+                    border: 1px solid var(--border-color);
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                    z-index: 1000;
+                    animation: slideIn 0.3s ease;
+                `;
+
+                document.body.appendChild(notification);
+
+                // 3秒后自动移除
+                setTimeout(() => {
+                    notification.style.animation = 'slideOut 0.3s ease';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 300);
+                }, 3000);
+            }
+
+            // 添加动画样式
+            const notificationStyle = document.createElement('style');
+            notificationStyle.textContent = `
+                @keyframes slideIn {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes slideOut {
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(100%); opacity: 0; }
+                }
+                .notification.success { border-left: 4px solid #10b981; }
+                .notification.error { border-left: 4px solid #ef4444; }
+                .notification.info { border-left: 4px solid #3b82f6; }
+            `;
+            document.head.appendChild(notificationStyle);
+            
+            // ==================== EVENT LISTENERS ====================
         document.addEventListener('DOMContentLoaded', () => {
             // Initialize
             initAudioPlayer();
@@ -1306,55 +1419,6 @@
 
                 Promise.all(filePromises).then(handleImportedFiles);
             }
-
-            // 显示通知
-            function showNotification(message, type = 'info') {
-                // 创建通知元素
-                const notification = document.createElement('div');
-                notification.className = `notification ${type}`;
-                notification.textContent = message;
-                notification.style.cssText = `
-                    position: fixed;
-                    top: 20px;
-                    right: 20px;
-                    padding: 12px 16px;
-                    border-radius: 8px;
-                    background-color: var(--bg-secondary);
-                    border: 1px solid var(--border-color);
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-                    z-index: 1000;
-                    animation: slideIn 0.3s ease;
-                `;
-
-                document.body.appendChild(notification);
-
-                // 3秒后自动移除
-                setTimeout(() => {
-                    notification.style.animation = 'slideOut 0.3s ease';
-                    setTimeout(() => {
-                        if (notification.parentNode) {
-                            notification.parentNode.removeChild(notification);
-                        }
-                    }, 300);
-                }, 3000);
-            }
-
-            // 添加动画样式
-            const style = document.createElement('style');
-            style.textContent = `
-                @keyframes slideIn {
-                    from { transform: translateX(100%); opacity: 0; }
-                    to { transform: translateX(0); opacity: 1; }
-                }
-                @keyframes slideOut {
-                    from { transform: translateX(0); opacity: 1; }
-                    to { transform: translateX(100%); opacity: 0; }
-                }
-                .notification.success { border-left: 4px solid #10b981; }
-                .notification.error { border-left: 4px solid #ef4444; }
-                .notification.info { border-left: 4px solid #3b82f6; }
-            `;
-            document.head.appendChild(style);
         });
     </script>
 </body>
