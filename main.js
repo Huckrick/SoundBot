@@ -159,9 +159,19 @@ function setupIpcHandlers() {
 
   // 处理文件导入
   ipcMain.handle('file-import', async (event, action, data) => {
+    console.log('[IPC] file-import 收到请求:', action, data);
     try {
       switch (action) {
         case 'select-audio': {
+          console.log('[IPC] 打开文件选择对话框...');
+          if (!mainWindow) {
+            console.error('[IPC] mainWindow 为空');
+            return { success: false, error: '主窗口未初始化' };
+          }
+          if (!dialog) {
+            console.error('[IPC] dialog 为空');
+            return { success: false, error: 'dialog 未定义' };
+          }
           const result = await dialog.showOpenDialog(mainWindow, {
             title: '选择音频文件',
             filters: [

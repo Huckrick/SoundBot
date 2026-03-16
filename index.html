@@ -1084,8 +1084,13 @@
             document.getElementById('importFileBtn').addEventListener('click', async () => {
                 document.getElementById('importDropdown').classList.add('hidden');
                 
+                console.log('点击了导入音频文件按钮');
+                console.log('window.electronAPI:', window.electronAPI);
+                console.log('window.electronAPI.fileImport:', window.electronAPI?.fileImport);
+                
                 try {
                     if (window.electronAPI && window.electronAPI.fileImport) {
+                        console.log('调用 fileImport.selectAudioFiles...');
                         const result = await window.electronAPI.fileImport.selectAudioFiles({
                             title: '选择音频文件',
                             filters: [
@@ -1093,6 +1098,7 @@
                                 { name: '所有文件', extensions: ['*'] }
                             ]
                         });
+                        console.log('选择结果:', result);
 
                         if (result.success && result.files) {
                             await handleImportedFiles(result.files);
