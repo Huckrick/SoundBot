@@ -1,0 +1,91 @@
+"""
+Pydantic 数据模型
+
+定义 API 请求/响应的数据结构和验证规则。
+"""
+
+from typing import Optional, List
+from pydantic import BaseModel, Field
+
+
+# ==================== 请求模型 ====================
+
+class ScanRequest(BaseModel):
+    """扫描请求"""
+    folder_path: str = Field(..., description="要扫描的文件夹路径")
+    recursive: bool = Field(default=True, description="是否递归扫描子文件夹")
+
+
+class SearchRequest(BaseModel):
+    """语义搜索请求"""
+    query: str = Field(..., description="搜索查询文本")
+    top_k: int = Field(default=20, ge=1, le=100, description="返回结果数量")
+    threshold: float = Field(default=0.15, ge=0.0, le=1.0, description="相似度阈值")
+
+
+class IndexRequest(BaseModel):
+    """索引请求"""
+    folder_path: str = Field(..., description="要索引的文件夹路径")
+    recursive: bool = Field(default=True, description="是否递归扫描")
+
+
+# ==================== 响应模型 ====================
+
+class AudioFile(BaseModel):
+    """音频文件元数据"""
+    path: str = Field(..., description="文件完整路径")
+    filename: str = Field(..., description="文件名")
+    duration: float = Field(..., description="时长（秒）")
+    sample_rate: int = Field(..., description="采样率")
+    channels: int = Field(..., description="声道数")
+    format: str = Field(..., description="音频格式")
+    size: int = Field(..., description="文件大小（字节）")
+
+
+class SearchResult(BaseModel):
+    """搜索结果"""
+    audio_file: AudioFile
+    score: float = Field(..., description="相似度分数")
+    distance: float = Field(..., description="距离（越低越相似）")
+
+
+class ScanResponse(BaseModel):
+    """扫描响应"""
+    total: int = Field(..., description="扫描到的音频文件总数")
+    files: List[AudioFile] = Field(..., description="音频文件列表")
+
+
+class SearchResponse(BaseModel):
+    """搜索响应"""
+    query: str = Field(..., description="搜索查询")
+    total: int = Field(..., description="结果总数")
+    results: List[SearchResult] = Field(..., description="搜索结果列表")
+
+
+class IndexResponse(BaseModel):
+    """索引响应"""
+    indexed: int = Field(..., description="已索引的文件数")
+    skipped: int = Field(..., description="跳过的文件数")
+    duration: float = Field(..., description="耗时（秒）")
+
+
+class HealthResponse(BaseModel):
+    """健康检查响应"""
+    status: str = Field(..., description="服务状态")
+    version: str = Field(..., description="版本号")
+    device: str = Field(..., description="当前设备")
+
+
+class ErrorResponse(BaseModel):
+    """错误响应"""
+    error: str = Field(..., description="错误信息")
+    detail: Optional[str] = Field(None, description="详细错误信息")
+
+
+# ==================== 状态模型 ====================
+
+class IndexStatus(BaseModel):
+    """索引状态"""
+    total_files: int = Field(default=0, description="总文件数")
+    indexed_files: int = Field(default=0, description="已索引文件数")
+    last_update: Optional[str] = Field(None, description="最后更新时间")
