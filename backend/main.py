@@ -212,6 +212,81 @@ async def search_audio(request: schemas.SearchRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ==================== 音频波形 ====================
+
+@app.get("/api/waveform")
+async def get_waveform(path: str = Query(..., description="音频文件路径")):
+    """
+    获取音频波形数据
+    
+    将原始波形降采样到 2000 个峰值点，用于前端波形显示
+    
+    返回格式：
+    {
+        "peaks": [0.1, 0.4, -0.3, ...],  # 降采样后的峰值数组
+        "duration": 12.4,                  # 时长（秒）
+        "sample_rate": 48000,               # 采样率
+        "channels": 2                       # 声道数
+    }
+    """
+    import urllib.parse
+    import librosa
+    import numpy as np
+    
+    # 解码 URL 编码的路径
+    file_path = urllib.parse.unquote(path)
+    
+    audio_file = Path(file_path)
+    
+    if not audio_file.exists():
+        raise HTTPException(status_code=404, detail=f"文件不存在: {file_path}")
+    
+    if not audio_file.is_file():
+        raise HTTPException(status_code=400, detail=f"不是有效文件: {file_path}")
+    
+    try:
+        # 加载音频
+        y, sr = librosa.load(str(audio_file), sr=None, mono=False)
+        
+        # 获取基本信息
+        duration = librosa.get_duration(y=y, sr=sr)
+        channels = 1 if y.ndim == 1 else y.shape[0]
+        
+        # 转换为单声道进行波形处理
+        y_mono = librosa.to_mono(y)
+        
+        # 降采样到 2000 个点
+        target_points = 2000
+        samples_per_point = len(y_mono) // target_points
+        
+        if samples_per_point > 0:
+            # 计算每个区间的峰值（绝对值最大）
+            peaks = []
+            for i in range(target_points):
+                start = i * samples_per_point
+                end = min((i + 1) * samples_per_point, len(y_mono))
+                segment = y_mono[start:end]
+                if len(segment) > 0:
+                    peak = np.max(np.abs(segment))
+                    peaks.append(float(peak))
+                else:
+                    peaks.append(0.0)
+        else:
+            # 如果音频太短，直接返回全部数据
+            peaks = y_mono.tolist()[:target_points]
+        
+        return {
+            "peaks": peaks,
+            "duration": duration,
+            "sample_rate": sr,
+            "channels": channels
+        }
+        
+    except Exception as e:
+        logger.error(f"获取波形失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ==================== 音频文件服务 ====================
 
 @app.get("/api/v1/audio/{file_path:path}")
