@@ -2164,10 +2164,11 @@
             document.getElementById('mainWaveform').addEventListener('click', (e) => {
                 if (!currentSound) return;
                 const canvas = document.getElementById('mainWaveform');
+                const waveContainer = document.getElementById('waveformContainer');
                 const rect = canvas.getBoundingClientRect();
 
-                // 使用 rect.width（显示尺寸）
-                const canvasWidth = rect.width;
+                // 使用 waveContainer.offsetWidth（与绘制函数一致）
+                const canvasWidth = waveContainer.offsetWidth;
                 
                 // 计算考虑缩放和滚动后的实际点击位置
                 const clickX = e.clientX - rect.left;
@@ -2200,7 +2201,9 @@
                 if (e.altKey) {
                     e.preventDefault();
                     isSelecting = true;
+                    const waveContainer = document.getElementById('waveformContainer');
                     const rect = waveformCanvas.getBoundingClientRect();
+                    const canvasWidth = waveContainer.offsetWidth;
                     selectionStartX = e.clientX - rect.left + waveformScrollOffset;
                     selectionStart = null;
                     selectionEnd = null;
@@ -2321,14 +2324,14 @@
                 e.preventDefault();
 
                 const canvas = document.getElementById('mainWaveform');
-                const container = document.getElementById('waveformContainer');
-                const rect = canvas.getBoundingClientRect();
+                const waveContainer = document.getElementById('waveformContainer');
                 
-                // 使用 rect.width（显示尺寸）来计算鼠标位置
-                const canvasWidth = rect.width;
+                // 使用 waveContainer.offsetWidth（与绘制函数一致）
+                const canvasWidth = waveContainer.offsetWidth;
 
-                // 获取鼠标在画布上的相对位置 (0-1)
-                const mouseX = e.clientX - rect.left;
+                // 获取鼠标相对于容器的位置
+                const containerRect = waveContainer.getBoundingClientRect();
+                const mouseX = e.clientX - containerRect.left;
                 const mouseProgress = Math.max(0, Math.min(1, mouseX / canvasWidth));
 
                 // 保存缩放前的状态
@@ -2351,7 +2354,8 @@
                 const newTotalWidth = canvasWidth * newZoom;
                 const maxScroll = Math.max(0, newTotalWidth - canvasWidth);
 
-                // 缩放后，鼠标在该绝对位置应该对应到画布上的同一相对位置
+                // 缩放后，保持鼠标下的波形位置不变
+                // 新的 scrollOffset = 鼠标绝对位置 - 鼠标在画布上的位置
                 let newScrollOffset = mouseAbsPos - (mouseProgress * canvasWidth);
 
                 // 限制滚动范围
