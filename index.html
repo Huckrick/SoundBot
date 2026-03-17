@@ -2318,33 +2318,37 @@
                 const container = document.getElementById('waveformContainer');
                 const rect = canvas.getBoundingClientRect();
 
-                // 获取鼠标在波形上的相对位置 (0-1)
+                // 获取鼠标在画布上的相对位置 (0-1)
                 const mouseX = e.clientX - rect.left;
                 const mouseProgress = Math.max(0, Math.min(1, mouseX / canvas.width));
 
+                // 保存缩放前的状态
+                const oldZoom = waveformZoomLevel;
+                const oldTotalWidth = canvas.width * oldZoom;
+
                 // 计算缩放
                 const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-                const oldZoom = waveformZoomLevel;
-                waveformZoomLevel = Math.max(WAVEFORM_MIN_ZOOM, Math.min(WAVEFORM_MAX_ZOOM, waveformZoomLevel * zoomFactor));
+                const newZoom = Math.max(WAVEFORM_MIN_ZOOM, Math.min(WAVEFORM_MAX_ZOOM, oldZoom * zoomFactor));
 
                 // 如果缩放比例变化很小，跳过重绘
-                if (Math.abs(waveformZoomLevel - oldZoom) < 0.001) return;
+                if (Math.abs(newZoom - oldZoom) < 0.001) return;
 
-                // 计算缩放后保持鼠标位置不变
-                const totalWidth = canvas.width * waveformZoomLevel;
-                const maxScroll = Math.max(0, totalWidth - canvas.width);
+                waveformZoomLevel = newZoom;
 
-                // 鼠标相对于波形左端的绝对位置
-                const mouseAbsPos = (mouseProgress * canvas.width) + waveformScrollOffset;
+                // 计算缩放后波形的总宽度
+                const newTotalWidth = canvas.width * newZoom;
+                const maxScroll = Math.max(0, newTotalWidth - canvas.width);
 
-                // 缩放后的新绝对位置
-                const newMouseAbsPos = mouseAbsPos;
+                // 计算鼠标在缩放前波形上的绝对位置
+                // 使用缩放前波形的总宽度来计算
+                const mouseAbsPos = (mouseProgress * oldTotalWidth) + waveformScrollOffset;
 
-                // 重新计算滚动偏移，使鼠标位置保持不变
-                waveformScrollOffset = newMouseAbsPos - (mouseProgress * canvas.width);
+                // 缩放后，鼠标在该绝对位置应该对应到新的相对位置
+                // 新的滚动偏移 = 鼠标绝对位置 - 鼠标在画布上的新位置
+                let newScrollOffset = mouseAbsPos - (mouseProgress * canvas.width);
 
                 // 限制滚动范围
-                waveformScrollOffset = Math.max(0, Math.min(maxScroll, waveformScrollOffset));
+                waveformScrollOffset = Math.max(0, Math.min(maxScroll, newScrollOffset));
 
                 // 更新缩放显示
                 updateZoomDisplay();
