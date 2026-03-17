@@ -243,6 +243,31 @@
         <div class="h-10 flex items-center justify-between px-4 border-b shrink-0" style="border-color: var(--border-color);">
             <div class="flex items-center gap-4">
                 <span id="waveformFileName" class="text-sm font-medium truncate max-w-md"></span>
+                <!-- 缩放控制 -->
+                <div class="flex items-center gap-1" id="zoomControls">
+                    <button id="zoomOutBtn" class="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors" title="缩小">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="8" y1="11" x2="14" y2="11"></line>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                    </button>
+                    <span id="zoomLevelDisplay" class="text-xs min-w-12 text-center">100%</span>
+                    <button id="zoomInBtn" class="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors" title="放大">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="11" y1="8" x2="11" y2="14"></line>
+                            <line x1="8" y1="11" x2="14" y2="11"></line>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                    </button>
+                    <button id="zoomResetBtn" class="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors ml-1" title="重置缩放">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                            <path d="M3 3v5h5"></path>
+                        </svg>
+                    </button>
+                </div>
             </div>
             <div class="flex items-center gap-4 font-mono text-xs opacity-70">
                 <!-- 采样率显示 -->
@@ -256,6 +281,9 @@
                 <!-- 选区信息 -->
                 <span id="selectionInfo" class="hidden">
                     选区: <span id="selectionStart">0.00</span>s - <span id="selectionEnd">0.00</span>s
+                    <button id="exportSelectionBtn" class="ml-2 px-2 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors">
+                        导出WAV
+                    </button>
                 </span>
             </div>
         </div>
@@ -372,6 +400,20 @@
         let currentVolume = 80;
         let isMuted = false;
         let activeCategory = 'tag-all';
+
+        // ==================== WAVEFORM ZOOM STATE ====================
+        let waveformZoomLevel = 1.0;           // 当前缩放级别 (1.0 = 100%)
+        let waveformScrollOffset = 0;          // 水平滚动偏移量
+        let isDraggingTimeline = false;        // 是否正在拖动时间条
+        let selectionStart = null;              // 选区起始时间 (秒)
+        let selectionEnd = null;                // 选区结束时间 (秒)
+        let isSelecting = false;                // 是否正在框选
+        let selectionStartX = 0;                 // 选区起始X坐标
+
+        const WAVEFORM_MIN_ZOOM = 1.0;
+        const WAVEFORM_MAX_ZOOM = 50.0;
+        const WAVEFORM_ZOOM_FACTOR = 1.1;       // 滚轮缩放因子
+        const ZOOM_BUTTON_FACTOR = 1.5;         // 按钮缩放因子
         
         // ==================== NOTIFICATIONS ====================
         function showNotification(message, type = 'info') {
@@ -1516,6 +1558,15 @@
             }
         }
 
+        // ==================== 缩放显示更新 ====================
+        function updateZoomDisplay() {
+            const zoomDisplay = document.getElementById('zoomLevelDisplay');
+            if (zoomDisplay) {
+                const percent = Math.round(waveformZoomLevel * 100);
+                zoomDisplay.textContent = `${percent}%`;
+            }
+        }
+
         // ==================== WAVEFORM DATA ====================
         let audioContext = null;
         
@@ -1589,9 +1640,9 @@
                 
                 const progress = playbackProgress / currentSound.duration;
                 const waveformData = currentSound.waveform || null;
-                
-                // 绘制细腻波形
-                drawBarWaveform(ctx, width, height, waveformData, textColor, secondaryColor, progress);
+
+                // 绘制细腻波形（传入缩放和滚动参数）
+                drawBarWaveform(ctx, width, height, waveformData, textColor, secondaryColor, progress, waveformZoomLevel, waveformScrollOffset);
             }
             
             if (emptyState) emptyState.classList.add('hidden');
@@ -1599,13 +1650,121 @@
 
         // 绘制装饰性波形（空状态）
         // 绘制细腻线条波形（类似专业音频编辑器）
-        function drawBarWaveform(ctx, width, height, waveformData, activeColor, inactiveColor, progress) {
+        function drawBarWaveform(ctx, width, height, waveformData, activeColor, inactiveColor, progress, zoomLevel = 1.0, scrollOffset = 0) {
             const centerY = height / 2;
             const maxAmplitude = height * 0.85;
             
+            // 实际绘制宽度 = 画布宽度 * 缩放级别
+            const actualWidth = width * zoomLevel;
+            
             // 使用 /api/waveform 返回的 2000 点或默认采样数
             const samples = (waveformData && waveformData.length) ? waveformData.length : 400;
-            const step = width / samples;
+            const step = actualWidth / samples;
+            
+            // 设置剪裁区域，只绘制可见部分
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, 0, width, height);
+            ctx.clip();
+            
+            // 绘制选区高亮背景（需要在波形之前绘制）
+            // 注意：需要考虑缩放级别，计算实际的绘制宽度
+            if (selectionStart !== null && selectionEnd !== null && currentSound) {
+                // 实际绘制宽度 = 画布宽度 * 缩放级别
+                const actualWidth = width * waveformZoomLevel;
+                const selStartX = (selectionStart / currentSound.duration) * actualWidth;
+                const selEndX = (selectionEnd / currentSound.duration) * actualWidth;
+                
+                // 计算可见区域的起始位置（考虑滚动偏移）
+                const visibleStart = waveformScrollOffset;
+                const visibleEnd = visibleStart + width;
+                
+                // 计算选区在可见区域的交集
+                const drawStart = Math.max(selStartX, visibleStart);
+                const drawEnd = Math.min(selEndX, visibleEnd);
+                
+                if (drawEnd > drawStart) {
+                    // 选区在可见区域内，调整到画布坐标
+                    const canvasDrawStart = drawStart - visibleStart;
+                    const canvasDrawEnd = drawEnd - visibleStart;
+                    const drawWidth = canvasDrawEnd - canvasDrawStart;
+                    
+                    // 选区半透明背景
+                    ctx.globalAlpha = 0.2;
+                    ctx.fillStyle = '#3b82f6'; // 蓝色选区
+                    ctx.fillRect(canvasDrawStart, 0, drawWidth, height);
+                    
+                    // 选区边框
+                    ctx.globalAlpha = 0.8;
+                    ctx.strokeStyle = '#3b82f6';
+                    ctx.lineWidth = 2;
+                    
+                    // 左边界（如果在可见区域内）
+                    if (selStartX >= visibleStart && selStartX <= visibleEnd) {
+                        ctx.beginPath();
+                        ctx.moveTo(canvasDrawStart, 0);
+                        ctx.lineTo(canvasDrawStart, height);
+                        ctx.stroke();
+                    }
+                    
+                    // 右边界（如果在可见区域内）
+                    if (selEndX >= visibleStart && selEndX <= visibleEnd) {
+                        ctx.beginPath();
+                        ctx.moveTo(canvasDrawStart + drawWidth, 0);
+                        ctx.lineTo(canvasDrawStart + drawWidth, height);
+                        ctx.stroke();
+                    }
+                    
+                    // 绘制选区手柄（开始和结束标记）
+                    ctx.fillStyle = '#3b82f6';
+                    ctx.globalAlpha = 1;
+                    
+                    // 开始手柄
+                    if (selStartX >= visibleStart && selStartX <= visibleEnd) {
+                        const handleX = selStartX - visibleStart;
+                        ctx.beginPath();
+                        ctx.moveTo(handleX, 0);
+                        ctx.lineTo(handleX + 6, 0);
+                        ctx.lineTo(handleX, 8);
+                        ctx.closePath();
+                        ctx.fill();
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(handleX, height);
+                        ctx.lineTo(handleX + 6, height);
+                        ctx.lineTo(handleX, height - 8);
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                    
+                    // 结束手柄
+                    if (selEndX >= visibleStart && selEndX <= visibleEnd) {
+                        const handleX = selEndX - visibleStart;
+                        ctx.beginPath();
+                        ctx.moveTo(handleX, 0);
+                        ctx.lineTo(handleX - 6, 0);
+                        ctx.lineTo(handleX, 8);
+                        ctx.closePath();
+                        ctx.fill();
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(handleX, height);
+                        ctx.lineTo(handleX - 6, height);
+                        ctx.lineTo(handleX, height - 8);
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                }
+            }
+            
+            // 设置剪裁区域，只绘制可见部分
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, 0, width, height);
+            ctx.clip();
+            
+            // 应用滚动偏移（向左移动画布以显示正确位置）
+            ctx.translate(-scrollOffset, 0);
             
             // 未播放部分
             ctx.globalAlpha = 0.25;
@@ -1627,7 +1786,7 @@
                 const y = centerY - amplitude * maxAmplitude * 0.5;
                 ctx.lineTo(i * step, y);
             }
-            ctx.lineTo(width, centerY);
+            ctx.lineTo(actualWidth, centerY);
             ctx.closePath();
             ctx.fill();
             
@@ -1644,12 +1803,12 @@
                 const y = centerY + amplitude * maxAmplitude * 0.5;
                 ctx.lineTo(i * step, y);
             }
-            ctx.lineTo(width, centerY);
+            ctx.lineTo(actualWidth, centerY);
             ctx.closePath();
             ctx.fill();
             
             // 播放进度部分 - 使用更亮的颜色和中心线
-            const progressX = progress * width;
+            const progressX = progress * actualWidth;
             
             // 中心线
             ctx.globalAlpha = 0.4;
@@ -1723,6 +1882,9 @@
                 ctx.arc(progressX, centerY, 1.5, 0, Math.PI * 2);
                 ctx.fill();
             }
+            
+            // 恢复上下文状态（取消剪裁和变换）
+            ctx.restore();
         }
 
         // ==================== CHAT ====================
@@ -1815,6 +1977,36 @@
             renderSoundList();
             drawMainWaveform();
             lucide.createIcons();
+            
+            // 导出选区按钮点击事件
+            document.getElementById('exportSelectionBtn').addEventListener('click', async () => {
+                if (!currentSound || selectionStart === null || selectionEnd === null) return;
+                
+                try {
+                    showNotification('正在导出选区...', 'info');
+                    
+                    const response = await fetch('/api/export/clip', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            path: currentSound.path || currentSound.filePath,
+                            start: selectionStart,
+                            end: selectionEnd
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        showNotification('导出成功: ' + result.output_path, 'success');
+                    } else {
+                        showNotification('导出失败: ' + result.message, 'error');
+                    }
+                } catch (error) {
+                    console.error('导出失败:', error);
+                    showNotification('导出失败: ' + error.message, 'error');
+                }
+            });
             
             // Settings
             document.getElementById('settingsBtn').addEventListener('click', (e) => {
@@ -1973,7 +2165,14 @@
                 if (!currentSound) return;
                 const canvas = document.getElementById('mainWaveform');
                 const rect = canvas.getBoundingClientRect();
-                const progress = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+
+                // 计算考虑缩放和滚动后的实际点击位置
+                let clickX = e.clientX - rect.left;
+                const totalWidth = canvas.width * waveformZoomLevel;
+                const scrollRatio = waveformScrollOffset / (totalWidth - canvas.width || 1);
+                const adjustedX = clickX + scrollRatio * (totalWidth - canvas.width);
+
+                const progress = Math.max(0, Math.min(1, adjustedX / canvas.width));
                 if (audioPlayer && audioPlayer.duration) {
                     audioPlayer.currentTime = progress * audioPlayer.duration;
                     playbackProgress = Math.round(audioPlayer.currentTime * 1000);
@@ -1983,7 +2182,268 @@
                 updatePlaybackUI();
                 drawMainWaveform();
             });
-            
+
+            // ==================== 区域选择功能 ====================
+            const waveformCanvas = document.getElementById('mainWaveform');
+
+            // 开始框选 (Alt+点击 或 专门的选择模式)
+            waveformCanvas.addEventListener('mousedown', (e) => {
+                if (!currentSound) return;
+
+                // Alt+点击 开始框选
+                if (e.altKey) {
+                    e.preventDefault();
+                    isSelecting = true;
+                    const rect = waveformCanvas.getBoundingClientRect();
+                    selectionStartX = e.clientX - rect.left + waveformScrollOffset;
+                    selectionStart = null;
+                    selectionEnd = null;
+                    // 清除之前的选区
+                    updateSelectionInfo(null, null);
+                    return;
+                }
+            });
+
+            waveformCanvas.addEventListener('mousemove', (e) => {
+                if (!isSelecting || !currentSound) return;
+
+                const rect = waveformCanvas.getBoundingClientRect();
+                const currentX = e.clientX - rect.left + waveformScrollOffset;
+                const startX = Math.min(selectionStartX, currentX);
+                const endX = Math.max(selectionStartX, currentX);
+
+                // 转换为时间
+                const startProgress = startX / (waveformCanvas.width * waveformZoomLevel);
+                const endProgress = endX / (waveformCanvas.width * waveformZoomLevel);
+
+                selectionStart = Math.max(0, startProgress * currentSound.duration);
+                selectionEnd = Math.min(currentSound.duration, endProgress * currentSound.duration);
+
+                // 实时更新显示
+                updateSelectionInfo(selectionStart, selectionEnd);
+                requestAnimationFrame(() => drawMainWaveform());
+            });
+
+            waveformCanvas.addEventListener('mouseup', (e) => {
+                if (isSelecting && currentSound) {
+                    isSelecting = false;
+
+                    // 如果选区太小，视为无效选择
+                    if (selectionEnd - selectionStart < 0.1) {
+                        selectionStart = null;
+                        selectionEnd = null;
+                        updateSelectionInfo(null, null);
+                    }
+                    requestAnimationFrame(() => drawMainWaveform());
+                }
+            });
+
+            // 鼠标离开时结束框选
+            waveformCanvas.addEventListener('mouseleave', () => {
+                if (isSelecting) {
+                    isSelecting = false;
+                    if (selectionEnd - selectionStart < 0.1) {
+                        selectionStart = null;
+                        selectionEnd = null;
+                        updateSelectionInfo(null, null);
+                    }
+                    requestAnimationFrame(() => drawMainWaveform());
+                }
+            });
+
+            // 选区信息更新函数
+            function updateSelectionInfo(start, end) {
+                const selectionInfoEl = document.getElementById('selectionInfo');
+                const selectionStartEl = document.getElementById('selectionStart');
+                const selectionEndEl = document.getElementById('selectionEnd');
+                const exportBtn = document.getElementById('exportSelectionBtn');
+
+                if (start !== null && end !== null && start < end) {
+                    if (selectionInfoEl) selectionInfoEl.classList.remove('hidden');
+                    if (selectionStartEl) selectionStartEl.textContent = start.toFixed(2);
+                    if (selectionEndEl) selectionEndEl.textContent = end.toFixed(2);
+                    if (exportBtn) exportBtn.classList.remove('hidden');
+                    
+                    // 更新 canvas 的 draggable 状态
+                    waveformCanvas.draggable = true;
+                } else {
+                    if (selectionInfoEl) selectionInfoEl.classList.add('hidden');
+                    if (exportBtn) exportBtn.classList.add('hidden');
+                    waveformCanvas.draggable = false;
+                }
+            }
+
+            // ==================== 拖出导出功能 ====================
+            let isDraggingSelection = false;
+            let dragStartX = 0;
+
+            waveformCanvas.addEventListener('dragstart', (e) => {
+                if (!currentSound || selectionStart === null || selectionEnd === null) {
+                    e.preventDefault();
+                    return;
+                }
+                
+                // 检查拖拽起始位置是否在选区内
+                const rect = waveformCanvas.getBoundingClientRect();
+                const dragX = e.clientX - rect.left + waveformScrollOffset;
+                const selStartX = (selectionStart / currentSound.duration) * (waveformCanvas.width * waveformZoomLevel);
+                const selEndX = (selectionEnd / currentSound.duration) * (waveformCanvas.width * waveformZoomLevel);
+                
+                if (dragX >= selStartX && dragX <= selEndX) {
+                    isDraggingSelection = true;
+                    e.dataTransfer.setData('application/json', JSON.stringify({
+                        path: currentSound.path || currentSound.filePath,
+                        start: selectionStart,
+                        end: selectionEnd
+                    }));
+                    e.dataTransfer.effectAllowed = 'copy';
+                    
+                    // 设置拖拽时的自定义图标（可选）
+                    e.dataTransfer.setDragImage(waveformCanvas, e.offsetX, e.offsetY);
+                } else {
+                    e.preventDefault();
+                }
+            });
+
+            waveformCanvas.addEventListener('dragend', (e) => {
+                isDraggingSelection = false;
+            });
+
+            // ==================== 波形滚轮缩放 ====================
+            document.getElementById('waveformContainer').addEventListener('wheel', (e) => {
+                if (!currentSound) return;
+                e.preventDefault();
+
+                const canvas = document.getElementById('mainWaveform');
+                const container = document.getElementById('waveformContainer');
+                const rect = canvas.getBoundingClientRect();
+
+                // 获取鼠标在波形上的相对位置 (0-1)
+                const mouseX = e.clientX - rect.left;
+                const mouseProgress = Math.max(0, Math.min(1, mouseX / canvas.width));
+
+                // 计算缩放
+                const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+                const oldZoom = waveformZoomLevel;
+                waveformZoomLevel = Math.max(WAVEFORM_MIN_ZOOM, Math.min(WAVEFORM_MAX_ZOOM, waveformZoomLevel * zoomFactor));
+
+                // 如果缩放比例变化很小，跳过重绘
+                if (Math.abs(waveformZoomLevel - oldZoom) < 0.001) return;
+
+                // 计算缩放后保持鼠标位置不变
+                const totalWidth = canvas.width * waveformZoomLevel;
+                const maxScroll = Math.max(0, totalWidth - canvas.width);
+
+                // 鼠标相对于波形左端的绝对位置
+                const mouseAbsPos = (mouseProgress * canvas.width) + waveformScrollOffset;
+
+                // 缩放后的新绝对位置
+                const newMouseAbsPos = mouseAbsPos;
+
+                // 重新计算滚动偏移，使鼠标位置保持不变
+                waveformScrollOffset = newMouseAbsPos - (mouseProgress * canvas.width);
+
+                // 限制滚动范围
+                waveformScrollOffset = Math.max(0, Math.min(maxScroll, waveformScrollOffset));
+
+                // 更新缩放显示
+                updateZoomDisplay();
+
+                // 使用 requestAnimationFrame 进行平滑重绘
+                requestAnimationFrame(() => {
+                    drawMainWaveform();
+                });
+            }, { passive: false });
+
+            // ==================== 波形拖动/滚动功能 ====================
+            let isDraggingWaveform = false;
+            let lastDragX = 0;
+
+            document.getElementById('waveformContainer').addEventListener('mousedown', (e) => {
+                // Shift+拖动 或 中键拖动 来滚动波形
+                if (e.shiftKey || e.button === 1) {
+                    e.preventDefault();
+                    isDraggingWaveform = true;
+                    lastDragX = e.clientX;
+                    document.body.style.cursor = 'grabbing';
+                }
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (isDraggingWaveform && currentSound) {
+                    const deltaX = lastDragX - e.clientX;
+                    lastDragX = e.clientX;
+
+                    const canvas = document.getElementById('mainWaveform');
+                    const totalWidth = canvas.width * waveformZoomLevel;
+                    const maxScroll = Math.max(0, totalWidth - canvas.width);
+
+                    waveformScrollOffset = Math.max(0, Math.min(maxScroll, waveformScrollOffset + deltaX));
+                    requestAnimationFrame(() => drawMainWaveform());
+                }
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isDraggingWaveform) {
+                    isDraggingWaveform = false;
+                    document.body.style.cursor = '';
+                }
+            });
+
+            // 鼠标离开容器时停止拖动
+            document.getElementById('waveformContainer').addEventListener('mouseleave', () => {
+                if (isDraggingWaveform) {
+                    isDraggingWaveform = false;
+                    document.body.style.cursor = '';
+                }
+            });
+
+            // ==================== 缩放按钮事件 ====================
+            document.getElementById('zoomInBtn').addEventListener('click', () => {
+                if (!currentSound) return;
+                const canvas = document.getElementById('mainWaveform');
+                const oldZoom = waveformZoomLevel;
+                waveformZoomLevel = Math.min(WAVEFORM_MAX_ZOOM, waveformZoomLevel * ZOOM_BUTTON_FACTOR);
+
+                if (waveformZoomLevel !== oldZoom) {
+                    // 以波形中心为基准缩放
+                    const totalWidth = canvas.width * waveformZoomLevel;
+                    const maxScroll = Math.max(0, totalWidth - canvas.width);
+                    const centerOffset = canvas.width / 2 + waveformScrollOffset;
+                    waveformScrollOffset = (centerOffset * (waveformZoomLevel / oldZoom)) - canvas.width / 2;
+                    waveformScrollOffset = Math.max(0, Math.min(maxScroll, waveformScrollOffset));
+
+                    updateZoomDisplay();
+                    requestAnimationFrame(() => drawMainWaveform());
+                }
+            });
+
+            document.getElementById('zoomOutBtn').addEventListener('click', () => {
+                if (!currentSound) return;
+                const canvas = document.getElementById('mainWaveform');
+                const oldZoom = waveformZoomLevel;
+                waveformZoomLevel = Math.max(WAVEFORM_MIN_ZOOM, waveformZoomLevel / ZOOM_BUTTON_FACTOR);
+
+                if (waveformZoomLevel !== oldZoom) {
+                    const totalWidth = canvas.width * waveformZoomLevel;
+                    const maxScroll = Math.max(0, totalWidth - canvas.width);
+                    const centerOffset = canvas.width / 2 + waveformScrollOffset;
+                    waveformScrollOffset = (centerOffset * (waveformZoomLevel / oldZoom)) - canvas.width / 2;
+                    waveformScrollOffset = Math.max(0, Math.min(maxScroll, waveformScrollOffset));
+
+                    updateZoomDisplay();
+                    requestAnimationFrame(() => drawMainWaveform());
+                }
+            });
+
+            document.getElementById('zoomResetBtn').addEventListener('click', () => {
+                if (!currentSound) return;
+                waveformZoomLevel = 1.0;
+                waveformScrollOffset = 0;
+                updateZoomDisplay();
+                requestAnimationFrame(() => drawMainWaveform());
+            });
+
             // Volume
             const volumeSlider = document.getElementById('volumeSlider');
             volumeSlider.addEventListener('input', (e) => {
