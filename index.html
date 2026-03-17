@@ -263,14 +263,17 @@
         </div>
         
         <!-- 波形容器 -->
-        <div class="flex-1 relative" id="waveformContainer">
+        <div class="flex-1 relative min-h-0" id="waveformContainer">
             <!-- 空状态提示 -->
             <div id="waveformEmptyState" class="absolute inset-0 flex items-center justify-center z-10">
                 <span class="text-sm opacity-40" style="color: var(--text-secondary);">请导入或选择一个音频文件</span>
             </div>
             
-            <!-- WaveSurfer 容器 -->
-            <div id="waveform" class="w-full h-full hidden"></div>
+            <!-- Canvas 波形（主显示，使用 /api/waveform 真实数据） -->
+            <canvas id="mainWaveform" class="absolute inset-0 w-full h-full waveform-canvas hidden"></canvas>
+            
+            <!-- WaveSurfer 容器（可选，仅在其加载成功时显示） -->
+            <div id="waveform" class="absolute inset-0 w-full h-full hidden"></div>
         </div>
     </div>
     
@@ -1147,10 +1150,7 @@
             playbackProgress = 0;
             updatePlaybackUI();
             
-            // 加载音频到 WaveSurfer
-            loadAudioToWaveSurfer(sound);
-            
-            // 同时也加载波形数据（备用）
+            // 只使用 Canvas 波形 + /api/waveform 数据，避免 WaveSurfer 内部错误导致黑屏
             loadWaveformForSound(sound);
             
             renderSoundList(document.getElementById('searchInput').value);
@@ -1243,16 +1243,6 @@
             
             if (!playIcon || !pauseIcon || !currentTimeEl || !durationTimeEl || !progressBar) return;
             
-            // 从 WaveSurfer 获取当前时间
-            if (wavesurfer && wavesurfer.isReady) {
-                const currentTime = wavesurfer.getCurrentTime();
-                const duration = wavesurfer.getDuration();
-                if (duration > 0) {
-                    playbackProgress = currentTime * 1000;
-                    currentSound.duration = duration * 1000;
-                }
-            }
-            
             if (isPlaying) {
                 playIcon.classList.add('hidden');
                 pauseIcon.classList.remove('hidden');
@@ -1319,6 +1309,7 @@
         function drawMainWaveform() {
             const canvas = document.getElementById('mainWaveform');
             const emptyState = document.getElementById('waveformEmptyState');
+            const waveContainer = document.getElementById('waveformContainer');
             
             // 没有音频时显示提示
             if (!currentSound) {
@@ -1327,14 +1318,13 @@
                 return;
             }
             
-            // 有音频时显示波形
-            if (canvas) {
+            // 有音频时显示 Canvas 波形
+            if (canvas && waveContainer) {
                 canvas.classList.remove('hidden');
                 const ctx = canvas.getContext('2d');
                 
-                const container = canvas.parentElement;
-                const width = canvas.width = container.offsetWidth || 1200;
-                const height = canvas.height = container.offsetHeight || 96;
+                const width = canvas.width = waveContainer.offsetWidth || 1200;
+                const height = canvas.height = waveContainer.offsetHeight || 120;
                 
                 // 填充背景色
                 const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--bg-secondary').trim() || '#141414';
@@ -1361,8 +1351,8 @@
             const centerY = height / 2;
             const maxAmplitude = height * 0.85;
             
-            // 采样点数 - 更多采样点实现更细腻效果
-            const samples = Math.min(400, Math.floor(width / 2));
+            // 使用 /api/waveform 返回的 2000 点或默认采样数
+            const samples = (waveformData && waveformData.length) ? waveformData.length : 400;
             const step = width / samples;
             
             // 未播放部分
@@ -1672,33 +1662,20 @@
                 renderSoundList(document.getElementById('searchInput').value);
             });
             
-            // Playback Controls - 使用 WaveSurfer
-            document.getElementById('playPauseBtn').addEventListener('click', async () => {
-                if (!wavesurfer) {
-                    if (!currentSound && soundData.length > 0) {
-                        selectSound(soundData[0]);
-                    }
-                    return;
+            // Playback Controls - 使用原生 Audio 播放，避免 WaveSurfer 报错
+            document.getElementById('playPauseBtn').addEventListener('click', () => {
+                if (!currentSound && soundData.length > 0) {
+                    selectSound(soundData[0]);
                 }
-                
-                if (wavesurfer.isPlaying()) {
-                    wavesurfer.pause();
-                    isPlaying = false;
+                if (!currentSound) return;
+                if (isPlaying) {
+                    pausePlayback();
                 } else {
-                    await wavesurfer.play();
-                    isPlaying = true;
+                    startPlayback();
                 }
-                updatePlaybackUI();
             });
             
-            document.getElementById('stopBtn').addEventListener('click', () => {
-                if (wavesurfer) {
-                    wavesurfer.stop();
-                }
-                isPlaying = false;
-                playbackProgress = 0;
-                updatePlaybackUI();
-            });
+            document.getElementById('stopBtn').addEventListener('click', stopPlayback);
             
             document.getElementById('loopBtn').addEventListener('click', () => {
                 isLooping = !isLooping;
@@ -1728,13 +1705,29 @@
                 const rect = e.currentTarget.getBoundingClientRect();
                 const progress = (e.clientX - rect.left) / rect.width;
                 
-                if (audioPlayer) {
+                if (audioPlayer && audioPlayer.duration) {
                     audioPlayer.currentTime = progress * audioPlayer.duration;
                     playbackProgress = audioPlayer.currentTime * 1000;
                 } else {
                     playbackProgress = Math.floor(progress * currentSound.duration);
                 }
                 
+                updatePlaybackUI();
+                drawMainWaveform();
+            });
+            
+            // 点击波形跳转播放位置
+            document.getElementById('mainWaveform').addEventListener('click', (e) => {
+                if (!currentSound) return;
+                const canvas = document.getElementById('mainWaveform');
+                const rect = canvas.getBoundingClientRect();
+                const progress = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                if (audioPlayer && audioPlayer.duration) {
+                    audioPlayer.currentTime = progress * audioPlayer.duration;
+                    playbackProgress = audioPlayer.currentTime * 1000;
+                } else {
+                    playbackProgress = progress * currentSound.duration;
+                }
                 updatePlaybackUI();
                 drawMainWaveform();
             });
