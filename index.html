@@ -11,10 +11,9 @@
     <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
     
-    <!-- WaveSurfer.js CDN -->
-    <script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
-    <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
-    <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/timeline.min.js"></script>
+    <!-- WaveSurfer.js CDN (v6 更稳定) -->
+    <script src="https://unpkg.com/wavesurfer.js@6/dist/wavesurfer.min.js"></script>
+    <script src="https://unpkg.com/wavesurfer.js@6/dist/plugins/wavesurfer.regions.min.js"></script>
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -431,11 +430,12 @@
         
         function initWaveSurfer() {
             const container = document.getElementById('waveform');
+            const containerParent = document.getElementById('waveformContainer');
             if (!container) return;
             
             // 检查 WaveSurfer 是否可用
             if (typeof WaveSurfer === 'undefined') {
-                console.error('WaveSurfer 未加载');
+                console.error('WaveSurfer 未加载，请检查 CDN');
                 return;
             }
             
@@ -445,8 +445,12 @@
             const progressColor = isDark ? '#e5e5e5' : '#171717';
             const cursorColor = isDark ? '#ef4444' : '#ef4444';
             
+            // 设置容器高度
+            const waveHeight = containerParent ? containerParent.clientHeight : 120;
+            container.style.height = waveHeight + 'px';
+            
             try {
-                // 初始化 WaveSurfer
+                // 初始化 WaveSurfer v6，优先使用 MediaElement 后端（更稳定）
                 wavesurfer = WaveSurfer.create({
                     container: container,
                     waveColor: waveColor,
@@ -456,14 +460,14 @@
                     barWidth: 2,
                     barGap: 1,
                     barRadius: 2,
-                    height: container.clientHeight || 120,
+                    height: waveHeight,
                     normalize: true,
-                    backend: 'WebAudio',
+                    backend: 'MediaElement', // 使用 MediaElement 更稳定
                 });
                 
-                // 初始化 Regions 插件
-                if (WaveSurfer.Regions) {
-                    wavesurferRegions = wavesurfer.registerPlugin(WaveSurfer.Regions.create());
+                // 初始化 Regions 插件 (v6)
+                if (WaveSurferRegions) {
+                    wavesurferRegions = wavesurfer.registerPlugin(WaveSurferRegions.create());
                 }
                 
                 // 监听播放位置变化
@@ -609,10 +613,8 @@
                     emptyState.classList.add('hidden');
                 }
                 
-                // 加载音频
+                // 使用 load 方法加载音频
                 console.log('[WaveSurfer] 开始加载音频...');
-                
-                // 使用 load 方法加载
                 wavesurfer.load(audioUrl);
                 
                 console.log('[WaveSurfer] 音频加载请求已发送');
