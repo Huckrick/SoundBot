@@ -433,88 +433,104 @@
             const container = document.getElementById('waveform');
             if (!container) return;
             
+            // 检查 WaveSurfer 是否可用
+            if (typeof WaveSurfer === 'undefined') {
+                console.error('WaveSurfer 未加载');
+                return;
+            }
+            
             // 获取主题颜色
             const isDark = document.documentElement.classList.contains('dark');
             const waveColor = isDark ? '#525252' : '#a3a3a3';
             const progressColor = isDark ? '#e5e5e5' : '#171717';
             const cursorColor = isDark ? '#ef4444' : '#ef4444';
             
-            // 初始化 WaveSurfer
-            wavesurfer = WaveSurfer.create({
-                container: container,
-                waveColor: waveColor,
-                progressColor: progressColor,
-                cursorColor: cursorColor,
-                cursorWidth: 2,
-                barWidth: 2,
-                barGap: 1,
-                barRadius: 2,
-                height: 'auto',
-                normalize: true,
-                backend: 'WebAudio',
-            });
-            
-            // 初始化 Regions 插件
-            wavesurferRegions = wavesurfer.registerPlugin(WaveSurfer.Regions.create());
-            
-            // 监听播放位置变化
-            wavesurfer.on('timeupdate', (currentTime) => {
-                playbackProgress = currentTime * 1000;
-                updatePlaybackUI();
-            });
-            
-            // 监听播放结束
-            wavesurfer.on('finish', () => {
-                if (!isLooping) {
-                    isPlaying = false;
-                    updatePlaybackUI();
-                } else {
-                    wavesurfer.play();
-                }
-            });
-            
-            // 监听音频加载完成
-            wavesurfer.on('ready', () => {
-                console.log('[WaveSurfer] 音频加载完成');
-                // 更新时长显示
-                if (currentSound) {
-                    currentSound.duration = wavesurfer.getDuration() * 1000;
-                    updatePlaybackUI();
-                }
-            });
-            
-            // 监听 Regions 变化
-            wavesurferRegions.on('region-created', (region) => {
-                console.log('[WaveSurfer] 选区创建:', region.start, '-', region.end);
-                updateSelectionInfo(region.start, region.end);
+            try {
+                // 初始化 WaveSurfer
+                wavesurfer = WaveSurfer.create({
+                    container: container,
+                    waveColor: waveColor,
+                    progressColor: progressColor,
+                    cursorColor: cursorColor,
+                    cursorWidth: 2,
+                    barWidth: 2,
+                    barGap: 1,
+                    barRadius: 2,
+                    height: container.clientHeight || 120,
+                    normalize: true,
+                    backend: 'WebAudio',
+                });
                 
-                // 启用裁切和淡入淡出按钮
-                document.getElementById('cropBtn').disabled = false;
-                document.getElementById('cropBtn').classList.remove('opacity-50', 'cursor-not-allowed');
-                document.getElementById('fadeBtn').disabled = false;
-                document.getElementById('fadeBtn').classList.remove('opacity-50', 'cursor-not-allowed');
+                // 初始化 Regions 插件
+                if (WaveSurfer.Regions) {
+                    wavesurferRegions = wavesurfer.registerPlugin(WaveSurfer.Regions.create());
+                }
                 
-                // 清除其他选区（只保留一个）
-                wavesurferRegions.getRegions().forEach(r => {
-                    if (r.id !== region.id) {
-                        r.remove();
+                // 监听播放位置变化
+                wavesurfer.on('timeupdate', (currentTime) => {
+                    playbackProgress = currentTime * 1000;
+                    updatePlaybackUI();
+                });
+                
+                // 监听播放结束
+                wavesurfer.on('finish', () => {
+                    if (!isLooping) {
+                        isPlaying = false;
+                        updatePlaybackUI();
+                    } else {
+                        wavesurfer.play();
                     }
                 });
-            });
-            
-            wavesurferRegions.on('region-updated', (region) => {
-                updateSelectionInfo(region.start, region.end);
-            });
-            
-            wavesurferRegions.on('region-removed', () => {
-                updateSelectionInfo(0, 0);
-                document.getElementById('cropBtn').disabled = true;
-                document.getElementById('cropBtn').classList.add('opacity-50', 'cursor-not-allowed');
-                document.getElementById('fadeBtn').disabled = true;
-                document.getElementById('fadeBtn').classList.add('opacity-50', 'cursor-not-allowed');
-            });
-            
-            console.log('[WaveSurfer] 初始化完成');
+                
+                // 监听音频加载完成
+                wavesurfer.on('ready', () => {
+                    console.log('[WaveSurfer] 音频加载完成');
+                    if (currentSound) {
+                        currentSound.duration = wavesurfer.getDuration() * 1000;
+                        updatePlaybackUI();
+                    }
+                });
+                
+                // 监听错误
+                wavesurfer.on('error', (error) => {
+                    console.error('[WaveSurfer] 错误:', error);
+                });
+                
+                // Regions 事件
+                if (wavesurferRegions) {
+                    wavesurferRegions.on('region-created', (region) => {
+                        console.log('[WaveSurfer] 选区创建:', region.start, '-', region.end);
+                        updateSelectionInfo(region.start, region.end);
+                        
+                        document.getElementById('cropBtn').disabled = false;
+                        document.getElementById('cropBtn').classList.remove('opacity-50', 'cursor-not-allowed');
+                        document.getElementById('fadeBtn').disabled = false;
+                        document.getElementById('fadeBtn').classList.remove('opacity-50', 'cursor-not-allowed');
+                        
+                        wavesurferRegions.getRegions().forEach(r => {
+                            if (r.id !== region.id) {
+                                r.remove();
+                            }
+                        });
+                    });
+                    
+                    wavesurferRegions.on('region-updated', (region) => {
+                        updateSelectionInfo(region.start, region.end);
+                    });
+                    
+                    wavesurferRegions.on('region-removed', () => {
+                        updateSelectionInfo(0, 0);
+                        document.getElementById('cropBtn').disabled = true;
+                        document.getElementById('cropBtn').classList.add('opacity-50', 'cursor-not-allowed');
+                        document.getElementById('fadeBtn').disabled = true;
+                        document.getElementById('fadeBtn').classList.add('opacity-50', 'cursor-not-allowed');
+                    });
+                }
+                
+                console.log('[WaveSurfer] 初始化完成');
+            } catch (error) {
+                console.error('[WaveSurfer] 初始化失败:', error);
+            }
         }
         
         function updateSelectionInfo(start, end) {
@@ -533,15 +549,27 @@
         
         // 加载音频到 WaveSurfer
         async function loadAudioToWaveSurfer(sound) {
-            if (!wavesurfer || !sound || !sound.filePath) return;
+            if (!wavesurfer || !sound || !sound.filePath) {
+                console.warn('[WaveSurfer] 跳过加载: 缺少参数');
+                return;
+            }
             
             try {
+                // 确保容器有高度
+                const container = document.getElementById('waveform');
+                const containerParent = document.getElementById('waveformContainer');
+                if (container && containerParent) {
+                    container.style.height = containerParent.clientHeight + 'px';
+                }
+                
                 let audioUrl;
                 
-                // 优先使用主进程 IPC 读取本地音频文件
+                // 使用 fetch 获取音频然后转换为 Blob URL
                 if (window.electronAPI && window.electronAPI.readAudioFile) {
+                    console.log('[WaveSurfer] 读取音频文件:', sound.filePath);
                     const result = await window.electronAPI.readAudioFile(sound.filePath);
-                    if (result && result.success) {
+                    
+                    if (result && result.success && result.data) {
                         const uint8Array = new Uint8Array(result.data);
                         const fileExt = sound.filePath.split('.').pop().toLowerCase();
                         const mimeTypes = {
@@ -557,29 +585,40 @@
                         const mimeType = mimeTypes[fileExt] || 'audio/wav';
                         const blob = new Blob([uint8Array], { type: mimeType });
                         audioUrl = URL.createObjectURL(blob);
+                        console.log('[WaveSurfer] Blob URL 创建成功');
+                    } else {
+                        console.warn('[WaveSurfer] 读取文件失败');
                     }
                 }
                 
                 if (!audioUrl) {
-                    // 后备方案
-                    audioUrl = 'file://' + encodeURI(sound.filePath).replace(/#/g, '%23');
+                    console.error('[WaveSurfer] 无法创建音频 URL');
+                    return;
                 }
                 
                 // 显示文件名
-                document.getElementById('waveformFileName').textContent = sound.name;
-                
-                // 加载音频
-                await wavesurfer.load(audioUrl);
+                const fileNameEl = document.getElementById('waveformFileName');
+                if (fileNameEl) fileNameEl.textContent = sound.name;
                 
                 // 显示波形区域
-                document.getElementById('waveform').classList.remove('hidden');
-                document.getElementById('waveformEmptyState').classList.add('hidden');
+                if (container) {
+                    container.classList.remove('hidden');
+                }
+                const emptyState = document.getElementById('waveformEmptyState');
+                if (emptyState) {
+                    emptyState.classList.add('hidden');
+                }
                 
-                console.log('[WaveSurfer] 音频加载成功');
+                // 加载音频
+                console.log('[WaveSurfer] 开始加载音频...');
+                
+                // 使用 load 方法加载
+                wavesurfer.load(audioUrl);
+                
+                console.log('[WaveSurfer] 音频加载请求已发送');
                 
             } catch (error) {
                 console.error('[WaveSurfer] 加载音频失败:', error);
-                showNotification('加载波形失败', 'error');
             }
         }
         
