@@ -137,7 +137,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     stopServer: () => ipcRenderer.invoke('backend-api', 'stop-server'),
 
     // 获取音频波形数据
-    getWaveform: (filePath) => ipcRenderer.invoke('backend-api', 'waveform', filePath)
+    getWaveform: (filePath) => ipcRenderer.invoke('backend-api', 'waveform', filePath),
+    
+    // 裁切音频片段
+    exportClip: (filePath, start, end) => ipcRenderer.invoke('backend-api', 'export-clip', { filePath, start, end }),
+    
+    // 音频淡入淡出
+    applyFade: (filePath, fadeIn, fadeOut) => ipcRenderer.invoke('backend-api', 'audio-fade', { filePath, fadeIn, fadeOut })
   }
 });
 

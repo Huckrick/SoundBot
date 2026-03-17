@@ -90,3 +90,36 @@ class IndexStatus(BaseModel):
     total_files: int = Field(default=0, description="总文件数")
     indexed_files: int = Field(default=0, description="已索引文件数")
     last_update: Optional[str] = Field(None, description="最后更新时间")
+
+
+# ==================== 音频处理请求模型 ====================
+
+class ClipRequest(BaseModel):
+    """裁切请求"""
+    path: str = Field(..., description="源音频文件路径")
+    start: float = Field(..., ge=0, description="裁切起始时间（秒）")
+    end: float = Field(..., gt=0, description="裁切结束时间（秒）")
+    output: Optional[str] = Field(None, description="输出文件路径，默认在原文件同目录添加 _clip 后缀")
+
+
+class FadeRequest(BaseModel):
+    """淡入淡出请求"""
+    path: str = Field(..., description="音频文件路径")
+    fade_in: float = Field(default=0, ge=0, description="淡入时长（秒）")
+    fade_out: float = Field(default=0, ge=0, description="淡出时长（秒）")
+    output: Optional[str] = Field(None, description="输出文件路径，默认在原文件同目录添加 _fade 后缀")
+
+
+class ClipResponse(BaseModel):
+    """裁切响应"""
+    success: bool = Field(..., description="是否成功")
+    output_path: Optional[str] = Field(None, description="输出文件路径")
+    duration: Optional[float] = Field(None, description="裁切后的时长")
+    message: Optional[str] = Field(None, description="消息")
+
+
+class FadeResponse(BaseModel):
+    """淡入淡出响应"""
+    success: bool = Field(..., description="是否成功")
+    output_path: Optional[str] = Field(None, description="输出文件路径")
+    message: Optional[str] = Field(None, description="消息")

@@ -426,6 +426,138 @@ async def scan_files_only(request: schemas.ScanRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ==================== 音频裁切 ====================
+
+@app.post("/api/export/clip", response_model=schemas.ClipResponse)
+async def export_clip(request: schemas.ClipRequest):
+    """
+    裁切音频片段
+    
+    - **path**: 源音频文件路径
+    - **start**: 裁切起始时间（秒）
+    - **end**: 裁切结束时间（秒）
+    - **output**: 输出文件路径（可选，默认在原文件同目录添加 _clip 后缀）
+    """
+    import soundfile as sf
+    import numpy as np
+    
+    source_file = Path(request.path)
+    
+    if not source_file.exists():
+        raise HTTPException(status_code=404, detail=f"文件不存在: {request.path}")
+    
+    if request.start >= request.end:
+        raise HTTPException(status_code=400, detail="起始时间必须小于结束时间")
+    
+    try:
+        # 读取音频
+        audio, sr = sf.read(str(source_file))
+        
+        # 计算裁切的样本位置
+        start_sample = int(request.start * sr)
+        end_sample = int(request.end * sr)
+        
+        # 边界检查
+        if start_sample >= len(audio):
+            raise HTTPException(status_code=400, detail="起始时间超出音频时长")
+        
+        end_sample = min(end_sample, len(audio))
+        
+        # 裁切
+        clipped_audio = audio[start_sample:end_sample]
+        
+        # 生成输出路径
+        if request.output:
+            output_path = Path(request.output)
+        else:
+            output_path = source_file.parent / f"{source_file.stem}_clip{source_file.suffix}"
+        
+        # 保存
+        sf.write(str(output_path), clipped_audio, sr)
+        
+        duration = len(clipped_audio) / sr
+        
+        return schemas.ClipResponse(
+            success=True,
+            output_path=str(output_path),
+            duration=duration,
+            message=f"成功裁切 {request.start:.2f}s - {request.end:.2f}s"
+        )
+        
+    except Exception as e:
+        logger.error(f"裁切失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== 音频淡入淡出 ====================
+
+@app.post("/api/audio/fade", response_model=schemas.FadeResponse)
+async def audio_fade(request: schemas.FadeRequest):
+    """
+    音频淡入淡出
+    
+    - **path**: 音频文件路径
+    - **fade_in**: 淡入时长（秒）
+    - **fade_out**: 淡出时长（秒）
+    - **output**: 输出文件路径（可选，默认在原文件同目录添加 _fade 后缀）
+    """
+    import soundfile as sf
+    import numpy as np
+    
+    source_file = Path(request.path)
+    
+    if not source_file.exists():
+        raise HTTPException(status_code=404, detail=f"文件不存在: {request.path}")
+    
+    try:
+        # 读取音频
+        audio, sr = sf.read(str(source_file))
+        duration_samples = len(audio)
+        duration_seconds = duration_samples / sr
+        
+        # 确保 fade 时间不超过音频时长
+        fade_in_samples = min(int(request.fade_in * sr), duration_samples)
+        fade_out_samples = min(int(request.fade_out * sr), duration_samples)
+        
+        # 淡入：线性增益从 0 到 1
+        if fade_in_samples > 0:
+            fade_in_curve = np.linspace(0, 1, fade_in_samples)
+            if audio.ndim == 1:
+                audio[:fade_in_samples] = audio[:fade_in_samples] * fade_in_curve
+            else:
+                for ch in range(audio.shape[1]):
+                    audio[:fade_in_samples, ch] = audio[:fade_in_samples, ch] * fade_in_curve.reshape(-1, 1)
+        
+        # 淡出：线性增益从 1 到 0
+        if fade_out_samples > 0:
+            fade_out_curve = np.linspace(1, 0, fade_out_samples)
+            start_idx = duration_samples - fade_out_samples
+            if audio.ndim == 1:
+                audio[start_idx:] = audio[start_idx:] * fade_out_curve
+            else:
+                for ch in range(audio.shape[1]):
+                    audio[start_idx:, ch] = audio[start_idx:, ch] * fade_out_curve.reshape(-1, 1)
+        
+        # 生成输出路径
+        if request.output:
+            output_path = Path(request.output)
+        else:
+            output_path = source_file.parent / f"{source_file.stem}_fade{source_file.suffix}"
+        
+        # 保存
+        sf.write(str(output_path), audio, sr)
+        
+        return schemas.FadeResponse(
+            success=True,
+            output_path=str(output_path),
+            message=f"淡入: {request.fade_in}s, 淡出: {request.fade_out}s"
+        )
+        
+    except Exception as e:
+        logger.error(f"淡入淡出处理失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ==================== 主入口 ====================
 
 if __name__ == "__main__":

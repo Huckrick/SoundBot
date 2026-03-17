@@ -337,6 +337,28 @@ function setupIpcHandlers() {
           return await response.json();
         }
 
+        case 'export-clip': {
+          // 裁切音频
+          const { filePath, start, end } = data;
+          const clipResponse = await fetch(`http://127.0.0.1:${BACKEND_PORT}/api/export/clip`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: filePath, start, end })
+          });
+          return await clipResponse.json();
+        }
+
+        case 'audio-fade': {
+          // 音频淡入淡出
+          const { filePath, fadeIn, fadeOut } = data;
+          const fadeResponse = await fetch(`http://127.0.0.1:${BACKEND_PORT}/api/audio/fade`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: filePath, fade_in: fadeIn, fade_out: fadeOut })
+          });
+          return await fadeResponse.json();
+        }
+
         default:
           return { success: false, error: '未知操作' };
       }
