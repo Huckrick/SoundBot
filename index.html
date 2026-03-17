@@ -241,45 +241,39 @@
         
         <!-- 波形工具栏 -->
         <div class="h-10 flex items-center justify-between px-4 border-b shrink-0" style="border-color: var(--border-color);">
-            <!-- 左侧：音频名称 -->
-            <div class="flex items-center gap-2 flex-1 min-w-0">
-                <span id="waveformFileName" class="text-xs opacity-70 truncate">未加载音频</span>
+            <div class="flex items-center gap-2">
+                <span id="waveformFileName" class="text-xs opacity-70 truncate max-w-xs">未加载音频</span>
             </div>
-            <!-- 中间：分类名称 -->
-            <div class="flex items-center justify-center flex-1">
-                <span id="waveformCategory" class="text-xs font-medium opacity-70 truncate max-w-xs">-</span>
-            </div>
-            <!-- 右侧：采样率/比特深度 + 缩放按钮 -->
-            <div class="flex items-center gap-3 flex-1 justify-end min-w-0">
-                <!-- 采样率和比特深度 -->
-                <span id="waveformAudioInfo" class="text-xs font-mono opacity-60 whitespace-nowrap">-</span>
-                <!-- 缩放按钮 -->
-                <div class="flex items-center gap-1">
-                    <button id="zoomOutBtn" class="w-6 h-6 rounded flex items-center justify-center transition-colors hover:bg-black/10 dark:hover:bg-white/10" title="缩小">
-                        <i data-lucide="zoom-out" class="w-3.5 h-3.5"></i>
-                    </button>
-                    <button id="zoomInBtn" class="w-6 h-6 rounded flex items-center justify-center transition-colors hover:bg-black/10 dark:hover:bg-white/10" title="放大">
-                        <i data-lucide="zoom-in" class="w-3.5 h-3.5"></i>
-                    </button>
-                </div>
+            <div class="flex items-center gap-2">
+                <!-- 选区信息 -->
+                <span id="selectionInfo" class="text-xs font-mono opacity-70 hidden">
+                    选区: <span id="selectionStart">0.00</span>s - <span id="selectionEnd">0.00</span>s
+                </span>
+                <!-- 裁切按钮 -->
+                <button id="cropBtn" class="px-2 py-1 text-xs rounded border opacity-50 cursor-not-allowed" 
+                        style="border-color: var(--border-color);" disabled title="裁切选区">
+                    <i data-lucide="scissors" class="w-3 h-3"></i>裁切
+                </button>
+                <!-- 淡入淡出按钮 -->
+                <button id="fadeBtn" class="px-2 py-1 text-xs rounded border opacity-50 cursor-not-allowed" 
+                        style="border-color: var(--border-color);" disabled title="淡入淡出">
+                    <i data-lucide="volume-1" class="w-3 h-3"></i>淡入淡出
+                </button>
             </div>
         </div>
         
-        <!-- 波形容器（带横向滚动） -->
-        <div class="flex-1 relative min-h-0 overflow-x-auto overflow-y-hidden" id="waveformContainer">
-            <!-- 内部容器用于支持缩放 -->
-            <div class="relative h-full" id="waveformInnerContainer" style="min-width: 100%;">
-                <!-- 空状态提示 -->
-                <div id="waveformEmptyState" class="absolute inset-0 flex items-center justify-center z-10">
-                    <span class="text-sm opacity-40" style="color: var(--text-secondary);">请导入或选择一个音频文件</span>
-                </div>
-                
-                <!-- Canvas 波形（主显示，使用 /api/waveform 真实数据） -->
-                <canvas id="mainWaveform" class="absolute inset-0 w-full h-full waveform-canvas hidden"></canvas>
-                
-                <!-- WaveSurfer 容器（可选，仅在其加载成功时显示） -->
-                <div id="waveform" class="absolute inset-0 w-full h-full hidden"></div>
+        <!-- 波形容器 -->
+        <div class="flex-1 relative min-h-0" id="waveformContainer">
+            <!-- 空状态提示 -->
+            <div id="waveformEmptyState" class="absolute inset-0 flex items-center justify-center z-10">
+                <span class="text-sm opacity-40" style="color: var(--text-secondary);">请导入或选择一个音频文件</span>
             </div>
+            
+            <!-- Canvas 波形（主显示，使用 /api/waveform 真实数据） -->
+            <canvas id="mainWaveform" class="absolute inset-0 w-full h-full waveform-canvas hidden"></canvas>
+            
+            <!-- WaveSurfer 容器（可选，仅在其加载成功时显示） -->
+            <div id="waveform" class="absolute inset-0 w-full h-full hidden"></div>
         </div>
     </div>
     
@@ -434,74 +428,6 @@
         let audioPlayer = null;
         let animationFrameId = null;
         
-        // ==================== WAVEFORM ZOOM ====================
-        let waveformZoom = 1; // 缩放级别 (1 = 原始, >1 = 放大)
-        const MIN_ZOOM = 1;
-        const MAX_ZOOM = 50;
-        let waveformScrollX = 0; // 横向滚动位置
-        
-        // 缩放功能
-        function setWaveformZoom(newZoom) {
-            waveformZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
-            updateWaveformContainerWidth();
-            drawMainWaveform();
-            updateWaveformScrollPosition();
-        }
-        
-        function updateWaveformContainerWidth() {
-            const innerContainer = document.getElementById('waveformInnerContainer');
-            if (innerContainer) {
-                const container = document.getElementById('waveformContainer');
-                const baseWidth = container ? container.clientWidth : 800;
-                innerContainer.style.minWidth = (baseWidth * waveformZoom) + 'px';
-            }
-        }
-        
-        function updateWaveformScrollPosition() {
-            const container = document.getElementById('waveformContainer');
-            if (container) {
-                container.scrollLeft = waveformScrollX;
-            }
-        }
-        
-        // 放大
-        function zoomIn() {
-            setWaveformZoom(waveformZoom * 1.5);
-        }
-        
-        // 缩小
-        function zoomOut() {
-            setWaveformZoom(waveformZoom / 1.5);
-        }
-        
-        // 跟随鼠标缩放（滚轮）
-        function handleWaveformWheel(e) {
-            if (e.ctrlKey || e.metaKey) {
-                e.preventDefault();
-                const delta = e.deltaY > 0 ? 0.9 : 1.1;
-                const container = document.getElementById('waveformContainer');
-                const rect = container.getBoundingClientRect();
-                const mouseX = e.clientX - rect.left + container.scrollLeft;
-                const containerWidth = container.clientWidth;
-                const relativePos = mouseX / containerWidth;
-                
-                setWaveformZoom(waveformZoom * delta);
-                
-                // 保持鼠标位置相对不变
-                setTimeout(() => {
-                    const newScrollX = mouseX * waveformZoom - relativePos * containerWidth;
-                    waveformScrollX = Math.max(0, newScrollX);
-                    updateWaveformScrollPosition();
-                }, 10);
-            } else if (e.shiftKey) {
-                // 横向滚动
-                e.preventDefault();
-                const container = document.getElementById('waveformContainer');
-                container.scrollLeft += e.deltaY;
-                waveformScrollX = container.scrollLeft;
-            }
-        }
-        
         // 使用 requestAnimationFrame 实现毫秒级平滑播放头更新
         function startPlaybackAnimation() {
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
@@ -527,7 +453,6 @@
         
         // ==================== WAVESURFER ====================
         let wavesurfer = null;
-        let currentBlobUrl = null; // 跟踪当前 Blob URL 用于内存管理
         let wavesurferRegions = null;
         
         function initWaveSurfer() {
@@ -691,11 +616,6 @@
                         const mimeType = mimeTypes[fileExt] || 'audio/wav';
                         const blob = new Blob([uint8Array], { type: mimeType });
                         audioUrl = URL.createObjectURL(blob);
-                        // 清理之前的 Blob URL
-                        if (currentBlobUrl) {
-                            URL.revokeObjectURL(currentBlobUrl);
-                        }
-                        currentBlobUrl = audioUrl;
                         console.log('[WaveSurfer] Blob URL 创建成功');
                     } else {
                         console.warn('[WaveSurfer] 读取文件失败');
@@ -709,27 +629,7 @@
                 
                 // 显示文件名
                 const fileNameEl = document.getElementById('waveformFileName');
-                const categoryEl = document.getElementById('waveformCategory');
-                const audioInfoEl = document.getElementById('waveformAudioInfo');
-                
                 if (fileNameEl) fileNameEl.textContent = sound.name;
-                
-                // 显示分类名称（如果存在）
-                if (categoryEl) {
-                    categoryEl.textContent = sound.category || '-';
-                }
-                
-                // 显示采样率和比特深度（如果存在）
-                if (audioInfoEl) {
-                    const sampleRate = sound.waveformSampleRate;
-                    const bitDepth = sound.bitDepth || '-';
-                    if (sampleRate) {
-                        const srKHz = (sampleRate / 1000).toFixed(1);
-                        audioInfoEl.textContent = `${srKHz}kHz / ${bitDepth}bit`;
-                    } else {
-                        audioInfoEl.textContent = '-';
-                    }
-                }
                 
                 // 显示波形区域
                 if (container) {
@@ -1296,27 +1196,103 @@
         async function loadMissingWaveforms() {
             if (!window.electronAPI || !window.electronAPI.backendAPI || !window.electronAPI.backendAPI.getWaveform) return;
             
-            const soundsNeedingWaveform = soundData.filter(s => s.filePath && !s.waveform);
+            // 只加载需要波形且未在加载中的声音
+            const soundsNeedingWaveform = soundData.filter(s => s.filePath && !s.waveform && !s.waveformLoading);
             
-            for (const sound of soundsNeedingWaveform) {
-                try {
-                    const waveformData = await window.electronAPI.backendAPI.getWaveform(sound.filePath);
-                    if (waveformData && waveformData.peaks && waveformData.peaks.length > 0) {
-                        sound.waveform = waveformData.peaks;
-                        sound.waveformDuration = waveformData.duration;
-                        sound.waveformSampleRate = waveformData.sample_rate;
-                        sound.waveformChannels = waveformData.channels;
+            if (soundsNeedingWaveform.length === 0) return;
+            
+            // 标记为加载中，避免重复加载
+            soundsNeedingWaveform.forEach(s => s.waveformLoading = true);
+            
+            // 批量并行加载（最多3个并发）
+            const batchSize = 3;
+            for (let i = 0; i < soundsNeedingWaveform.length; i += batchSize) {
+                const batch = soundsNeedingWaveform.slice(i, i + batchSize);
+                
+                await Promise.all(batch.map(async (sound) => {
+                    try {
+                        const waveformData = await window.electronAPI.backendAPI.getWaveform(sound.filePath);
+                        if (waveformData && waveformData.peaks && waveformData.peaks.length > 0) {
+                            sound.waveform = waveformData.peaks;
+                            sound.waveformDuration = waveformData.duration;
+                            sound.waveformSampleRate = waveformData.sample_rate;
+                            sound.waveformChannels = waveformData.channels;
+                            // 只重绘这个特定的波形，而不是整个列表
+                            drawSingleMiniWaveform(sound.id);
+                        }
+                    } catch (e) {
+                        // 忽略错误，静默失败
+                        console.warn(`[Waveform] 加载失败: ${sound.name}`, e);
+                    } finally {
+                        sound.waveformLoading = false;
                     }
-                } catch (e) {
-                    // 忽略错误，静默失败
+                }));
+                
+                // 小延迟避免阻塞UI
+                if (i + batchSize < soundsNeedingWaveform.length) {
+                    await new Promise(resolve => setTimeout(resolve, 10));
                 }
             }
+        }
+        
+        // 只绘制单个波形，不重绘整个列表
+        function drawSingleMiniWaveform(soundId) {
+            const canvas = document.querySelector(`.mini-waveform[data-id="${soundId}"]`);
+            if (!canvas) return;
             
-            // 重新绘制小波形
-            drawMiniWaveforms();
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width = canvas.offsetWidth || 112;
+            const height = canvas.height = canvas.offsetHeight || 32;
+            
+            ctx.clearRect(0, 0, width, height);
+            
+            const sound = soundData.find(s => s.id === soundId);
+            if (!sound || !sound.waveform) return;
+            
+            const isCurrent = currentSound && currentSound.id === soundId;
+            const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim() || '#e5e5e5';
+            const secondaryColor = getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim() || '#a3a3a3';
+            
+            const waveformData = sound.waveform;
+            const centerY = height / 2;
+            const maxAmplitude = height * 0.8;
+            const samples = 50;
+            const step = width / samples;
+            
+            ctx.globalAlpha = isCurrent ? 1 : 0.5;
+            ctx.fillStyle = isCurrent ? textColor : secondaryColor;
+            
+            // 上半部分
+            ctx.beginPath();
+            ctx.moveTo(0, centerY);
+            for (let i = 0; i <= samples; i++) {
+                const dataIndex = Math.floor((i / samples) * waveformData.length);
+                const amplitude = waveformData[Math.min(dataIndex, waveformData.length - 1)] || 0;
+                const y = centerY - amplitude * maxAmplitude * 0.5;
+                ctx.lineTo(i * step, y);
+            }
+            ctx.lineTo(width, centerY);
+            ctx.closePath();
+            ctx.fill();
+            
+            // 下半部分
+            ctx.beginPath();
+            ctx.moveTo(0, centerY);
+            for (let i = 0; i <= samples; i++) {
+                const dataIndex = Math.floor((i / samples) * waveformData.length);
+                const amplitude = waveformData[Math.min(dataIndex, waveformData.length - 1)] || 0;
+                const y = centerY + amplitude * maxAmplitude * 0.5;
+                ctx.lineTo(i * step, y);
+            }
+            ctx.lineTo(width, centerY);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.globalAlpha = 1;
         }
 
         function selectSound(sound) {
+            const previousSound = currentSound;
             currentSound = sound;
             playbackProgress = 0;
             updatePlaybackUI();
@@ -1324,7 +1300,31 @@
             // 只使用 Canvas 波形 + /api/waveform 数据，避免 WaveSurfer 内部错误导致黑屏
             loadWaveformForSound(sound);
             
-            renderSoundList(document.getElementById('searchInput').value);
+            // 只更新选中状态，不重绘整个列表
+            updateSelectionState(previousSound, sound);
+        }
+        
+        // 仅更新选中状态，避免重绘整个列表
+        function updateSelectionState(previousSound, newSound) {
+            // 移除之前的选中状态
+            if (previousSound) {
+                const prevRow = document.querySelector(`.sound-row[data-id="${previousSound.id}"]`);
+                if (prevRow) {
+                    prevRow.classList.remove('selected');
+                    // 重绘之前选中的波形（恢复非高亮状态）
+                    drawSingleMiniWaveform(previousSound.id);
+                }
+            }
+            
+            // 添加新的选中状态
+            if (newSound) {
+                const newRow = document.querySelector(`.sound-row[data-id="${newSound.id}"]`);
+                if (newRow) {
+                    newRow.classList.add('selected');
+                    // 重绘新选中的波形（高亮状态）
+                    drawSingleMiniWaveform(newSound.id);
+                }
+            }
         }
 
         // 从后端加载波形数据
@@ -1383,7 +1383,8 @@
             }
             
             updatePlaybackUI();
-            renderSoundList(document.getElementById('searchInput').value);
+            // 只更新播放按钮状态，不重绘整个列表
+            updatePlayButtonState();
         }
         
         function pausePlayback() {
@@ -1393,7 +1394,39 @@
             isPlaying = false;
             stopPlaybackAnimation(); // 停止动画更新
             updatePlaybackUI();
-            renderSoundList(document.getElementById('searchInput').value);
+            // 只更新播放按钮状态，不重绘整个列表
+            updatePlayButtonState();
+        }
+        
+        // 仅更新播放按钮状态，避免重绘整个列表导致波形闪烁
+        function updatePlayButtonState() {
+            document.querySelectorAll('.play-sound-btn').forEach(btn => {
+                const soundId = parseInt(btn.dataset.id);
+                const isCurrent = currentSound && currentSound.id === soundId;
+                const icon = btn.querySelector('i');
+                if (icon) {
+                    icon.setAttribute('data-lucide', isCurrent && isPlaying ? 'pause' : 'play');
+                }
+                // 更新播放指示器
+                const row = btn.closest('.sound-row');
+                if (row) {
+                    const nameDiv = row.querySelector('.flex-1');
+                    if (nameDiv) {
+                        let indicator = nameDiv.querySelector('.playing-indicator');
+                        if (isCurrent && isPlaying) {
+                            if (!indicator) {
+                                indicator = document.createElement('div');
+                                indicator.className = 'playing-indicator';
+                                indicator.innerHTML = '<span></span><span></span><span></span><span></span>';
+                                nameDiv.appendChild(indicator);
+                            }
+                        } else if (indicator) {
+                            indicator.remove();
+                        }
+                    }
+                }
+            });
+            lucide.createIcons();
         }
         
         function stopPlayback() {
@@ -1484,7 +1517,6 @@
             const canvas = document.getElementById('mainWaveform');
             const emptyState = document.getElementById('waveformEmptyState');
             const waveContainer = document.getElementById('waveformContainer');
-            const innerContainer = document.getElementById('waveformInnerContainer');
             
             // 没有音频时显示提示
             if (!currentSound) {
@@ -1494,17 +1526,12 @@
             }
             
             // 有音频时显示 Canvas 波形
-            if (canvas && waveContainer && innerContainer) {
+            if (canvas && waveContainer) {
                 canvas.classList.remove('hidden');
                 const ctx = canvas.getContext('2d');
                 
-                // 使用内部容器的宽度（支持缩放）
-                const width = innerContainer.offsetWidth || waveContainer.clientWidth * waveformZoom;
-                const height = waveContainer.offsetHeight || 120;
-                
-                // 设置 canvas 尺寸
-                canvas.width = width;
-                canvas.height = height;
+                const width = canvas.width = waveContainer.offsetWidth || 1200;
+                const height = canvas.height = waveContainer.offsetHeight || 120;
                 
                 // 填充背景色
                 const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--bg-secondary').trim() || '#141414';
@@ -1518,7 +1545,7 @@
                 const progress = playbackProgress / currentSound.duration;
                 const waveformData = currentSound.waveform || null;
                 
-                // 绘制细腻波形（支持缩放）
+                // 绘制细腻波形
                 drawBarWaveform(ctx, width, height, waveformData, textColor, secondaryColor, progress);
             }
             
@@ -1626,65 +1653,29 @@
             ctx.closePath();
             ctx.fill();
             
-            // 播放头位置 - 增强视觉效果
+            // 播放头位置
             if (progress > 0) {
-                const cursorX = progressX;
-                
-                // 发光效果（多层渐变）
-                // 外层大光晕
-                const gradientOuter = ctx.createLinearGradient(cursorX - 15, 0, cursorX + 15, 0);
-                gradientOuter.addColorStop(0, 'transparent');
-                gradientOuter.addColorStop(0.4, activeColor + '20');
-                gradientOuter.addColorStop(0.5, activeColor + '40');
-                gradientOuter.addColorStop(0.6, activeColor + '20');
-                gradientOuter.addColorStop(1, 'transparent');
-                ctx.globalAlpha = 1;
-                ctx.strokeStyle = gradientOuter;
-                ctx.lineWidth = 12;
-                ctx.beginPath();
-                ctx.moveTo(cursorX, 0);
-                ctx.lineTo(cursorX, height);
-                ctx.stroke();
-                
-                // 内层光晕
-                const gradientInner = ctx.createLinearGradient(cursorX - 8, 0, cursorX + 8, 0);
-                gradientInner.addColorStop(0, 'transparent');
-                gradientInner.addColorStop(0.3, activeColor + '40');
-                gradientInner.addColorStop(0.5, activeColor + '80');
-                gradientInner.addColorStop(0.7, activeColor + '40');
-                gradientInner.addColorStop(1, 'transparent');
-                ctx.strokeStyle = gradientInner;
-                ctx.lineWidth = 6;
-                ctx.beginPath();
-                ctx.moveTo(cursorX, 0);
-                ctx.lineTo(cursorX, height);
-                ctx.stroke();
-                
-                // 主光标线
+                // 发光效果
                 ctx.globalAlpha = 1;
                 ctx.shadowColor = activeColor;
-                ctx.shadowBlur = 10;
+                ctx.shadowBlur = 6;
                 ctx.strokeStyle = activeColor;
                 ctx.lineWidth = 2;
                 ctx.beginPath();
-                ctx.moveTo(cursorX, 0);
-                ctx.lineTo(cursorX, height);
+                ctx.moveTo(progressX, 0);
+                ctx.lineTo(progressX, height);
                 ctx.stroke();
                 ctx.shadowBlur = 0;
                 
-                // 播放头中心点（大亮点）
-                ctx.fillStyle = '#ffffff';
-                ctx.shadowColor = activeColor;
-                ctx.shadowBlur = 8;
+                // 播放头中心点
+                ctx.fillStyle = activeColor;
                 ctx.beginPath();
-                ctx.arc(cursorX, centerY, 5, 0, Math.PI * 2);
+                ctx.arc(progressX, centerY, 4, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.shadowBlur = 0;
                 
-                // 中心小白点
                 ctx.fillStyle = '#ffffff';
                 ctx.beginPath();
-                ctx.arc(cursorX, centerY, 2, 0, Math.PI * 2);
+                ctx.arc(progressX, centerY, 1.5, 0, Math.PI * 2);
                 ctx.fill();
             }
         }
@@ -1779,21 +1770,6 @@
             renderSoundList();
             drawMainWaveform();
             lucide.createIcons();
-            updateWaveformContainerWidth();
-            
-            // 波形缩放按钮
-            document.getElementById('zoomInBtn').addEventListener('click', zoomIn);
-            document.getElementById('zoomOutBtn').addEventListener('click', zoomOut);
-            
-            // 波形容器滚轮事件（缩放和横向滚动）
-            const waveformContainer = document.getElementById('waveformContainer');
-            if (waveformContainer) {
-                waveformContainer.addEventListener('wheel', handleWaveformWheel, { passive: false });
-                // 监听滚动位置变化
-                waveformContainer.addEventListener('scroll', () => {
-                    waveformScrollX = waveformContainer.scrollLeft;
-                });
-            }
             
             // Settings
             document.getElementById('settingsBtn').addEventListener('click', (e) => {
