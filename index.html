@@ -304,13 +304,13 @@
         
         <!-- Progress Bar -->
         <div class="flex-1 max-w-xl mx-8 flex items-center gap-3">
-            <span class="text-xs font-mono w-12 text-right" id="currentTime">00:00</span>
+            <span class="text-xs font-mono w-20 text-right" id="currentTime">00:00.000</span>
             <div class="flex-1 progress-container h-1.5 rounded-full overflow-hidden" style="background-color: var(--border-color);" id="progressContainer">
                 <div id="progressBar" class="h-full rounded-full relative" style="width: 0%; background-color: var(--text-primary);">
                     <div class="progress-handle" style="right: -6px; background-color: var(--text-primary);"></div>
                 </div>
             </div>
-            <span class="text-xs font-mono w-12" id="durationTime">00:00</span>
+            <span class="text-xs font-mono w-20" id="durationTime">00:00.000</span>
         </div>
         
         <!-- Volume Control -->
@@ -426,6 +426,30 @@
         
         // ==================== AUDIO PLAYER ====================
         let audioPlayer = null;
+        let animationFrameId = null;
+        
+        // 使用 requestAnimationFrame 实现毫秒级平滑播放头更新
+        function startPlaybackAnimation() {
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            
+            function update() {
+                if (audioPlayer && currentSound && isPlaying) {
+                    // 直接从 audioPlayer 获取当前时间，确保毫秒级精度
+                    playbackProgress = Math.round(audioPlayer.currentTime * 1000);
+                    updatePlaybackUI();
+                    drawMainWaveform();
+                    animationFrameId = requestAnimationFrame(update);
+                }
+            }
+            animationFrameId = requestAnimationFrame(update);
+        }
+        
+        function stopPlaybackAnimation() {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+        }
         
         // ==================== WAVESURFER ====================
         let wavesurfer = null;
@@ -475,7 +499,7 @@
                 
                 // 监听播放位置变化
                 wavesurfer.on('timeupdate', (currentTime) => {
-                    playbackProgress = currentTime * 1000;
+                    playbackProgress = Math.round(currentTime * 1000);
                     updatePlaybackUI();
                 });
                 
@@ -493,7 +517,7 @@
                 wavesurfer.on('ready', () => {
                     console.log('[WaveSurfer] 音频加载完成');
                     if (currentSound) {
-                        currentSound.duration = wavesurfer.getDuration() * 1000;
+                        currentSound.duration = Math.round(wavesurfer.getDuration() * 1000);
                         updatePlaybackUI();
                     }
                 });
@@ -712,6 +736,7 @@
                     audioPlayer.play();
                 } else {
                     isPlaying = false;
+                    stopPlaybackAnimation(); // 停止动画更新
                     if (playbackInterval) clearInterval(playbackInterval);
                     updatePlaybackUI();
                     renderSoundList(document.getElementById('searchInput').value);
@@ -719,14 +744,14 @@
             });
             audioPlayer.addEventListener('timeupdate', () => {
                 if (audioPlayer && currentSound) {
-                    playbackProgress = audioPlayer.currentTime * 1000;
+                    playbackProgress = Math.round(audioPlayer.currentTime * 1000);
                     updatePlaybackUI();
-                    drawMainWaveform();
                 }
             });
+            
             audioPlayer.addEventListener('loadedmetadata', () => {
                 if (currentSound) {
-                    currentSound.duration = audioPlayer.duration * 1000;
+                    currentSound.duration = Math.round(audioPlayer.duration * 1000);
                     updatePlaybackUI();
                 }
             });
@@ -807,6 +832,7 @@
                 try {
                     await audioPlayer.play();
                     isPlaying = true;
+                    startPlaybackAnimation(); // 启动毫秒级动画更新
                     console.log('[loadAndPlaySound] 播放成功');
                 } catch (playError) {
                     console.error('[loadAndPlaySound] 播放失败:', playError);
@@ -817,6 +843,7 @@
                         try {
                             await audioPlayer.play();
                             isPlaying = true;
+                            startPlaybackAnimation(); // 启动毫秒级动画更新
                             console.log('[loadAndPlaySound] 后备方案播放成功');
                         } catch (e2) {
                             console.error('[loadAndPlaySound] 后备方案也失败:', e2);
@@ -844,12 +871,15 @@
         }
 
         // ==================== UTILS ====================
+        // 完整毫秒精度格式：MM:SS.mmm
         function formatTime(ms) {
-            const totalSeconds = Math.floor(ms / 1000);
+            // 使用 Math.round 确保整数，避免浮点数精度问题
+            const msInteger = Math.round(ms);
+            const totalSeconds = Math.floor(msInteger / 1000);
             const minutes = Math.floor(totalSeconds / 60);
             const seconds = totalSeconds % 60;
-            const milliseconds = Math.floor((ms % 1000) / 10);
-            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(2, '0')}`;
+            const milliseconds = msInteger % 1000;
+            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}`;
         }
 
         function formatTimeShort(ms) {
@@ -1097,13 +1127,16 @@
                 const soundId = parseInt(canvas.dataset.id);
                 const sound = soundData.find(s => s.id === soundId);
                 
+                if (!sound) return;
+                
                 const isCurrent = currentSound && currentSound.id === soundId;
                 
                 // 获取正确的颜色值
                 const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim() || '#e5e5e5';
                 const secondaryColor = getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim() || '#a3a3a3';
                 
-                // 绘制细腻线条波形
+                // 使用真实波形数据或备用假数据
+                const waveformData = sound.waveform;
                 const centerY = height / 2;
                 const maxAmplitude = height * 0.8;
                 
@@ -1115,12 +1148,24 @@
                 ctx.strokeStyle = isCurrent ? textColor : secondaryColor;
                 ctx.lineWidth = 1;
                 
+                // 获取波形数据采样
+                const getWaveformValue = (index) => {
+                    if (waveformData && waveformData.length > 0) {
+                        // 从真实波形数据中采样
+                        const dataIndex = Math.floor((index / samples) * waveformData.length);
+                        return waveformData[Math.min(dataIndex, waveformData.length - 1)] || 0;
+                    } else {
+                        // 备用假数据（使用固定的种子确保一致）
+                        const seed = Math.sin(index * 0.15) * 0.5 + Math.sin(index * 0.08) * 0.3 + Math.sin(index * 0.22) * 0.2;
+                        return Math.abs(seed) * 0.8 + 0.2;
+                    }
+                };
+                
                 // 上半部分
                 ctx.beginPath();
                 ctx.moveTo(0, centerY);
                 for (let i = 0; i <= samples; i++) {
-                    const seed = Math.sin(i * 0.15) * 0.5 + Math.sin(i * 0.08) * 0.3 + Math.sin(i * 0.22) * 0.2;
-                    const amplitude = Math.abs(seed) * 0.8 + 0.2;
+                    const amplitude = getWaveformValue(i);
                     const y = centerY - amplitude * maxAmplitude * 0.5;
                     ctx.lineTo(i * step, y);
                 }
@@ -1132,8 +1177,7 @@
                 ctx.beginPath();
                 ctx.moveTo(0, centerY);
                 for (let i = 0; i <= samples; i++) {
-                    const seed = Math.sin(i * 0.15) * 0.5 + Math.sin(i * 0.08) * 0.3 + Math.sin(i * 0.22) * 0.2;
-                    const amplitude = Math.abs(seed) * 0.8 + 0.2;
+                    const amplitude = getWaveformValue(i);
                     const y = centerY + amplitude * maxAmplitude * 0.5;
                     ctx.lineTo(i * step, y);
                 }
@@ -1143,6 +1187,33 @@
                 
                 ctx.globalAlpha = 1;
             });
+            
+            // 异步加载没有波形数据的声音的波形
+            loadMissingWaveforms();
+        }
+
+        // 异步加载列表中缺少的波形数据
+        async function loadMissingWaveforms() {
+            if (!window.electronAPI || !window.electronAPI.backendAPI || !window.electronAPI.backendAPI.getWaveform) return;
+            
+            const soundsNeedingWaveform = soundData.filter(s => s.filePath && !s.waveform);
+            
+            for (const sound of soundsNeedingWaveform) {
+                try {
+                    const waveformData = await window.electronAPI.backendAPI.getWaveform(sound.filePath);
+                    if (waveformData && waveformData.peaks && waveformData.peaks.length > 0) {
+                        sound.waveform = waveformData.peaks;
+                        sound.waveformDuration = waveformData.duration;
+                        sound.waveformSampleRate = waveformData.sample_rate;
+                        sound.waveformChannels = waveformData.channels;
+                    }
+                } catch (e) {
+                    // 忽略错误，静默失败
+                }
+            }
+            
+            // 重新绘制小波形
+            drawMiniWaveforms();
         }
 
         function selectSound(sound) {
@@ -1205,6 +1276,7 @@
                     showNotification('播放失败: ' + error.message, 'error');
                 });
                 isPlaying = true;
+                startPlaybackAnimation(); // 启动毫秒级动画更新
             } else {
                 // 如果没有音频源，重新加载
                 loadAndPlaySound(currentSound);
@@ -1219,6 +1291,7 @@
                 audioPlayer.pause();
             }
             isPlaying = false;
+            stopPlaybackAnimation(); // 停止动画更新
             updatePlaybackUI();
             renderSoundList(document.getElementById('searchInput').value);
         }
@@ -1230,6 +1303,7 @@
             }
             isPlaying = false;
             playbackProgress = 0;
+            stopPlaybackAnimation(); // 停止动画更新
             updatePlaybackUI();
             renderSoundList(document.getElementById('searchInput').value);
         }
@@ -1252,14 +1326,14 @@
             }
             
             if (currentSound) {
-                currentTimeEl.textContent = formatTimeShort(playbackProgress);
-                durationTimeEl.textContent = formatTimeShort(currentSound.duration);
+                currentTimeEl.textContent = formatTime(playbackProgress);
+                durationTimeEl.textContent = formatTime(currentSound.duration);
                 
                 const progress = (playbackProgress / currentSound.duration) * 100;
                 progressBar.style.width = `${progress}%`;
             } else {
-                currentTimeEl.textContent = '00:00';
-                durationTimeEl.textContent = '00:00';
+                currentTimeEl.textContent = '00:00.000';
+                durationTimeEl.textContent = '00:00.000';
                 progressBar.style.width = '0%';
             }
         }
@@ -1699,23 +1773,23 @@
                 startPlayback();
             });
             
-            // Progress Bar
+// Progress Bar
             document.getElementById('progressContainer').addEventListener('click', (e) => {
                 if (!currentSound) return;
                 const rect = e.currentTarget.getBoundingClientRect();
                 const progress = (e.clientX - rect.left) / rect.width;
-                
+
                 if (audioPlayer && audioPlayer.duration) {
                     audioPlayer.currentTime = progress * audioPlayer.duration;
-                    playbackProgress = audioPlayer.currentTime * 1000;
+                    playbackProgress = Math.round(audioPlayer.currentTime * 1000);
                 } else {
-                    playbackProgress = Math.floor(progress * currentSound.duration);
+                    playbackProgress = Math.round(progress * currentSound.duration);
                 }
-                
+
                 updatePlaybackUI();
                 drawMainWaveform();
             });
-            
+
             // 点击波形跳转播放位置
             document.getElementById('mainWaveform').addEventListener('click', (e) => {
                 if (!currentSound) return;
@@ -1724,9 +1798,9 @@
                 const progress = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
                 if (audioPlayer && audioPlayer.duration) {
                     audioPlayer.currentTime = progress * audioPlayer.duration;
-                    playbackProgress = audioPlayer.currentTime * 1000;
+                    playbackProgress = Math.round(audioPlayer.currentTime * 1000);
                 } else {
-                    playbackProgress = progress * currentSound.duration;
+                    playbackProgress = Math.round(progress * currentSound.duration);
                 }
                 updatePlaybackUI();
                 drawMainWaveform();
