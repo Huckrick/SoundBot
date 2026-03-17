@@ -241,24 +241,22 @@
         
         <!-- 波形工具栏 -->
         <div class="h-10 flex items-center justify-between px-4 border-b shrink-0" style="border-color: var(--border-color);">
-            <div class="flex items-center gap-2">
-                <span id="waveformFileName" class="text-xs opacity-70 truncate max-w-xs">未加载音频</span>
+            <div class="flex items-center gap-4">
+                <span id="waveformFileName" class="text-sm font-medium truncate max-w-md"></span>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-4 font-mono text-xs opacity-70">
+                <!-- 采样率显示 -->
+                <span id="sampleRateInfo" class="hidden">
+                    采样率: <span id="sampleRateValue">--</span> Hz
+                </span>
+                <!-- 比特深度显示 -->
+                <span id="bitDepthInfo" class="hidden">
+                    比特深度: <span id="bitDepthValue">--</span> bit
+                </span>
                 <!-- 选区信息 -->
-                <span id="selectionInfo" class="text-xs font-mono opacity-70 hidden">
+                <span id="selectionInfo" class="hidden">
                     选区: <span id="selectionStart">0.00</span>s - <span id="selectionEnd">0.00</span>s
                 </span>
-                <!-- 裁切按钮 -->
-                <button id="cropBtn" class="px-2 py-1 text-xs rounded border opacity-50 cursor-not-allowed" 
-                        style="border-color: var(--border-color);" disabled title="裁切选区">
-                    <i data-lucide="scissors" class="w-3 h-3"></i>裁切
-                </button>
-                <!-- 淡入淡出按钮 -->
-                <button id="fadeBtn" class="px-2 py-1 text-xs rounded border opacity-50 cursor-not-allowed" 
-                        style="border-color: var(--border-color);" disabled title="淡入淡出">
-                    <i data-lucide="volume-1" class="w-3 h-3"></i>淡入淡出
-                </button>
             </div>
         </div>
         
@@ -533,11 +531,6 @@
                         console.log('[WaveSurfer] 选区创建:', region.start, '-', region.end);
                         updateSelectionInfo(region.start, region.end);
                         
-                        document.getElementById('cropBtn').disabled = false;
-                        document.getElementById('cropBtn').classList.remove('opacity-50', 'cursor-not-allowed');
-                        document.getElementById('fadeBtn').disabled = false;
-                        document.getElementById('fadeBtn').classList.remove('opacity-50', 'cursor-not-allowed');
-                        
                         wavesurferRegions.getRegions().forEach(r => {
                             if (r.id !== region.id) {
                                 r.remove();
@@ -551,10 +544,6 @@
                     
                     wavesurferRegions.on('region-removed', () => {
                         updateSelectionInfo(0, 0);
-                        document.getElementById('cropBtn').disabled = true;
-                        document.getElementById('cropBtn').classList.add('opacity-50', 'cursor-not-allowed');
-                        document.getElementById('fadeBtn').disabled = true;
-                        document.getElementById('fadeBtn').classList.add('opacity-50', 'cursor-not-allowed');
                     });
                 }
                 
@@ -1344,6 +1333,8 @@
                         sound.waveformSampleRate = waveformData.sample_rate;
                         sound.waveformChannels = waveformData.channels;
                         console.log('[Waveform] 成功加载波形数据:', waveformData.peaks.length, '个点');
+                        // 更新音频信息显示
+                        updateAudioInfo(sound);
                     } else {
                         console.warn('[Waveform] 后端返回数据格式不正确');
                         sound.waveform = null;
@@ -1355,6 +1346,55 @@
             }
             
             drawMainWaveform();
+        }
+
+        // 更新音频信息显示（采样率、比特深度等）
+        function updateAudioInfo(sound = null) {
+            const targetSound = sound || currentSound;
+            const fileNameEl = document.getElementById('waveformFileName');
+            const sampleRateEl = document.getElementById('sampleRateInfo');
+            const sampleRateValue = document.getElementById('sampleRateValue');
+            const bitDepthEl = document.getElementById('bitDepthInfo');
+            const bitDepthValue = document.getElementById('bitDepthValue');
+            
+            if (!targetSound) {
+                // 没有音频时隐藏所有信息
+                if (fileNameEl) fileNameEl.textContent = '';
+                if (sampleRateEl) sampleRateEl.classList.add('hidden');
+                if (bitDepthEl) bitDepthEl.classList.add('hidden');
+                return;
+            }
+            
+            // 显示文件名
+            if (fileNameEl) fileNameEl.textContent = targetSound.name;
+            
+            // 显示采样率（如果有数据）
+            if (targetSound.waveformSampleRate) {
+                if (sampleRateEl) {
+                    sampleRateEl.classList.remove('hidden');
+                    sampleRateValue.textContent = targetSound.waveformSampleRate.toLocaleString();
+                }
+            } else {
+                if (sampleRateEl) sampleRateEl.classList.add('hidden');
+            }
+            
+            // 显示比特深度（根据音频格式估算或从后端获取）
+            if (targetSound.waveformChannels) {
+                if (bitDepthEl) {
+                    bitDepthEl.classList.remove('hidden');
+                    // 根据文件类型估算比特深度
+                    const fileExt = (targetSound.name || '').split('.').pop().toLowerCase();
+                    let bitDepth = 16; // 默认16位
+                    if (fileExt === 'wav' || fileExt === 'aiff' || fileExt === 'aif') {
+                        bitDepth = 24; // 专业音频格式通常是24位
+                    } else if (fileExt === 'mp3' || fileExt === 'aac') {
+                        bitDepth = '压缩'; // 压缩格式没有固定比特深度
+                    }
+                    bitDepthValue.textContent = bitDepth;
+                }
+            } else {
+                if (bitDepthEl) bitDepthEl.classList.add('hidden');
+            }
         }
 
         function playSound(sound) {
@@ -1464,10 +1504,15 @@
                 
                 const progress = (playbackProgress / currentSound.duration) * 100;
                 progressBar.style.width = `${progress}%`;
+                
+                // 更新音频信息显示
+                updateAudioInfo();
             } else {
                 currentTimeEl.textContent = '00:00.000';
                 durationTimeEl.textContent = '00:00.000';
                 progressBar.style.width = '0%';
+                // 清空音频信息
+                updateAudioInfo();
             }
         }
 
@@ -1989,15 +2034,6 @@
             });
             
             // WaveSurfer 点击跳转播放（使用 WaveSurfer 内置功能）
-            // 裁切按钮
-            document.getElementById('cropBtn').addEventListener('click', () => {
-                cropSelection();
-            });
-            
-            // 淡入淡出按钮
-            document.getElementById('fadeBtn').addEventListener('click', () => {
-                applyFade();
-            });
             
             // Animation loop for waveform - 保留旧的 canvas 绘制作为备用
             // WaveSurfer 会自动处理播放游标
