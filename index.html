@@ -2167,12 +2167,15 @@
                 const rect = canvas.getBoundingClientRect();
 
                 // 计算考虑缩放和滚动后的实际点击位置
-                let clickX = e.clientX - rect.left;
+                const clickX = e.clientX - rect.left;
                 const totalWidth = canvas.width * waveformZoomLevel;
-                const scrollRatio = waveformScrollOffset / (totalWidth - canvas.width || 1);
-                const adjustedX = clickX + scrollRatio * (totalWidth - canvas.width);
-
-                const progress = Math.max(0, Math.min(1, adjustedX / canvas.width));
+                
+                // 鼠标点击位置 + 当前滚动偏移 = 在完整波形上的位置
+                const adjustedX = clickX + waveformScrollOffset;
+                
+                // 计算播放进度 (0-1)
+                const progress = Math.max(0, Math.min(1, adjustedX / totalWidth));
+                
                 if (audioPlayer && audioPlayer.duration) {
                     audioPlayer.currentTime = progress * audioPlayer.duration;
                     playbackProgress = Math.round(audioPlayer.currentTime * 1000);
