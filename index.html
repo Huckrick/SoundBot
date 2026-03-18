@@ -281,9 +281,6 @@
                 <!-- 选区信息 -->
                 <span id="selectionInfo" class="hidden">
                     选区: <span id="selectionStart">0.00</span>s - <span id="selectionEnd">0.00</span>s
-                    <button id="exportSelectionBtn" class="ml-2 px-2 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors">
-                        导出WAV
-                    </button>
                 </span>
             </div>
         </div>
@@ -2033,37 +2030,6 @@
             renderSoundList();
             drawMainWaveform();
             lucide.createIcons();
-            
-            // 导出选区按钮点击事件
-            document.getElementById('exportSelectionBtn').addEventListener('click', async () => {
-                if (!currentSound || selectionStart === null || selectionEnd === null) return;
-                
-                try {
-                    showNotification('正在导出选区...', 'info');
-                    
-                    const response = await fetch('/api/export/clip', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            path: currentSound.path || currentSound.filePath,
-                            start: selectionStart,
-                            end: selectionEnd
-                        })
-                    });
-                    
-                    const result = await response.json();
-                    
-                    if (result.success) {
-                        showNotification('导出成功: ' + result.output_path, 'success');
-                    } else {
-                        showNotification('导出失败: ' + result.message, 'error');
-                    }
-                } catch (error) {
-                    console.error('导出失败:', error);
-                    showNotification('导出失败: ' + error.message, 'error');
-                }
-            });
-            
             // Settings
             document.getElementById('settingsBtn').addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -2333,7 +2299,8 @@
                         const rect = waveformCanvas.getBoundingClientRect();
                         const clickX = e.clientX - rect.left + waveformScrollOffset;
                         const progress = clickX / (waveformCanvas.width * waveformZoomLevel);
-                        const clickTime = Math.max(0, Math.min(currentSound.duration, progress * currentSound.duration));
+                        // 转换为秒（duration 是毫秒，audioPlayer.currentTime 是秒）
+                        const clickTime = Math.max(0, Math.min(currentSound.duration / 1000, progress * (currentSound.duration / 1000)));
 
                         audioPlayer.currentTime = clickTime;
                         updatePlaybackUI();
@@ -2367,30 +2334,59 @@
 
             // 选区信息更新函数
             const dragHandle = document.getElementById('dragHandle');
+            const waveContainer = document.getElementById('waveformContainer');
 
             function updateSelectionInfo(start, end) {
                 const selectionInfoEl = document.getElementById('selectionInfo');
                 const selectionStartEl = document.getElementById('selectionStart');
                 const selectionEndEl = document.getElementById('selectionEnd');
-                const exportBtn = document.getElementById('exportSelectionBtn');
 
                 if (start !== null && end !== null && start < end) {
                     if (selectionInfoEl) selectionInfoEl.classList.remove('hidden');
-                    if (selectionStartEl) selectionStartEl.textContent = start.toFixed(2);
-                    if (selectionEndEl) selectionEndEl.textContent = end.toFixed(2);
-                    if (exportBtn) exportBtn.classList.remove('hidden');
+                    // 显示为秒（除以1000）
+                    if (selectionStartEl) selectionStartEl.textContent = (start / 1000).toFixed(2);
+                    if (selectionEndEl) selectionEndEl.textContent = (end / 1000).toFixed(2);
 
-                    // 显示拖拽手柄
-                    if (dragHandle) dragHandle.classList.remove('hidden');
+                    // 显示拖拽手柄，并根据选区位置定位
+                    if (dragHandle) {
+                        dragHandle.classList.remove('hidden');
+
+                        // 计算选区在可见区域的像素位置
+                        if (waveContainer && currentSound) {
+                            const containerWidth = waveContainer.offsetWidth;
+                            const actualWidth = containerWidth * waveformZoomLevel;
+                            const selStartX = (start / currentSound.duration) * actualWidth;
+                            const selEndX = (end / currentSound.duration) * actualWidth;
+
+                            // 可见区域边界
+                            let visibleLeft = selStartX - waveformScrollOffset;
+                            let visibleRight = selEndX - waveformScrollOffset;
+
+                            // 边界裁剪
+                            visibleLeft = Math.max(0, visibleLeft);
+                            visibleRight = Math.min(containerWidth, visibleRight);
+
+                            const handleWidth = Math.max(20, visibleRight - visibleLeft); // 最小20px
+
+                            dragHandle.style.left = visibleLeft + 'px';
+                            dragHandle.style.width = handleWidth + 'px';
+                            dragHandle.style.right = 'auto';
+                        }
+
+                        // 设置draggable属性
+                        dragHandle.setAttribute('draggable', 'true');
+                    }
 
                     // 更新 canvas 的 draggable 状态
                     waveformCanvas.draggable = true;
                 } else {
                     if (selectionInfoEl) selectionInfoEl.classList.add('hidden');
-                    if (exportBtn) exportBtn.classList.add('hidden');
 
                     // 隐藏拖拽手柄
-                    if (dragHandle) dragHandle.classList.add('hidden');
+                    if (dragHandle) {
+                        dragHandle.classList.add('hidden');
+                        dragHandle.setAttribute('draggable', 'false');
+                    }
 
                     waveformCanvas.draggable = false;
                 }
@@ -2418,8 +2414,8 @@
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 path: currentSound.path || currentSound.filePath,
-                                start: selectionStart,
-                                end: selectionEnd,
+                                start: selectionStart / 1000,  // 转换为秒
+                                end: selectionEnd / 1000,        // 转换为秒
                                 temp_file: true  // 使用临时文件模式
                             })
                         });
@@ -2496,8 +2492,8 @@
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 path: currentSound.path || currentSound.filePath,
-                                start: selectionStart,
-                                end: selectionEnd,
+                                start: selectionStart / 1000,  // 转换为秒
+                                end: selectionEnd / 1000,        // 转换为秒
                                 temp_file: true
                             })
                         });
@@ -2749,8 +2745,8 @@
                         if (hasSelection && audioPlayer) {
                             // 先暂停（如果有）
                             audioPlayer.pause();
-                            // 设置播放起始位置为选区开始
-                            audioPlayer.currentTime = selectionStart;
+                            // 设置播放起始位置为选区开始（转换为秒）
+                            audioPlayer.currentTime = selectionStart / 1000;
                             // 移除之前的时间更新监听器，避免重复
                             audioPlayer.removeEventListener('timeupdate', handleSelectionLoop);
                             // 添加循环播放监听器
@@ -2776,8 +2772,8 @@
             // 选区循环播放处理函数
             function handleSelectionLoop() {
                 if (selectionStart !== null && selectionEnd !== null &&
-                    audioPlayer.currentTime >= selectionEnd) {
-                    audioPlayer.currentTime = selectionStart;
+                    audioPlayer.currentTime >= selectionEnd / 1000) {
+                    audioPlayer.currentTime = selectionStart / 1000;
                 }
             }
             
