@@ -292,11 +292,13 @@
                 <span class="text-sm opacity-40" style="color: var(--text-secondary);">请导入或选择一个音频文件</span>
             </div>
 
-            <!-- 拖拽手柄（选区拖拽导出） -->
-            <div id="dragHandle" class="absolute top-0 left-0 right-0 h-8 z-20 cursor-grab hidden" style="background: linear-gradient(to bottom, rgba(59, 130, 246, 0.3), transparent);">
-                <div class="flex items-center justify-center h-full">
-                    <span id="dragHandleText" class="text-xs text-blue-400 opacity-80 whitespace-nowrap">拖拽到DAW导出选区</span>
-                </div>
+            <!-- 拖拽手柄（选区拖拽导出）- 独立浮窗 -->
+            <div id="dragHandle" class="absolute h-8 px-3 z-20 cursor-grab hidden flex items-center rounded-md"
+                 style="background: rgba(59, 130, 246, 0.9); transform: translateX(-50%); top: -36px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+                <svg class="w-4 h-4 text-white mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M5 9l7-7 7 7M12 2v13"/>
+                </svg>
+                <span id="dragHandleText" class="text-xs text-white font-medium whitespace-nowrap">拖拽导出</span>
             </div>
 
             <!-- Canvas 波形（主显示，使用 /api/waveform 真实数据） -->
@@ -2134,10 +2136,50 @@
                     selectSound(soundData[0]);
                 }
                 if (!currentSound) return;
+
                 if (isPlaying) {
                     pausePlayback();
                 } else {
-                    startPlayback();
+                    // 有选区时智能播放
+                    if (selectionStart !== null && selectionEnd !== null && audioPlayer && audioPlayer.src) {
+                        const currentTime = audioPlayer.currentTime; // 秒
+                        const selStart = selectionStart / 1000;     // 毫秒转秒
+                        const selEnd = selectionEnd / 1000;         // 毫秒转秒
+
+                        let playStart = currentTime;
+                        let playEnd = audioPlayer.duration || currentSound.duration / 1000;
+
+                        // 智能判断播放范围
+                        if (currentTime >= selStart && currentTime <= selEnd) {
+                            // 光标在选区内 -> 播放到选区结束停止
+                            playStart = currentTime;
+                            playEnd = selEnd;
+                        } else if (currentTime < selStart) {
+                            // 光标在选区前 -> 播放到选区结束
+                            playStart = currentTime;
+                            playEnd = selEnd;
+                        } else {
+                            // 光标在选区后 -> 播放到音频结尾
+                            playStart = currentTime;
+                            playEnd = audioPlayer.duration || currentSound.duration / 1000;
+                        }
+
+                        // 设置播放范围
+                        audioPlayer.currentTime = playStart;
+                        audioPlayer.removeEventListener('ended', handlePlaybackEnded);
+                        audioPlayer.addEventListener('ended', handlePlaybackEnded);
+
+                        audioPlayer.play().then(() => {
+                            isPlaying = true;
+                            startPlaybackAnimation();
+                            updatePlaybackUI();
+                        }).catch(err => {
+                            console.error('播放失败:', err);
+                            startPlayback();
+                        });
+                    } else {
+                        startPlayback();
+                    }
                 }
             });
             
@@ -2347,7 +2389,7 @@
                     if (selectionStartEl) selectionStartEl.textContent = (start / 1000).toFixed(2);
                     if (selectionEndEl) selectionEndEl.textContent = (end / 1000).toFixed(2);
 
-                    // 显示拖拽手柄，并根据选区位置定位
+                    // 显示拖拽手柄，定位在选区上方居中
                     if (dragHandle) {
                         dragHandle.classList.remove('hidden');
 
@@ -2366,13 +2408,12 @@
                             visibleLeft = Math.max(0, visibleLeft);
                             visibleRight = Math.min(containerWidth, visibleRight);
 
-                            const handleWidth = Math.max(20, visibleRight - visibleLeft); // 最小20px
-
-                            dragHandle.style.left = visibleLeft + 'px';
-                            dragHandle.style.width = handleWidth + 'px';
-                            dragHandle.style.right = 'auto';
+                            // 选区中心点（用于居中）
+                            const centerX = (visibleLeft + visibleRight) / 2;
+                            dragHandle.style.left = centerX + 'px';
 
                             // 选区太窄时隐藏文字
+                            const handleWidth = visibleRight - visibleLeft;
                             const dragHandleText = document.getElementById('dragHandleText');
                             if (dragHandleText) {
                                 dragHandleText.style.display = handleWidth < 60 ? 'none' : 'inline';
@@ -2383,8 +2424,7 @@
                         dragHandle.setAttribute('draggable', 'true');
                     }
 
-                    // 更新 canvas 的 draggable 状态
-                    waveformCanvas.draggable = true;
+                    // canvas不设置draggable，完全由dragHandle处理拖拽
                 } else {
                     if (selectionInfoEl) selectionInfoEl.classList.add('hidden');
 
@@ -2393,6 +2433,8 @@
                         dragHandle.classList.add('hidden');
                         dragHandle.setAttribute('draggable', 'false');
                     }
+                }
+            }
 
                     waveformCanvas.draggable = false;
                 }
