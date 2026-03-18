@@ -292,10 +292,11 @@
                 <span class="text-sm opacity-40" style="color: var(--text-secondary);">请导入或选择一个音频文件</span>
             </div>
 
-            <!-- 拖拽手柄（选区拖拽导出） -->
-            <div id="dragHandle" class="absolute top-0 left-0 right-0 h-8 z-20 cursor-grab hidden" style="background: linear-gradient(to bottom, rgba(59, 130, 246, 0.3), transparent);">
-                <div class="flex items-center justify-center h-full">
-                    <span id="dragHandleText" class="text-xs text-blue-400 opacity-80 whitespace-nowrap">拖拽到DAW导出选区</span>
+            <!-- 拖拽手柄（选区拖拽导出）- 只在选区上方显示 -->
+            <div id="dragHandle" class="absolute h-8 z-20 cursor-grab hidden"
+                 style="top: 0; min-width: 60px; background: linear-gradient(to bottom, rgba(59, 130, 246, 0.3), transparent);">
+                <div class="flex items-center justify-center h-full px-2">
+                    <span id="dragHandleText" class="text-xs text-blue-400 opacity-80 whitespace-nowrap">拖拽导出</span>
                 </div>
             </div>
 
@@ -2134,10 +2135,50 @@
                     selectSound(soundData[0]);
                 }
                 if (!currentSound) return;
+
                 if (isPlaying) {
                     pausePlayback();
                 } else {
-                    startPlayback();
+                    // 有选区时智能播放
+                    if (selectionStart !== null && selectionEnd !== null && audioPlayer && audioPlayer.src) {
+                        const currentTime = audioPlayer.currentTime; // 秒
+                        const selStart = selectionStart / 1000;     // 毫秒转秒
+                        const selEnd = selectionEnd / 1000;         // 毫秒转秒
+
+                        let playStart = currentTime;
+                        let playEnd = audioPlayer.duration || currentSound.duration / 1000;
+
+                        // 智能判断播放范围
+                        if (currentTime >= selStart && currentTime <= selEnd) {
+                            // 光标在选区内 -> 播放到选区结束停止
+                            playStart = currentTime;
+                            playEnd = selEnd;
+                        } else if (currentTime < selStart) {
+                            // 光标在选区前 -> 播放到选区结束
+                            playStart = currentTime;
+                            playEnd = selEnd;
+                        } else {
+                            // 光标在选区后 -> 播放到音频结尾
+                            playStart = currentTime;
+                            playEnd = audioPlayer.duration || currentSound.duration / 1000;
+                        }
+
+                        // 设置播放范围
+                        audioPlayer.currentTime = playStart;
+                        audioPlayer.removeEventListener('ended', handlePlaybackEnded);
+                        audioPlayer.addEventListener('ended', handlePlaybackEnded);
+
+                        audioPlayer.play().then(() => {
+                            isPlaying = true;
+                            startPlaybackAnimation();
+                            updatePlaybackUI();
+                        }).catch(err => {
+                            console.error('播放失败:', err);
+                            startPlayback();
+                        });
+                    } else {
+                        startPlayback();
+                    }
                 }
             });
             
@@ -2219,6 +2260,7 @@
             let mouseDownX = 0;
             let mouseDownTime = 0;
             let wasSelecting = false;  // 标记是否发生过拖拽框选
+            let mouseStartedInDragHandle = false;  // 标记鼠标是否在dragHandle区域按下
             const DRAG_THRESHOLD = 10; // 移动超过10像素视为拖拽
 
             // 左键按下 - 记录位置和时间
@@ -2226,6 +2268,19 @@
                 if (!currentSound) return;
 
                 if (e.button === 0) {
+                    // 检查是否点击在dragHandle区域（顶部选区拖拽区域）
+                    const dragHandle = document.getElementById('dragHandle');
+                    if (dragHandle && !dragHandle.classList.contains('hidden')) {
+                        const handleRect = dragHandle.getBoundingClientRect();
+                        // 判断点击是否在dragHandle范围内
+                        if (e.clientY >= handleRect.top && e.clientY <= handleRect.bottom) {
+                            // 点击在dragHandle区域，不处理选区
+                            mouseStartedInDragHandle = true;
+                            return;
+                        }
+                    }
+                    mouseStartedInDragHandle = false;
+
                     mouseDownX = e.clientX;
                     mouseDownTime = Date.now();
                     wasSelecting = false;
@@ -2238,6 +2293,11 @@
 
                 // 检查是否是拖拽（按住左键移动超过阈值）
                 if (e.buttons === 1) {  // 左键按住
+                    // 如果鼠标在dragHandle区域按下，不处理选区
+                    if (mouseStartedInDragHandle) {
+                        return;
+                    }
+
                     const deltaX = Math.abs(e.clientX - mouseDownX);
 
                     // 如果移动超过阈值，开始框选
@@ -2278,6 +2338,9 @@
             // 鼠标松开 - 判断是点击还是拖拽
             waveformCanvas.addEventListener('mouseup', (e) => {
                 if (!currentSound) return;
+
+                // 重置dragHandle标记
+                mouseStartedInDragHandle = false;
 
                 if (e.button === 0) {
                     const deltaX = Math.abs(e.clientX - mouseDownX);
@@ -2379,12 +2442,11 @@
                             }
                         }
 
-                        // 设置draggable属性
+                        // 设置draggable属性 - 只在dragHandle上允许拖拽
                         dragHandle.setAttribute('draggable', 'true');
                     }
 
-                    // 更新 canvas 的 draggable 状态
-                    waveformCanvas.draggable = true;
+                    // canvas不设置draggable，避免与选区冲突
                 } else {
                     if (selectionInfoEl) selectionInfoEl.classList.add('hidden');
 
@@ -2393,8 +2455,6 @@
                         dragHandle.classList.add('hidden');
                         dragHandle.setAttribute('draggable', 'false');
                     }
-
-                    waveformCanvas.draggable = false;
                 }
             }
 
