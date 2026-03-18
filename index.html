@@ -1406,11 +1406,13 @@
             currentSound = sound;
             playbackProgress = 0;
             
-            // 暂停当前播放的音频，但不重置音频源
-            // 这样下次播放时可以正确加载新音频
+            // 暂停当前播放的音频
             if (audioPlayer) {
                 audioPlayer.pause();
             }
+            
+            // 预加载新音频到audioPlayer.src，但不播放
+            preloadAudioSource(sound);
             
             updatePlaybackUI();
             
@@ -1419,6 +1421,54 @@
             
             // 只更新选中状态，不重绘整个列表
             updateSelectionState(previousSound, sound);
+        }
+        
+        // 预加载音频源到audioPlayer.src，但不播放
+        async function preloadAudioSource(sound) {
+            if (!sound || !sound.filePath) return;
+            
+            try {
+                let audioSrc;
+                
+                if (window.electronAPI && window.electronAPI.readAudioFile) {
+                    const result = await window.electronAPI.readAudioFile(sound.filePath);
+                    
+                    if (result && result.success) {
+                        const uint8Array = new Uint8Array(result.data);
+                        const fileExt = sound.filePath.split('.').pop().toLowerCase();
+                        const mimeTypes = {
+                            'wav': 'audio/wav',
+                            'mp3': 'audio/mpeg',
+                            'flac': 'audio/flac',
+                            'aiff': 'audio/aiff',
+                            'aif': 'audio/aiff',
+                            'ogg': 'audio/ogg',
+                            'm4a': 'audio/mp4',
+                            'aac': 'audio/aac'
+                        };
+                        const mimeType = mimeTypes[fileExt] || 'audio/wav';
+                        const blob = new Blob([uint8Array], { type: mimeType });
+                        audioSrc = URL.createObjectURL(blob);
+                        
+                        // 释放旧的Blob URL
+                        if (currentBlobUrl) {
+                            URL.revokeObjectURL(currentBlobUrl);
+                        }
+                        currentBlobUrl = audioSrc;
+                    } else {
+                        audioSrc = 'file://' + encodeURI(sound.filePath).replace(/#/g, '%23');
+                    }
+                } else {
+                    audioSrc = 'file://' + encodeURI(sound.filePath).replace(/#/g, '%23');
+                }
+                
+                if (audioPlayer) {
+                    audioPlayer.src = audioSrc;
+                    audioPlayer.load();
+                }
+            } catch (error) {
+                console.error('[preloadAudioSource] 加载音频失败:', error);
+            }
         }
         
         // 仅更新选中状态，避免重绘整个列表
