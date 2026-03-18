@@ -292,10 +292,9 @@
                 <span class="text-sm opacity-40" style="color: var(--text-secondary);">请导入或选择一个音频文件</span>
             </div>
 
-            <!-- 拖拽手柄（选区拖拽导出）- 只在选区上方显示 -->
-            <div id="dragHandle" class="absolute h-8 z-20 cursor-grab hidden"
-                 style="top: 0; min-width: 60px; background: linear-gradient(to bottom, rgba(59, 130, 246, 0.3), transparent);">
-                <div class="flex items-center justify-center h-full px-2">
+            <!-- 拖拽手柄（选区拖拽导出） -->
+            <div id="dragHandle" class="absolute top-0 h-8 z-20 cursor-grab hidden" style="min-width: 60px; background: linear-gradient(to bottom, rgba(59, 130, 246, 0.3), transparent);">
+                <div class="flex items-center justify-center h-full">
                     <span id="dragHandleText" class="text-xs text-blue-400 opacity-80 whitespace-nowrap">拖拽导出</span>
                 </div>
             </div>
@@ -2140,13 +2139,13 @@
                     pausePlayback();
                 } else {
                     // 有选区时智能播放
-                    if (selectionStart !== null && selectionEnd !== null && audioPlayer && audioPlayer.src) {
+                    if (selectionStart !== null && selectionEnd !== null && audioPlayer && audioPlayer.src && currentSound) {
                         const currentTime = audioPlayer.currentTime; // 秒
                         const selStart = selectionStart / 1000;     // 毫秒转秒
                         const selEnd = selectionEnd / 1000;         // 毫秒转秒
 
                         let playStart = currentTime;
-                        let playEnd = audioPlayer.duration || currentSound.duration / 1000;
+                        let playEnd = currentSound.duration / 1000; // 使用currentSound.duration
 
                         // 智能判断播放范围
                         if (currentTime >= selStart && currentTime <= selEnd) {
@@ -2160,7 +2159,7 @@
                         } else {
                             // 光标在选区后 -> 播放到音频结尾
                             playStart = currentTime;
-                            playEnd = audioPlayer.duration || currentSound.duration / 1000;
+                            playEnd = currentSound.duration / 1000;
                         }
 
                         // 设置播放范围
@@ -2268,13 +2267,12 @@
                 if (!currentSound) return;
 
                 if (e.button === 0) {
-                    // 检查是否点击在dragHandle区域（顶部选区拖拽区域）
+                    // 检查是否点击在dragHandle区域
                     const dragHandle = document.getElementById('dragHandle');
                     if (dragHandle && !dragHandle.classList.contains('hidden')) {
                         const handleRect = dragHandle.getBoundingClientRect();
-                        // 判断点击是否在dragHandle范围内
+                        // 判断点击是否在dragHandle Y轴范围内
                         if (e.clientY >= handleRect.top && e.clientY <= handleRect.bottom) {
-                            // 点击在dragHandle区域，不处理选区
                             mouseStartedInDragHandle = true;
                             return;
                         }
@@ -2445,8 +2443,6 @@
                         // 设置draggable属性 - 只在dragHandle上允许拖拽
                         dragHandle.setAttribute('draggable', 'true');
                     }
-
-                    // canvas不设置draggable，避免与选区冲突
                 } else {
                     if (selectionInfoEl) selectionInfoEl.classList.add('hidden');
 
@@ -2470,9 +2466,6 @@
                         e.preventDefault();
                         return;
                     }
-
-                    // 禁用canvas的draggable避免冲突
-                    waveformCanvas.draggable = false;
 
                     isDraggingSelection = true;
 
@@ -2521,11 +2514,6 @@
 
                 dragHandle.addEventListener('dragend', async (e) => {
                     isDraggingSelection = false;
-
-                    // 恢复canvas的draggable状态
-                    if (selectionStart !== null && selectionEnd !== null) {
-                        waveformCanvas.draggable = true;
-                    }
 
                     // 删除临时文件
                     if (draggedClipPath) {
@@ -2745,7 +2733,7 @@
                                 const selEnd = selectionEnd / 1000;         // 转换为秒
 
                                 let playStart = currentTime;
-                                let playEnd = audioPlayer.duration || currentSound.duration / 1000;
+                                let playEnd = currentSound.duration / 1000; // 使用currentSound.duration
 
                                 // 智能判断播放范围
                                 if (currentTime >= selStart && currentTime <= selEnd) {
@@ -2759,7 +2747,7 @@
                                 } else {
                                     // 光标在选区后 -> 播放到音频结尾
                                     playStart = currentTime;
-                                    playEnd = audioPlayer.duration || currentSound.duration / 1000;
+                                    playEnd = currentSound.duration / 1000;
                                 }
 
                                 // 设置播放范围
