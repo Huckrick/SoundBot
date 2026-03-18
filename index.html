@@ -1411,6 +1411,13 @@
                 audioPlayer.pause();
             }
             
+            // 选择新音频时清除选区和相关状态
+            selectionStart = null;
+            selectionEnd = null;
+            playbackStartedInSelection = false;
+            playbackStartTime = 0;
+            lastStoppedAtSelectionEnd = false;
+            
             // 预加载新音频到audioPlayer.src，但不播放
             preloadAudioSource(sound);
             
