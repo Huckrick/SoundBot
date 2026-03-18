@@ -1406,10 +1406,10 @@
             currentSound = sound;
             playbackProgress = 0;
             
-            // 重置音频播放器，确保新选择的音频被正确加载
+            // 暂停当前播放的音频，但不重置音频源
+            // 这样下次播放时可以正确加载新音频
             if (audioPlayer) {
                 audioPlayer.pause();
-                audioPlayer.src = '';
             }
             
             updatePlaybackUI();
