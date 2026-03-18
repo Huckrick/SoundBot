@@ -2242,57 +2242,94 @@
             // ==================== 区域选择功能 ====================
             const waveformCanvas = document.getElementById('mainWaveform');
 
-            // 开始框选 (Alt+点击 或 专门的选择模式)
+            // 用于区分点击和拖拽
+            let mouseDownX = 0;
+            let mouseDownTime = 0;
+            const DRAG_THRESHOLD = 5; // 移动超过5像素视为拖拽
+
+            // 左键按下 - 区分点击和拖拽
             waveformCanvas.addEventListener('mousedown', (e) => {
                 if (!currentSound) return;
 
-                // Alt+点击 开始框选
-                if (e.altKey) {
-                    e.preventDefault();
-                    isSelecting = true;
-                    const waveContainer = document.getElementById('waveformContainer');
+                if (e.button === 0) {
                     const rect = waveformCanvas.getBoundingClientRect();
-                    const canvasWidth = waveContainer.offsetWidth;
-                    selectionStartX = e.clientX - rect.left + waveformScrollOffset;
+                    mouseDownX = e.clientX;
+                    mouseDownTime = Date.now();
+
+                    // 清除之前的选区
                     selectionStart = null;
                     selectionEnd = null;
-                    // 清除之前的选区
                     updateSelectionInfo(null, null);
-                    return;
                 }
             });
 
+            // 鼠标移动 - 拖拽时开始框选
             waveformCanvas.addEventListener('mousemove', (e) => {
-                if (!isSelecting || !currentSound) return;
+                if (!currentSound) return;
 
-                const rect = waveformCanvas.getBoundingClientRect();
-                const currentX = e.clientX - rect.left + waveformScrollOffset;
-                const startX = Math.min(selectionStartX, currentX);
-                const endX = Math.max(selectionStartX, currentX);
+                // 检查是否是拖拽（按住左键移动超过阈值）
+                if (e.buttons === 1) {  // 左键按住
+                    const deltaX = Math.abs(e.clientX - mouseDownX);
 
-                // 转换为时间
-                const startProgress = startX / (waveformCanvas.width * waveformZoomLevel);
-                const endProgress = endX / (waveformCanvas.width * waveformZoomLevel);
+                    // 如果移动超过阈值，开始框选
+                    if (deltaX > DRAG_THRESHOLD) {
+                        e.preventDefault();
 
-                selectionStart = Math.max(0, startProgress * currentSound.duration);
-                selectionEnd = Math.min(currentSound.duration, endProgress * currentSound.duration);
+                        if (!isSelecting) {
+                            isSelecting = true;
+                            const rect = waveformCanvas.getBoundingClientRect();
+                            selectionStartX = mouseDownX - rect.left + waveformScrollOffset;
+                        }
 
-                // 实时更新显示
-                updateSelectionInfo(selectionStart, selectionEnd);
-                requestAnimationFrame(() => drawMainWaveform());
+                        const rect = waveformCanvas.getBoundingClientRect();
+                        const currentX = e.clientX - rect.left + waveformScrollOffset;
+                        const startX = Math.min(selectionStartX, currentX);
+                        const endX = Math.max(selectionStartX, currentX);
+
+                        // 转换为时间
+                        const startProgress = startX / (waveformCanvas.width * waveformZoomLevel);
+                        const endProgress = endX / (waveformCanvas.width * waveformZoomLevel);
+
+                        selectionStart = Math.max(0, startProgress * currentSound.duration);
+                        selectionEnd = Math.min(currentSound.duration, endProgress * currentSound.duration);
+
+                        // 实时更新显示
+                        updateSelectionInfo(selectionStart, selectionEnd);
+                        requestAnimationFrame(() => drawMainWaveform());
+                    }
+                }
             });
 
+            // 鼠标松开 - 判断是点击还是拖拽
             waveformCanvas.addEventListener('mouseup', (e) => {
-                if (isSelecting && currentSound) {
-                    isSelecting = false;
+                if (!currentSound) return;
 
-                    // 如果选区太小，视为无效选择
-                    if (selectionEnd - selectionStart < 0.1) {
-                        selectionStart = null;
-                        selectionEnd = null;
-                        updateSelectionInfo(null, null);
+                if (e.button === 0) {
+                    const deltaX = Math.abs(e.clientX - mouseDownX);
+                    const deltaTime = Date.now() - mouseDownTime;
+
+                    if (isSelecting) {
+                        // 拖拽结束
+                        isSelecting = false;
+
+                        // 如果选区太小，视为无效选择
+                        if (selectionEnd - selectionStart < 0.1) {
+                            selectionStart = null;
+                            selectionEnd = null;
+                            updateSelectionInfo(null, null);
+                        }
+                        requestAnimationFrame(() => drawMainWaveform());
+                    } else if (deltaX <= DRAG_THRESHOLD && deltaTime < 300) {
+                        // 点击（移动少且时间短）- 定位播放头
+                        const rect = waveformCanvas.getBoundingClientRect();
+                        const clickX = e.clientX - rect.left + waveformScrollOffset;
+                        const progress = clickX / (waveformCanvas.width * waveformZoomLevel);
+                        const clickTime = Math.max(0, Math.min(currentSound.duration, progress * currentSound.duration));
+
+                        audioPlayer.currentTime = clickTime;
+                        updatePlaybackUI();
+                        drawMainWaveform();
                     }
-                    requestAnimationFrame(() => drawMainWaveform());
                 }
             });
 
@@ -2334,30 +2371,62 @@
             // ==================== 拖出导出功能 ====================
             let isDraggingSelection = false;
             let dragStartX = 0;
+            let draggedClipPath = null;  // 存储裁剪后的文件路径
 
-            waveformCanvas.addEventListener('dragstart', (e) => {
+            waveformCanvas.addEventListener('dragstart', async (e) => {
                 if (!currentSound || selectionStart === null || selectionEnd === null) {
                     e.preventDefault();
                     return;
                 }
-                
+
                 // 检查拖拽起始位置是否在选区内
                 const rect = waveformCanvas.getBoundingClientRect();
                 const dragX = e.clientX - rect.left + waveformScrollOffset;
                 const selStartX = (selectionStart / currentSound.duration) * (waveformCanvas.width * waveformZoomLevel);
                 const selEndX = (selectionEnd / currentSound.duration) * (waveformCanvas.width * waveformZoomLevel);
-                
+
                 if (dragX >= selStartX && dragX <= selEndX) {
                     isDraggingSelection = true;
-                    e.dataTransfer.setData('application/json', JSON.stringify({
-                        path: currentSound.path || currentSound.filePath,
-                        start: selectionStart,
-                        end: selectionEnd
-                    }));
-                    e.dataTransfer.effectAllowed = 'copy';
-                    
-                    // 设置拖拽时的自定义图标（可选）
-                    e.dataTransfer.setDragImage(waveformCanvas, e.offsetX, e.offsetY);
+
+                    // 先调用后端API裁剪音频文件
+                    try {
+                        const response = await fetch('/api/export/clip', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                path: currentSound.path || currentSound.filePath,
+                                start: selectionStart,
+                                end: selectionEnd
+                            })
+                        });
+
+                        if (response.ok) {
+                            const result = await response.json();
+                            draggedClipPath = result.output_path;
+
+                            // 设置文件 URI 列表（DAW 识别 file:// 协议）
+                            e.dataTransfer.setData('text/uri-list', 'file://' + draggedClipPath);
+                            e.dataTransfer.setData('text/plain', 'file://' + draggedClipPath);
+
+                            // 设置 JSON 数据（保留原有功能）
+                            e.dataTransfer.setData('application/json', JSON.stringify({
+                                path: currentSound.path || currentSound.filePath,
+                                start: selectionStart,
+                                end: selectionEnd,
+                                outputPath: draggedClipPath
+                            }));
+                            e.dataTransfer.effectAllowed = 'copy';
+
+                            // 设置拖拽时的自定义图标
+                            e.dataTransfer.setDragImage(waveformCanvas, e.offsetX, e.offsetY);
+                        } else {
+                            console.error('裁剪失败:', await response.text());
+                            e.preventDefault();
+                        }
+                    } catch (error) {
+                        console.error('裁剪请求失败:', error);
+                        e.preventDefault();
+                    }
                 } else {
                     e.preventDefault();
                 }
@@ -2365,6 +2434,7 @@
 
             waveformCanvas.addEventListener('dragend', (e) => {
                 isDraggingSelection = false;
+                draggedClipPath = null;
             });
 
             // ==================== 波形滚轮缩放 ====================
@@ -2543,6 +2613,41 @@
                     document.getElementById('sendMessage').click();
                 }
             });
+
+            // 空格键播放/暂停控制
+            document.addEventListener('keydown', (e) => {
+                // 如果焦点在输入框中，不响应空格键
+                if (document.activeElement.tagName === 'INPUT' ||
+                    document.activeElement.tagName === 'TEXTAREA') {
+                    return;
+                }
+
+                if (e.code === 'Space') {
+                    e.preventDefault();
+
+                    if (isPlaying) {
+                        pausePlayback();
+                    } else {
+                        // 如果有选区，播放选区并循环
+                        if (selectionStart !== null && selectionEnd !== null && currentSound) {
+                            audioPlayer.currentTime = selectionStart;
+                            // 移除之前的时间更新监听器，避免重复
+                            audioPlayer.removeEventListener('timeupdate', handleSelectionLoop);
+                            // 添加循环播放监听器
+                            audioPlayer.addEventListener('timeupdate', handleSelectionLoop);
+                        }
+                        startPlayback();
+                    }
+                }
+            });
+
+            // 选区循环播放处理函数
+            function handleSelectionLoop() {
+                if (selectionStart !== null && selectionEnd !== null &&
+                    audioPlayer.currentTime >= selectionEnd) {
+                    audioPlayer.currentTime = selectionStart;
+                }
+            }
             
             document.querySelectorAll('.example-prompt').forEach(btn => {
                 btn.addEventListener('click', () => {
