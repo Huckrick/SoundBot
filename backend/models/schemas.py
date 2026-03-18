@@ -100,6 +100,7 @@ class ClipRequest(BaseModel):
     start: float = Field(..., ge=0, description="裁切起始时间（秒）")
     end: float = Field(..., gt=0, description="裁切结束时间（秒）")
     output: Optional[str] = Field(None, description="输出文件路径，默认在原文件同目录添加 _clip 后缀")
+    temp_file: bool = Field(default=False, description="是否创建临时文件（用于拖拽导出）")
 
 
 class FadeRequest(BaseModel):

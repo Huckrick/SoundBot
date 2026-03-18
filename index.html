@@ -294,10 +294,17 @@
             <div id="waveformEmptyState" class="absolute inset-0 flex items-center justify-center z-10">
                 <span class="text-sm opacity-40" style="color: var(--text-secondary);">请导入或选择一个音频文件</span>
             </div>
-            
+
+            <!-- 拖拽手柄（选区拖拽导出） -->
+            <div id="dragHandle" class="absolute top-0 left-0 right-0 h-8 z-20 cursor-grab hidden" style="background: linear-gradient(to bottom, rgba(59, 130, 246, 0.3), transparent);">
+                <div class="flex items-center justify-center h-full">
+                    <span class="text-xs text-blue-400 opacity-80">拖拽到DAW导出选区</span>
+                </div>
+            </div>
+
             <!-- Canvas 波形（主显示，使用 /api/waveform 真实数据） -->
             <canvas id="mainWaveform" class="absolute inset-0 w-full h-full waveform-canvas hidden"></canvas>
-            
+
             <!-- WaveSurfer 容器（可选，仅在其加载成功时显示） -->
             <div id="waveform" class="absolute inset-0 w-full h-full hidden"></div>
         </div>
@@ -2245,21 +2252,17 @@
             // 用于区分点击和拖拽
             let mouseDownX = 0;
             let mouseDownTime = 0;
-            const DRAG_THRESHOLD = 5; // 移动超过5像素视为拖拽
+            let wasSelecting = false;  // 标记是否发生过拖拽框选
+            const DRAG_THRESHOLD = 10; // 移动超过10像素视为拖拽
 
-            // 左键按下 - 区分点击和拖拽
+            // 左键按下 - 记录位置和时间
             waveformCanvas.addEventListener('mousedown', (e) => {
                 if (!currentSound) return;
 
                 if (e.button === 0) {
-                    const rect = waveformCanvas.getBoundingClientRect();
                     mouseDownX = e.clientX;
                     mouseDownTime = Date.now();
-
-                    // 清除之前的选区
-                    selectionStart = null;
-                    selectionEnd = null;
-                    updateSelectionInfo(null, null);
+                    wasSelecting = false;
                 }
             });
 
@@ -2275,10 +2278,16 @@
                     if (deltaX > DRAG_THRESHOLD) {
                         e.preventDefault();
 
+                        // 只有第一次进入拖拽时才清除之前的选区
                         if (!isSelecting) {
                             isSelecting = true;
+                            wasSelecting = true;
                             const rect = waveformCanvas.getBoundingClientRect();
                             selectionStartX = mouseDownX - rect.left + waveformScrollOffset;
+                            // 清除之前的选区
+                            selectionStart = null;
+                            selectionEnd = null;
+                            updateSelectionInfo(null, null);
                         }
 
                         const rect = waveformCanvas.getBoundingClientRect();
@@ -2333,6 +2342,16 @@
                 }
             });
 
+            // 双击清除选区
+            waveformCanvas.addEventListener('dblclick', (e) => {
+                if (!currentSound) return;
+
+                selectionStart = null;
+                selectionEnd = null;
+                updateSelectionInfo(null, null);
+                requestAnimationFrame(() => drawMainWaveform());
+            });
+
             // 鼠标离开时结束框选
             waveformCanvas.addEventListener('mouseleave', () => {
                 if (isSelecting) {
@@ -2347,6 +2366,8 @@
             });
 
             // 选区信息更新函数
+            const dragHandle = document.getElementById('dragHandle');
+
             function updateSelectionInfo(start, end) {
                 const selectionInfoEl = document.getElementById('selectionInfo');
                 const selectionStartEl = document.getElementById('selectionStart');
@@ -2358,12 +2379,19 @@
                     if (selectionStartEl) selectionStartEl.textContent = start.toFixed(2);
                     if (selectionEndEl) selectionEndEl.textContent = end.toFixed(2);
                     if (exportBtn) exportBtn.classList.remove('hidden');
-                    
+
+                    // 显示拖拽手柄
+                    if (dragHandle) dragHandle.classList.remove('hidden');
+
                     // 更新 canvas 的 draggable 状态
                     waveformCanvas.draggable = true;
                 } else {
                     if (selectionInfoEl) selectionInfoEl.classList.add('hidden');
                     if (exportBtn) exportBtn.classList.add('hidden');
+
+                    // 隐藏拖拽手柄
+                    if (dragHandle) dragHandle.classList.add('hidden');
+
                     waveformCanvas.draggable = false;
                 }
             }
@@ -2373,6 +2401,79 @@
             let dragStartX = 0;
             let draggedClipPath = null;  // 存储裁剪后的文件路径
 
+            // 拖拽手柄的拖拽事件
+            if (dragHandle) {
+                dragHandle.addEventListener('dragstart', async (e) => {
+                    if (!currentSound || selectionStart === null || selectionEnd === null) {
+                        e.preventDefault();
+                        return;
+                    }
+
+                    isDraggingSelection = true;
+
+                    // 调用后端API创建临时裁剪文件
+                    try {
+                        const response = await fetch('/api/export/clip', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                path: currentSound.path || currentSound.filePath,
+                                start: selectionStart,
+                                end: selectionEnd,
+                                temp_file: true  // 使用临时文件模式
+                            })
+                        });
+
+                        if (response.ok) {
+                            const result = await response.json();
+                            draggedClipPath = result.output_path;
+
+                            // 设置文件 URI（DAW 识别 file:// 协议）
+                            e.dataTransfer.setData('text/uri-list', 'file://' + draggedClipPath);
+                            e.dataTransfer.setData('text/plain', 'file://' + draggedClipPath);
+
+                            // 设置 JSON 数据
+                            e.dataTransfer.setData('application/json', JSON.stringify({
+                                path: currentSound.path || currentSound.filePath,
+                                start: selectionStart,
+                                end: selectionEnd,
+                                outputPath: draggedClipPath
+                            }));
+                            e.dataTransfer.effectAllowed = 'copy';
+
+                            // 使用波形作为拖拽图像
+                            e.dataTransfer.setDragImage(waveformCanvas, e.offsetX, e.offsetY);
+                        } else {
+                            console.error('裁剪失败:', await response.text());
+                            e.preventDefault();
+                        }
+                    } catch (error) {
+                        console.error('裁剪请求失败:', error);
+                        e.preventDefault();
+                    }
+                });
+
+                dragHandle.addEventListener('dragend', async (e) => {
+                    isDraggingSelection = false;
+
+                    // 删除临时文件
+                    if (draggedClipPath) {
+                        try {
+                            // URL 编码文件路径
+                            const encodedPath = encodeURIComponent(draggedClipPath);
+                            await fetch(`/api/temp/${encodedPath}`, {
+                                method: 'DELETE'
+                            });
+                            console.log('已删除临时文件:', draggedClipPath);
+                        } catch (error) {
+                            console.error('删除临时文件失败:', error);
+                        }
+                        draggedClipPath = null;
+                    }
+                });
+            }
+
+            // 保留 canvas 的拖拽事件（向后兼容）
             waveformCanvas.addEventListener('dragstart', async (e) => {
                 if (!currentSound || selectionStart === null || selectionEnd === null) {
                     e.preventDefault();
@@ -2388,7 +2489,7 @@
                 if (dragX >= selStartX && dragX <= selEndX) {
                     isDraggingSelection = true;
 
-                    // 先调用后端API裁剪音频文件
+                    // 调用后端API创建临时裁剪文件
                     try {
                         const response = await fetch('/api/export/clip', {
                             method: 'POST',
@@ -2396,7 +2497,8 @@
                             body: JSON.stringify({
                                 path: currentSound.path || currentSound.filePath,
                                 start: selectionStart,
-                                end: selectionEnd
+                                end: selectionEnd,
+                                temp_file: true
                             })
                         });
 
@@ -2404,11 +2506,11 @@
                             const result = await response.json();
                             draggedClipPath = result.output_path;
 
-                            // 设置文件 URI 列表（DAW 识别 file:// 协议）
+                            // 设置文件 URI
                             e.dataTransfer.setData('text/uri-list', 'file://' + draggedClipPath);
                             e.dataTransfer.setData('text/plain', 'file://' + draggedClipPath);
 
-                            // 设置 JSON 数据（保留原有功能）
+                            // 设置 JSON 数据
                             e.dataTransfer.setData('application/json', JSON.stringify({
                                 path: currentSound.path || currentSound.filePath,
                                 start: selectionStart,
@@ -2417,7 +2519,7 @@
                             }));
                             e.dataTransfer.effectAllowed = 'copy';
 
-                            // 设置拖拽时的自定义图标
+                            // 设置拖拽图像
                             e.dataTransfer.setDragImage(waveformCanvas, e.offsetX, e.offsetY);
                         } else {
                             console.error('裁剪失败:', await response.text());
@@ -2432,9 +2534,22 @@
                 }
             });
 
-            waveformCanvas.addEventListener('dragend', (e) => {
+            waveformCanvas.addEventListener('dragend', async (e) => {
                 isDraggingSelection = false;
-                draggedClipPath = null;
+
+                // 删除临时文件
+                if (draggedClipPath) {
+                    try {
+                        const encodedPath = encodeURIComponent(draggedClipPath);
+                        await fetch(`/api/temp/${encodedPath}`, {
+                            method: 'DELETE'
+                        });
+                        console.log('已删除临时文件:', draggedClipPath);
+                    } catch (error) {
+                        console.error('删除临时文件失败:', error);
+                    }
+                    draggedClipPath = null;
+                }
             });
 
             // ==================== 波形滚轮缩放 ====================
@@ -2629,14 +2744,31 @@
                         pausePlayback();
                     } else {
                         // 如果有选区，播放选区并循环
-                        if (selectionStart !== null && selectionEnd !== null && currentSound) {
+                        const hasSelection = selectionStart !== null && selectionEnd !== null && currentSound;
+
+                        if (hasSelection && audioPlayer) {
+                            // 先暂停（如果有）
+                            audioPlayer.pause();
+                            // 设置播放起始位置为选区开始
                             audioPlayer.currentTime = selectionStart;
                             // 移除之前的时间更新监听器，避免重复
                             audioPlayer.removeEventListener('timeupdate', handleSelectionLoop);
                             // 添加循环播放监听器
                             audioPlayer.addEventListener('timeupdate', handleSelectionLoop);
+
+                            // 开始播放
+                            audioPlayer.play().then(() => {
+                                isPlaying = true;
+                                startPlaybackAnimation();
+                                updatePlaybackUI();
+                            }).catch(err => {
+                                console.error('播放选区失败:', err);
+                                // 如果播放失败，尝试从头开始
+                                startPlayback();
+                            });
+                        } else {
+                            startPlayback();
                         }
-                        startPlayback();
                     }
                 }
             });

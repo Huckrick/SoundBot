@@ -369,57 +369,121 @@ async def get_indexed_files():
 async def export_clip(request: schemas.ClipRequest):
     """
     裁切音频片段
-    
+
     - **path**: 源音频文件路径
     - **start**: 裁切起始时间（秒）
     - **end**: 裁切结束时间（秒）
     - **output**: 输出文件路径（可选，默认在原文件同目录添加 _clip 后缀）
+    - **temp_file**: 是否创建临时文件（用于拖拽导出，会在系统临时目录创建）
     """
     import soundfile as sf
     import numpy as np
+    import tempfile
+    import os
 
     source_file = config.validate_audio_path(request.path)
-    
+
     if request.start >= request.end:
         raise HTTPException(status_code=400, detail="起始时间必须小于结束时间")
-    
+
     try:
-        # 读取音频
+        # 读取音频，获取原始采样率
         audio, sr = sf.read(str(source_file))
-        
+
+        # 获取原始音频的格式信息
+        subtype = None
+        if hasattr(source_file, 'suffix'):
+            # 根据文件格式确定 subtype
+            suffix = source_file.suffix.lower()
+            if suffix in ['.wav']:
+                # WAV 文件保留原始格式
+                try:
+                    info = sf.info(str(source_file))
+                    subtype = info.subtype if hasattr(info, 'subtype') else 'PCM_16'
+                except:
+                    subtype = 'PCM_16'
+
         # 计算裁切的样本位置
         start_sample = int(request.start * sr)
         end_sample = int(request.end * sr)
-        
+
         # 边界检查
         if start_sample >= len(audio):
             raise HTTPException(status_code=400, detail="起始时间超出音频时长")
-        
+
         end_sample = min(end_sample, len(audio))
-        
+
         # 裁切
         clipped_audio = audio[start_sample:end_sample]
-        
+
         # 生成输出路径
-        if request.output:
+        if request.temp_file:
+            # 使用系统临时目录
+            temp_dir = tempfile.gettempdir()
+            # 生成唯一的临时文件名
+            import uuid
+            temp_name = f"soundmind_clip_{uuid.uuid4().hex[:8]}{source_file.suffix}"
+            output_path = Path(temp_dir) / temp_name
+        elif request.output:
             output_path = Path(request.output)
         else:
             output_path = source_file.parent / f"{source_file.stem}_clip{source_file.suffix}"
-        
-        # 保存
-        sf.write(str(output_path), clipped_audio, sr)
-        
+
+        # 保存 - 保留原始采样率和格式
+        if subtype:
+            sf.write(str(output_path), clipped_audio, sr, subtype=subtype)
+        else:
+            sf.write(str(output_path), clipped_audio, sr)
+
         duration = len(clipped_audio) / sr
-        
+
         return schemas.ClipResponse(
             success=True,
             output_path=str(output_path),
             duration=duration,
             message=f"成功裁切 {request.start:.2f}s - {request.end:.2f}s"
         )
-        
+
     except Exception as e:
         logger.error(f"裁切失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== 删除临时文件 ====================
+
+@app.delete("/api/temp/{file_path:path}")
+async def delete_temp_file(file_path: str):
+    """
+    删除临时文件
+
+    - **file_path**: 临时文件路径（URL编码）
+    """
+    import os
+
+    try:
+        # 解码URL编码的路径
+        from urllib.parse import unquote
+        file_path = unquote(file_path)
+
+        # 安全检查：确保文件在临时目录内
+        import tempfile
+        temp_dir = tempfile.gettempdir()
+        abs_path = os.path.abspath(file_path)
+
+        if not abs_path.startswith(temp_dir):
+            raise HTTPException(status_code=400, detail="只能删除临时目录中的文件")
+
+        # 删除文件
+        if os.path.exists(abs_path):
+            os.remove(abs_path)
+            return {"success": True, "message": f"已删除临时文件: {os.path.basename(abs_path)}"}
+        else:
+            return {"success": True, "message": "文件不存在"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"删除临时文件失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
