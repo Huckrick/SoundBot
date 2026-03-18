@@ -1405,6 +1405,13 @@
             const previousSound = currentSound;
             currentSound = sound;
             playbackProgress = 0;
+            
+            // 重置音频播放器，确保新选择的音频被正确加载
+            if (audioPlayer) {
+                audioPlayer.pause();
+                audioPlayer.src = '';
+            }
+            
             updatePlaybackUI();
             
             // 只使用 Canvas 波形 + /api/waveform 数据，避免 WaveSurfer 内部错误导致黑屏
@@ -2242,8 +2249,9 @@
                         let playStart;
                         let playEnd;
 
-                        // 如果上一次播放因为到达选区结束而停止，且当前光标在选区内，重新从选区开始播放
-                        if (lastStoppedAtSelectionEnd && currentTime >= selStart && currentTime <= selEnd) {
+                        // 如果上一次播放因为到达选区结束而停止，重新从选区开始播放
+                        // 使用更宽松的范围（selEnd + 0.5秒）来处理浮点数精度问题
+                        if (lastStoppedAtSelectionEnd && currentTime >= selStart && currentTime <= selEnd + 0.5) {
                             playStart = selStart;
                             playEnd = selEnd;
                             playbackStartedInSelection = true;
@@ -2807,8 +2815,9 @@
                                 let playStart;
                                 let playEnd;
 
-                                // 如果上一次播放因为到达选区结束而停止，且当前光标在选区内，重新从选区开始播放
-                                if (lastStoppedAtSelectionEnd && currentTime >= selStart && currentTime <= selEnd) {
+                                // 如果上一次播放因为到达选区结束而停止，重新从选区开始播放
+                                // 使用更宽松的范围（selEnd + 0.5秒）来处理浮点数精度问题
+                                if (lastStoppedAtSelectionEnd && currentTime >= selStart && currentTime <= selEnd + 0.5) {
                                     playStart = selStart;
                                     playEnd = selEnd;
                                     playbackStartedInSelection = true;
