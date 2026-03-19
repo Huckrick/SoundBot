@@ -3120,6 +3120,11 @@
                         // 移除选区最小限制，允许单线选区
                         // 即使选区很小也保持有效选择
                         requestAnimationFrame(() => drawMainWaveform());
+                        
+                        // 选区完成后预生成临时文件
+                        if (selectionStart !== null && selectionEnd !== null) {
+                            pregenerateClip();
+                        }
                     } else if (deltaX <= DRAG_THRESHOLD && deltaTime < 300) {
                         // 点击（移动少且时间短）- 定位播放头
                         const rect = waveformCanvas.getBoundingClientRect();
@@ -3187,6 +3192,88 @@
             let pendingDragPath = null;
             let isGeneratingClip = false;
             let clipGenerationPromise = null;
+            let lastSelectionKey = null;  // 用于判断选区是否变化
+
+            // 预生成临时文件函数
+            async function pregenerateClip() {
+                if (!currentSound || selectionStart === null || selectionEnd === null) {
+                    return;
+                }
+                
+                // 如果正在生成中，等待完成
+                if (isGeneratingClip && clipGenerationPromise) {
+                    console.log('[拖拽] 等待正在进行的生成...');
+                    await clipGenerationPromise;
+                    return;
+                }
+                
+                const startSec = selectionStart / 1000;
+                const endSec = selectionEnd / 1000;
+                const filePath = currentSound.path || currentSound.filePath;
+                const selectionKey = `${filePath}_${startSec}_${endSec}`;
+                
+                // 如果选区没变且已有文件，跳过
+                if (selectionKey === lastSelectionKey && pendingDragPath) {
+                    console.log('[拖拽] 选区未变化，跳过生成');
+                    return;
+                }
+                
+                lastSelectionKey = selectionKey;
+                const clipDuration = endSec - startSec;
+                console.log('[拖拽] 预生成临时文件，时长:', clipDuration.toFixed(2), '秒');
+                
+                // 显示生成中状态
+                const dragHandleText = document.getElementById('dragHandleText');
+                if (dragHandleText) {
+                    dragHandleText.textContent = '生成中...';
+                }
+                
+                isGeneratingClip = true;
+                
+                clipGenerationPromise = (async () => {
+                    try {
+                        let result;
+                        if (window.electronAPI && window.electronAPI.backendAPI) {
+                            result = await window.electronAPI.backendAPI.exportClip(filePath, startSec, endSec);
+                        } else {
+                            const response = await fetch('http://127.0.0.1:8000/api/export/clip', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ path: filePath, start: startSec, end: endSec, temp_file: true })
+                            });
+                            result = await response.json();
+                        }
+
+                        if (result && result.success && result.output_path) {
+                            pendingDragPath = result.output_path;
+                            console.log('[拖拽] 文件已生成:', pendingDragPath);
+                            
+                            // 恢复拖拽文字
+                            if (dragHandleText) {
+                                dragHandleText.textContent = '拖拽导出';
+                            }
+                            
+                            return true;
+                        } else {
+                            console.error('[拖拽] 失败:', result?.message || result?.detail || result?.error || '未知错误', result);
+                            if (dragHandleText) {
+                                dragHandleText.textContent = '生成失败';
+                            }
+                            return false;
+                        }
+                    } catch (error) {
+                        console.error('[拖拽] 异常:', error);
+                        if (dragHandleText) {
+                            dragHandleText.textContent = '生成失败';
+                        }
+                        return false;
+                    } finally {
+                        isGeneratingClip = false;
+                    }
+                })();
+                
+                await clipGenerationPromise;
+            }
 
             if (dragHandle) {
                 // 使用 HTML5 原生拖拽 API
@@ -3204,7 +3291,6 @@
                     
                     // 使用 Electron 的拖拽 API
                     if (window.electronAPI && window.electronAPI.startDrag) {
-                        // 阻止默认行为，使用 Electron 原生拖拽
                         e.preventDefault();
                         window.electronAPI.startDrag(pendingDragPath);
                         console.log('[拖拽] Electron startDrag 调用:', pendingDragPath);
@@ -3217,92 +3303,25 @@
                     }
                 });
                 
-                // mousedown: 预生成临时文件
+                // mousedown: 检查文件是否已生成
                 dragHandle.addEventListener('mousedown', async (e) => {
                     if (e.button !== 0) return;
                     if (!currentSound || selectionStart === null || selectionEnd === null) {
                         return;
                     }
-                    // 如果正在生成中，忽略重复点击
-                    if (isGeneratingClip) {
-                        console.log('[拖拽] 正在生成中，忽略重复点击');
-                        return;
-                    }
                     
-                    // 如果已经有文件，不重复生成
-                    if (pendingDragPath) {
-                        console.log('[拖拽] 已有文件，跳过生成:', pendingDragPath);
-                        return;
+                    // 如果还没有文件，立即开始生成
+                    if (!pendingDragPath && !isGeneratingClip) {
+                        await pregenerateClip();
                     }
-
-                    const startSec = selectionStart / 1000;
-                    const endSec = selectionEnd / 1000;
-                    const filePath = currentSound.path || currentSound.filePath;
-                    const clipDuration = endSec - startSec;
-
-                    console.log('[拖拽] mousedown - 开始创建临时文件，时长:', clipDuration.toFixed(2), '秒');
-                    isGeneratingClip = true;
-
-                    // 创建生成 Promise
-                    clipGenerationPromise = (async () => {
-                        try {
-                            let result;
-                            if (window.electronAPI && window.electronAPI.backendAPI) {
-                                result = await window.electronAPI.backendAPI.exportClip(filePath, startSec, endSec);
-                            } else {
-                                const response = await fetch('http://127.0.0.1:8000/api/export/clip', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ path: filePath, start: startSec, end: endSec, temp_file: true })
-                                });
-                                result = await response.json();
-                            }
-
-                            console.log('[拖拽] 结果:', result);
-                            
-                            if (result && result.success && result.output_path) {
-                                pendingDragPath = result.output_path;
-                                console.log('[拖拽] 文件已生成:', pendingDragPath);
-                                return true;
-                            } else {
-                                console.error('[拖拽] 失败:', result?.message || result?.detail || result?.error || '未知错误', result);
-                                return false;
-                            }
-                        } catch (error) {
-                            console.error('[拖拽] 异常:', error);
-                            return false;
-                        } finally {
-                            isGeneratingClip = false;
-                        }
-                    })();
-                    
-                    // 等待生成完成（给用户视觉反馈）
-                    await clipGenerationPromise;
                 });
 
-                // mouseup: 清理状态
-                dragHandle.addEventListener('mouseup', (e) => {
-                    console.log('[拖拽] mouseup');
-                    // 延迟清理，给 dragstart 留出时间
-                    setTimeout(() => {
-                        pendingDragPath = null;
-                        clipGenerationPromise = null;
-                    }, 1000);
-                });
-
-                // 鼠标离开时也清理
-                dragHandle.addEventListener('mouseleave', (e) => {
-                    setTimeout(() => {
-                        pendingDragPath = null;
-                        clipGenerationPromise = null;
-                    }, 1000);
-                });
-                
                 // dragend: 拖拽结束清理
                 dragHandle.addEventListener('dragend', (e) => {
                     console.log('[拖拽] dragend');
                     pendingDragPath = null;
                     clipGenerationPromise = null;
+                    lastSelectionKey = null;
                 });
             }
 
