@@ -6,11 +6,13 @@
 import os
 import time
 import asyncio
+import json
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 from contextlib import asynccontextmanager
+from concurrent.futures import ThreadPoolExecutor
 
-from fastapi import FastAPI, HTTPException, Query, Path as PathParam
+from fastapi import FastAPI, HTTPException, Query, Path as PathParam, BackgroundTasks, WebSocket, WebSocketDisconnect, Body
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -20,7 +22,12 @@ from models import schemas
 from core.indexer import get_indexer, AudioIndexer, reset_indexer
 from core.searcher import get_searcher, AudioSearcher, reset_searcher
 from core.embedder import get_embedder, reset_embedder, is_embedder_available
+from core.database import get_db_manager, reset_db_manager, AudioFileRecord
+from core.websocket_manager import get_ws_manager, reset_ws_manager
 from utils.logger import logger
+
+# 线程池用于 CPU 密集型任务
+_executor = ThreadPoolExecutor(max_workers=4)
 
 
 def cleanup_old_clips(max_keep=100):
@@ -42,22 +49,27 @@ async def lifespan(app: FastAPI):
     logger.info(f"设备: {config.get_device()}")
     logger.info(f"数据库路径: {config.get_db_path()}")
 
+    # 初始化 SQLite 数据库
+    db_manager = get_db_manager()
+    file_count = db_manager.get_file_count()
+    logger.info(f"SQLite 数据库已加载，当前文件数: {file_count}")
+
     # 使用动态获取的临时文件目录
     temp_dir = Path(config.get_temp_clip_dir())
     temp_dir.mkdir(parents=True, exist_ok=True)
     logger.info(f"临时文件目录: {temp_dir}")
 
-    # 不再自动清理临时文件，由用户自行管理
     logger.info("临时文件由用户自行管理，不执行自动清理")
 
     yield
 
     logger.info("SoundMind API 关闭中...")
-    # 不再自动清理临时文件，由用户自行管理
     logger.info("临时文件由用户自行管理，不执行自动清理")
     reset_embedder()
     reset_indexer()
     reset_searcher()
+    reset_db_manager()
+    reset_ws_manager()
     logger.info("全局单例状态已清理")
 
 
@@ -79,13 +91,57 @@ app.add_middleware(
 )
 
 
+# ==================== WebSocket 端点 ====================
+
+@app.websocket("/ws/scan/{client_id}")
+async def websocket_scan_progress(websocket: WebSocket, client_id: str):
+    """
+    WebSocket 端点：接收扫描进度推送
+
+    前端通过此 WebSocket 接收实时扫描进度。
+
+    接收消息格式:
+    - {"type": "cancel", "task_id": "xxx"} - 取消扫描任务
+    - {"type": "ping"} - 心跳检测
+
+    发送消息格式:
+    - scan_progress: {"type": "scan_progress", "task_id": "xxx", "data": {...}}
+    - scan_complete: {"type": "scan_complete", "task_id": "xxx", "data": {...}}
+    - scan_error: {"type": "scan_error", "task_id": "xxx", "data": {...}}
+    """
+    ws_manager = get_ws_manager()
+    await ws_manager.connect(websocket, client_id)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            message = json.loads(data)
+            msg_type = message.get("type", "")
+
+            if msg_type == "cancel":
+                task_id = message.get("task_id")
+                if task_id:
+                    ws_manager.cancel_task(task_id)
+                    logger.info(f"任务已取消: {task_id}")
+
+            elif msg_type == "ping":
+                await websocket.send_json({"type": "pong"})
+
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket, client_id)
+    except json.JSONDecodeError:
+        logger.warning(f"无效的 JSON 消息 from {client_id}")
+    except Exception as e:
+        logger.error(f"WebSocket 错误: {e}")
+        ws_manager.disconnect(websocket, client_id)
+
+
 # ==================== 健康检查 ====================
 
 @app.get("/api/v1/health", response_model=schemas.HealthResponse)
 async def health_check():
     """
     健康检查接口
-    
+
     返回服务状态、版本号和当前设备信息
     """
     return schemas.HealthResponse(
@@ -177,6 +233,295 @@ async def scan_only(request: schemas.ScanRequest):
         
     except Exception as e:
         logger.error(f"扫描失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== 异步导入（带进度推送） ====================
+
+@app.post("/api/v1/import/async")
+async def import_folder_async(
+    request: schemas.ScanRequest,
+    background_tasks: BackgroundTasks,
+    client_id: str = Query(default="default")
+):
+    """
+    异步导入文件夹（带进度推送）
+
+    - **folder_path**: 要导入的文件夹路径
+    - **recursive**: 是否递归扫描子文件夹
+    - **client_id**: WebSocket 客户端标识（前端生成）
+
+    后台执行扫描和导入，通过 WebSocket 推送进度。
+    """
+    folder = Path(request.folder_path)
+
+    if not folder.exists() or not folder.is_dir():
+        raise HTTPException(status_code=400, detail="无效的文件夹路径")
+
+    task_id = f"scan_{int(time.time() * 1000)}"
+    ws_manager = get_ws_manager()
+    ws_manager.register_task(task_id, client_id)
+
+    # 后台执行扫描
+    background_tasks.add_task(
+        _scan_and_import_task,
+        task_id=task_id,
+        folder_path=str(folder),
+        recursive=request.recursive,
+        client_id=client_id
+    )
+
+    return {"task_id": task_id, "message": "扫描任务已启动"}
+
+
+async def _scan_and_import_task(
+    task_id: str,
+    folder_path: str,
+    recursive: bool,
+    client_id: str
+):
+    """
+    后台扫描导入任务
+
+    执行流程：
+    1. 扫描所有音频文件
+    2. 检查文件是否已存在于数据库
+    3. 对新文件计算波形峰值
+    4. 写入 SQLite 数据库
+    5. 通过 WebSocket 推送进度
+    """
+    from core.scanner import AudioScanner
+    import librosa
+    import numpy as np
+
+    ws_manager = get_ws_manager()
+    db_manager = get_db_manager()
+    scanner = AudioScanner()
+
+    try:
+        # 第一步：扫描所有文件
+        await ws_manager.send_scan_status(
+            client_id, task_id, "scanning", "正在扫描文件..."
+        )
+
+        audio_files = scanner.scan(folder_path, recursive)
+        total = len(audio_files)
+
+        if total == 0:
+            await ws_manager.send_scan_complete(
+                client_id, task_id, 0, 0, 0, "未找到音频文件"
+            )
+            ws_manager.unregister_task(task_id)
+            return
+
+        logger.info(f"开始导入 {total} 个文件到 SQLite")
+
+        # 第二步：逐个处理文件
+        added = 0
+        skipped = 0
+
+        for i, audio_file in enumerate(audio_files):
+            # 检查是否取消
+            if ws_manager.is_task_cancelled(task_id):
+                await ws_manager.send_scan_complete(
+                    client_id, task_id, total, added, i - added,
+                    "用户取消"
+                )
+                ws_manager.unregister_task(task_id)
+                return
+
+            current_file = Path(audio_file.path).name
+
+            # 发送进度
+            await ws_manager.send_scan_progress(
+                client_id, task_id, i, total, current_file, "processing"
+            )
+
+            # 检查是否已存在
+            if db_manager.file_exists(audio_file.path):
+                skipped += 1
+                continue
+
+            # 计算波形峰值
+            peaks_json = None
+            try:
+                # 使用 librosa 加载并计算峰值
+                y, sr = librosa.load(audio_file.path, sr=None, mono=True)
+
+                # 降采样到 2000 个点
+                target_points = 2000
+                samples_per_point = max(1, len(y) // target_points)
+                peaks = []
+                for j in range(target_points):
+                    start = j * samples_per_point
+                    end = min((j + 1) * samples_per_point, len(y))
+                    if end > start:
+                        peak = float(np.max(np.abs(y[start:end])))
+                        peaks.append(peak)
+
+                peaks_json = json.dumps(peaks)
+            except Exception as e:
+                logger.warning(f"计算波形失败 {audio_file.path}: {e}")
+
+            # 写入数据库
+            record = AudioFileRecord(
+                path=audio_file.path,
+                filename=audio_file.filename,
+                duration=audio_file.duration,
+                sample_rate=audio_file.sample_rate,
+                channels=audio_file.channels,
+                file_size=audio_file.size,
+                peaks_json=peaks_json,
+                tags='[]'
+            )
+            db_manager.add_file(record)
+            added += 1
+
+        # 完成
+        await ws_manager.send_scan_complete(
+            client_id, task_id, total, added, skipped
+        )
+        ws_manager.unregister_task(task_id)
+        logger.info(f"导入完成: 新增 {added} 个文件，跳过 {skipped} 个")
+
+    except Exception as e:
+        logger.error(f"扫描导入失败: {e}")
+        await ws_manager.send_scan_error(client_id, task_id, str(e))
+        ws_manager.unregister_task(task_id)
+
+
+# ==================== SQLite 数据库 API ====================
+
+@app.get("/api/v1/db/files")
+async def get_all_db_files():
+    """
+    从 SQLite 获取所有文件列表（启动时加载）
+
+    返回格式：
+    {
+        "total": 1000,
+        "files": [
+            {
+                "path": "/path/to/file.wav",
+                "filename": "file.wav",
+                "duration": 12.5,
+                "sample_rate": 48000,
+                "channels": 2,
+                "size": 1234567,
+                "peaks": [0.1, 0.2, ...],  # 波形峰值数组
+                "tags": ["标签1", "标签2"],
+                "created_at": "2024-01-01T00:00:00"
+            }
+        ]
+    }
+    """
+    try:
+        db_manager = get_db_manager()
+        files = db_manager.get_all_files()
+
+        return {
+            "total": len(files),
+            "files": [
+                {
+                    "path": f.path,
+                    "filename": f.filename,
+                    "duration": f.duration,
+                    "sample_rate": f.sample_rate,
+                    "channels": f.channels,
+                    "size": f.file_size,
+                    "peaks": f.get_peaks(),
+                    "tags": f.get_tags(),
+                    "created_at": f.created_at
+                }
+                for f in files
+            ]
+        }
+    except Exception as e:
+        logger.error(f"获取文件列表失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/db/file/{path:path}")
+async def get_db_file(path: str):
+    """
+    获取单个文件详情
+
+    - **path**: URL 编码的文件路径
+    """
+    import urllib.parse
+    file_path = urllib.parse.unquote(path)
+
+    db_manager = get_db_manager()
+    record = db_manager.get_file(file_path)
+
+    if not record:
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    return {
+        "path": record.path,
+        "filename": record.filename,
+        "duration": record.duration,
+        "sample_rate": record.sample_rate,
+        "channels": record.channels,
+        "size": record.file_size,
+        "peaks": record.get_peaks(),
+        "tags": record.get_tags(),
+        "created_at": record.created_at
+    }
+
+
+@app.put("/api/v1/db/file/{path:path}/tags")
+async def update_file_tags(path: str, tags: List[str] = Body(...)):
+    """
+    更新文件标签
+
+    - **path**: URL 编码的文件路径
+    - **tags**: 新的标签列表
+    """
+    import urllib.parse
+    file_path = urllib.parse.unquote(path)
+
+    db_manager = get_db_manager()
+    success = db_manager.update_tags(file_path, tags)
+
+    if not success:
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    return {"success": True, "message": "标签已更新"}
+
+
+@app.delete("/api/v1/db/file/{path:path}")
+async def delete_db_file(path: str):
+    """
+    从数据库删除文件记录
+
+    - **path**: URL 编码的文件路径
+    """
+    import urllib.parse
+    file_path = urllib.parse.unquote(path)
+
+    db_manager = get_db_manager()
+    success = db_manager.delete_file(file_path)
+
+    if not success:
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    return {"success": True, "message": "文件已删除"}
+
+
+@app.get("/api/v1/db/stats")
+async def get_db_stats():
+    """
+    获取数据库统计信息
+    """
+    try:
+        db_manager = get_db_manager()
+        return {
+            "total_files": db_manager.get_file_count(),
+            "total_duration": db_manager.get_total_duration()
+        }
+    except Exception as e:
+        logger.error(f"获取统计失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

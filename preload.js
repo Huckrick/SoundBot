@@ -107,53 +107,72 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 读取本地音频文件并返回 ArrayBuffer（用于播放）
   readAudioFile: (filePath) => ipcRenderer.invoke('read-audio-file', filePath),
 
-  // 后端 API（与 FastAPI 服务通信）
-  backendAPI: {
-    // 健康检查
-    healthCheck: () => ipcRenderer.invoke('backend-api', 'health'),
+    // 后端 API（与 FastAPI 服务通信）
+    backendAPI: {
+        // 健康检查
+        healthCheck: () => ipcRenderer.invoke('backend-api', 'health'),
 
-    // 扫描并索引音频文件夹
-    scanFolder: (folderPath, recursive = true) => 
-      ipcRenderer.invoke('backend-api', 'scan', { folderPath, recursive }),
+        // 扫描并索引音频文件夹
+        scanFolder: (folderPath, recursive = true) =>
+          ipcRenderer.invoke('backend-api', 'scan', { folderPath, recursive }),
 
-    // 仅扫描文件不建索引（用于没有模型的情况）
-    scanOnly: (folderPath, recursive = true) =>
-      ipcRenderer.invoke('backend-api', 'scan-only', { folderPath, recursive }),
+        // 仅扫描文件不建索引（用于没有模型的情况）
+        scanOnly: (folderPath, recursive = true) =>
+          ipcRenderer.invoke('backend-api', 'scan-only', { folderPath, recursive }),
 
-    // 语义搜索音频
-    searchAudio: (query, topK = 20, threshold = 0.15) => 
-      ipcRenderer.invoke('backend-api', 'search', { query, topK, threshold }),
+        // 异步导入文件夹（带进度推送）
+        importFolderAsync: (folderPath, recursive = true, clientId = 'default') =>
+          ipcRenderer.invoke('backend-api', 'import-async', { folderPath, recursive, clientId }),
 
-    // 获取索引状态
-    getIndexStatus: () => ipcRenderer.invoke('backend-api', 'index-status'),
+        // 语义搜索音频
+        searchAudio: (query, topK = 20, threshold = 0.15) =>
+          ipcRenderer.invoke('backend-api', 'search', { query, topK, threshold }),
 
-    // 获取已索引的文件列表
-    getIndexedFiles: () => ipcRenderer.invoke('backend-api', 'indexed-files'),
+        // 获取索引状态
+        getIndexStatus: () => ipcRenderer.invoke('backend-api', 'index-status'),
 
-    // 获取音频文件 URL
-    getAudioUrl: (filePath) => ipcRenderer.invoke('backend-api', 'audio-url', filePath),
+        // 获取已索引的文件列表
+        getIndexedFiles: () => ipcRenderer.invoke('backend-api', 'indexed-files'),
 
-    // 启动后端服务
-    startServer: () => ipcRenderer.invoke('backend-api', 'start-server'),
+        // 从 SQLite 获取所有文件（启动时加载）
+        getAllDbFiles: () => ipcRenderer.invoke('backend-api', 'db-files'),
 
-    // 停止后端服务
-    stopServer: () => ipcRenderer.invoke('backend-api', 'stop-server'),
+        // 获取单个文件详情
+        getDbFile: (path) => ipcRenderer.invoke('backend-api', 'db-file', path),
 
-    // 获取音频波形数据
-    getWaveform: (filePath) => ipcRenderer.invoke('backend-api', 'waveform', filePath),
-    
-    // 裁切音频片段
-    exportClip: (filePath, start, end, tempFile = true) => ipcRenderer.invoke('backend-api', 'export-clip', { filePath, start, end, tempFile }),
-    
-    // 音频淡入淡出
-    applyFade: (filePath, fadeIn, fadeOut) => ipcRenderer.invoke('backend-api', 'audio-fade', { filePath, fadeIn, fadeOut }),
-    
-    // 获取临时文件目录
-    getTempDir: () => ipcRenderer.invoke('backend-api', 'get-temp-dir'),
-    
-    // 设置临时文件目录
-    setTempDir: (tempDir) => ipcRenderer.invoke('backend-api', 'set-temp-dir', { tempDir })
-  },
+        // 更新文件标签
+        updateFileTags: (path, tags) => ipcRenderer.invoke('backend-api', 'db-file-tags', { path, tags }),
+
+        // 从数据库删除文件
+        deleteDbFile: (path) => ipcRenderer.invoke('backend-api', 'db-file-delete', path),
+
+        // 获取数据库统计
+        getDbStats: () => ipcRenderer.invoke('backend-api', 'db-stats'),
+
+        // 获取音频文件 URL
+        getAudioUrl: (filePath) => ipcRenderer.invoke('backend-api', 'audio-url', filePath),
+
+        // 启动后端服务
+        startServer: () => ipcRenderer.invoke('backend-api', 'start-server'),
+
+        // 停止后端服务
+        stopServer: () => ipcRenderer.invoke('backend-api', 'stop-server'),
+
+        // 获取音频波形数据
+        getWaveform: (filePath) => ipcRenderer.invoke('backend-api', 'waveform', filePath),
+
+        // 裁切音频片段
+        exportClip: (filePath, start, end, tempFile = true) => ipcRenderer.invoke('backend-api', 'export-clip', { filePath, start, end, tempFile }),
+
+        // 音频淡入淡出
+        applyFade: (filePath, fadeIn, fadeOut) => ipcRenderer.invoke('backend-api', 'audio-fade', { filePath, fadeIn, fadeOut }),
+
+        // 获取临时文件目录
+        getTempDir: () => ipcRenderer.invoke('backend-api', 'get-temp-dir'),
+
+        // 设置临时文件目录
+        setTempDir: (tempDir) => ipcRenderer.invoke('backend-api', 'set-temp-dir', { tempDir })
+    },
 
   // 平台信息
   platform: process.platform,

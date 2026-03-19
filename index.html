@@ -2494,8 +2494,214 @@
             });
         }
 
+        // ==================== WEB SOCKET 管理 ====================
+        let scanWebSocket = null;
+        let currentScanTaskId = null;
+
+        // 连接到 WebSocket 获取扫描进度
+        function connectScanWebSocket(clientId) {
+            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//127.0.0.1:8000/ws/scan/${clientId}`;
+
+            try {
+                scanWebSocket = new WebSocket(wsUrl);
+
+                scanWebSocket.onopen = () => {
+                    console.log('WebSocket 连接已建立');
+                };
+
+                scanWebSocket.onmessage = (event) => {
+                    try {
+                        const message = JSON.parse(event.data);
+                        handleScanMessage(message);
+                    } catch (e) {
+                        console.error('解析 WebSocket 消息失败:', e);
+                    }
+                };
+
+                scanWebSocket.onerror = (error) => {
+                    console.error('WebSocket 错误:', error);
+                };
+
+                scanWebSocket.onclose = () => {
+                    console.log('WebSocket 连接已关闭');
+                    scanWebSocket = null;
+                };
+            } catch (error) {
+                console.error('创建 WebSocket 失败:', error);
+            }
+        }
+
+        // 处理扫描消息
+        function handleScanMessage(message) {
+            switch (message.type) {
+                case 'scan_progress':
+                    updateScanProgress(message.data);
+                    break;
+                case 'scan_complete':
+                    handleScanComplete(message.data);
+                    break;
+                case 'scan_error':
+                    handleScanError(message.data);
+                    break;
+                case 'scan_status':
+                    if (message.data && message.data.message) {
+                        showNotification(message.data.message, 'info');
+                    }
+                    break;
+                case 'pong':
+                    // 心跳响应
+                    break;
+            }
+        }
+
+        // 扫描进度弹窗
+        let scanProgressModal = null;
+
+        function createScanProgressModal() {
+            const modal = document.createElement('div');
+            modal.className = 'scan-progress-modal';
+            modal.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: var(--bg-secondary);
+                border: 1px solid var(--border);
+                border-radius: 12px;
+                padding: 24px;
+                min-width: 400px;
+                z-index: 9999;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            `;
+            modal.innerHTML = `
+                <h3 style="margin: 0 0 16px 0;">正在导入音频文件...</h3>
+                <div class="progress-bar-container" style="
+                    background: var(--bg-primary);
+                    border-radius: 8px;
+                    height: 24px;
+                    overflow: hidden;
+                ">
+                    <div class="progress-bar" style="
+                        height: 100%;
+                        background: linear-gradient(90deg, #3b82f6, #60a5fa);
+                        width: 0%;
+                        transition: width 0.3s ease;
+                    "></div>
+                </div>
+                <p class="progress-text" style="margin: 12px 0 8px 0; color: var(--text-secondary);">准备中...</p>
+                <p class="current-file" style="margin: 0; font-size: 12px; color: var(--text-muted); word-break: break-all;"></p>
+                <button class="cancel-btn" style="
+                    margin-top: 16px;
+                    padding: 8px 16px;
+                    background: #ef4444;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    cursor: pointer;
+                ">取消</button>
+            `;
+
+            // 取消按钮
+            modal.querySelector('.cancel-btn').addEventListener('click', () => {
+                if (currentScanTaskId && scanWebSocket) {
+                    scanWebSocket.send(JSON.stringify({
+                        type: 'cancel',
+                        task_id: currentScanTaskId
+                    }));
+                }
+            });
+
+            return modal;
+        }
+
+        function updateScanProgress(data) {
+            if (!scanProgressModal) {
+                scanProgressModal = createScanProgressModal();
+                document.body.appendChild(scanProgressModal);
+            }
+
+            const progressBar = scanProgressModal.querySelector('.progress-bar');
+            const progressText = scanProgressModal.querySelector('.progress-text');
+            const currentFileText = scanProgressModal.querySelector('.current-file');
+
+            if (data.progress !== undefined) {
+                progressBar.style.width = `${data.progress}%`;
+            }
+            if (data.scanned !== undefined && data.total !== undefined) {
+                progressText.textContent = `已扫描 ${data.scanned} / ${data.total} 个文件 (${data.progress || 0}%)`;
+            }
+            if (data.current_file) {
+                currentFileText.textContent = data.current_file;
+            }
+        }
+
+        function handleScanComplete(data) {
+            if (scanProgressModal) {
+                scanProgressModal.remove();
+                scanProgressModal = null;
+            }
+            currentScanTaskId = null;
+
+            if (data.error) {
+                showNotification(`导入失败: ${data.error}`, 'error');
+            } else {
+                showNotification(`导入完成: 新增 ${data.added} 个文件，跳过 ${data.skipped} 个`, 'success');
+
+                // 从 SQLite 重新加载文件列表
+                loadFilesFromDatabase();
+            }
+        }
+
+        function handleScanError(data) {
+            if (scanProgressModal) {
+                scanProgressModal.remove();
+                scanProgressModal = null;
+            }
+            currentScanTaskId = null;
+
+            showNotification(`导入错误: ${data.error || '未知错误'}`, 'error');
+        }
+
+        // 从 SQLite 数据库加载文件列表（启动时调用）
+        async function loadFilesFromDatabase() {
+            try {
+                const result = await window.electronAPI.backendAPI.getAllDbFiles();
+
+                if (result && result.files && result.files.length > 0) {
+                    soundData = result.files.map((file, index) => ({
+                        id: index + 1,
+                        name: file.filename,
+                        filePath: file.path,
+                        duration: (file.duration || 0) * 1000, // 转换为毫秒
+                        sampleRate: file.sample_rate,
+                        channels: file.channels,
+                        size: file.size,
+                        peaks: file.peaks, // 直接从数据库获取波形
+                        tags: file.tags || [],
+                        createdAt: file.created_at,
+                        folderPath: file.path.substring(0, file.path.lastIndexOf('/'))
+                    }));
+
+                    renderSoundList();
+
+                    if (result.total > 0) {
+                        console.log(`从 SQLite 加载了 ${result.total} 个文件`);
+                    }
+                } else {
+                    console.log('SQLite 数据库为空');
+                }
+            } catch (error) {
+                console.error('从数据库加载失败:', error);
+                // 静默失败，使用空数据
+            }
+        }
+
         // ==================== EVENT LISTENERS ====================
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 从 SQLite 数据库加载文件列表（秒加载）
+            await loadFilesFromDatabase();
+
             // Initialize
             initAudioPlayer();
             initWaveSurfer();
@@ -3373,121 +3579,55 @@
                 }
             });
             
-            // 导入文件夹
+            // 导入文件夹 - 使用新的异步导入 API（带进度）
             document.getElementById('importFolderBtn').addEventListener('click', async () => {
                 document.getElementById('importDropdown').classList.add('hidden');
-                
-                try {
-                    if (window.electronAPI && window.electronAPI.fileImport && window.electronAPI.backendAPI) {
-                        const folderResult = await window.electronAPI.fileImport.selectFolder({
-                            title: '选择音频文件夹'
-                        });
 
-                        if (folderResult.success && folderResult.folder) {
-                            const folderPath = folderResult.folder;
-                            // 使用 JS 原生方式获取文件夹名
-                            const folderName = folderPath.split(/[/\\]/).pop();
-                            
-                            // 调用后端扫描并索引
-                            showNotification('正在扫描并索引音频文件...', 'info');
-                            
-                            let scanResult;
-                            try {
-                                scanResult = await window.electronAPI.backendAPI.scanFolder(folderPath, true);
-                            } catch (e) {
-                                console.log('scanFolder 失败，尝试 scan-only:', e);
-                                // 如果 scan 失败，尝试调用 scan-only（不需要模型）
-                                scanResult = await window.electronAPI.backendAPI.scanOnly(folderPath, true);
-                            }
-                            
-                            if (scanResult && !scanResult.error) {
-                                showNotification(`索引完成: 新增 ${scanResult.indexed || scanResult.total || 0} 个文件`, 'success');
-                                
-                                // 获取文件列表 - 优先使用返回的 files，否则调用 getIndexedFiles
-                                let files = [];
-                                if (scanResult.files && scanResult.files.length > 0) {
-                                    files = scanResult.files;
-                                } else {
-                                    // 尝试从 getIndexedFiles 获取
-                                    try {
-                                        const filesResult = await window.electronAPI.backendAPI.getIndexedFiles();
-                                        files = filesResult.files || [];
-                                    } catch (e) {
-                                        console.log('getIndexedFiles 失败:', e);
-                                    }
-                                }
-                                
-                                if (files.length > 0) {
-                                    // 转换为前端格式，按文件夹分类，同时尝试获取时长
-                                    const newSounds = await Promise.all(files.map(async (file, index) => {
-                                        let duration = file.duration || 0;
-                                        
-                                        // 如果后端没有返回时长，尝试本地获取
-                                        if (!duration && file.path && window.electronAPI && window.electronAPI.readAudioFile) {
-                                            try {
-                                                const result = await window.electronAPI.readAudioFile(file.path);
-                                                if (result && result.success) {
-                                                    const uint8Array = new Uint8Array(result.data);
-                                                    const ext = (file.filename || '').split('.').pop().toLowerCase();
-                                                    const mimeTypes = {
-                                                        'wav': 'audio/wav', 'mp3': 'audio/mpeg', 'flac': 'audio/flac',
-                                                        'aiff': 'audio/aiff', 'aif': 'audio/aiff', 'ogg': 'audio/ogg',
-                                                        'm4a': 'audio/mp4', 'aac': 'audio/aac'
-                                                    };
-                                                    const mimeType = mimeTypes[ext] || 'audio/wav';
-                                                    const blob = new Blob([uint8Array], { type: mimeType });
-                                                    const url = URL.createObjectURL(blob);
-                                                    
-                                                    duration = await new Promise((resolve) => {
-                                                        const audio = new Audio();
-                                                        audio.onloadedmetadata = () => resolve(audio.duration * 1000);
-                                                        audio.onerror = () => resolve(0);
-                                                        audio.src = url;
-                                                    });
-                                                    URL.revokeObjectURL(url);
-                                                }
-                                            } catch (e) {
-                                                console.warn('获取音频时长失败:', e);
-                                            }
-                                        }
-                                        
-                                        return {
-                                            id: Date.now() + index,
-                                            name: file.filename || file.name,
-                                            category: folderName,
-                                            duration: duration,
-                                            tags: ['已索引'],
-                                            filePath: file.path,
-                                            size: file.size || 0,
-                                            type: file.type || '.' + (file.format || 'wav'),
-                                            lastModified: new Date(),
-                                            folderPath: folderPath
-                                        };
-                                    }));
-                                    
-                                    // 添加到现有数据
-                                    soundData.push(...newSounds);
-                                    
-                                    // 添加到 folderData
-                                    addFolderToTree(folderName, folderPath, newSounds.length);
-                                    
-                                    // 更新界面
-                                    updateCategoryData();
-                                    renderSoundList();
-                                    renderFolderTree();
-                                    showNotification(`已加载 ${newSounds.length} 个音效文件`, 'success');
-                                } else {
-                                    showNotification('未找到音频文件', 'error');
-                                }
-                            } else {
-                                showNotification('扫描失败: ' + (scanResult.error || '未知错误'), 'error');
-                            }
-                        } else if (!folderResult.canceled) {
-                            console.error('选择文件夹失败:', folderResult.error);
-                            showNotification('选择文件夹失败', 'error');
-                        }
-                    } else {
+                try {
+                    if (!window.electronAPI || !window.electronAPI.fileImport || !window.electronAPI.backendAPI) {
                         showNotification('Electron API 不可用', 'error');
+                        return;
+                    }
+
+                    const folderResult = await window.electronAPI.fileImport.selectFolder({
+                        title: '选择音频文件夹'
+                    });
+
+                    if (folderResult.success && folderResult.folder) {
+                        const folderPath = folderResult.folder;
+
+                        // 生成客户端ID用于 WebSocket
+                        const clientId = `client_${Date.now()}`;
+
+                        // 连接 WebSocket 获取进度
+                        connectScanWebSocket(clientId);
+
+                        // 延迟一点确保 WebSocket 连接建立
+                        await new Promise(resolve => setTimeout(resolve, 200));
+
+                        // 调用异步导入 API
+                        try {
+                            const result = await window.electronAPI.backendAPI.importFolderAsync(folderPath, true, clientId);
+
+                            if (result && result.task_id) {
+                                currentScanTaskId = result.task_id;
+                                showNotification('正在导入音频文件...', 'info');
+                            } else {
+                                showNotification('启动导入任务失败', 'error');
+                            }
+                        } catch (error) {
+                            console.error('导入启动失败:', error);
+                            showNotification('导入启动失败: ' + error.message, 'error');
+
+                            // 关闭 WebSocket
+                            if (scanWebSocket) {
+                                scanWebSocket.close();
+                                scanWebSocket = null;
+                            }
+                        }
+                    } else if (!folderResult.canceled) {
+                        console.error('选择文件夹失败:', folderResult.error);
+                        showNotification('选择文件夹失败', 'error');
                     }
                 } catch (error) {
                     console.error('导入文件夹时出错:', error);

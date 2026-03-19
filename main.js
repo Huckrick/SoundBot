@@ -385,6 +385,59 @@ function setupIpcHandlers() {
           return await response.json();
         }
 
+        case 'db-files': {
+          // 从 SQLite 获取所有文件
+          const response = await fetch(`${API_BASE_URL}/db/files`);
+          return await response.json();
+        }
+
+        case 'db-file': {
+          // 获取单个文件详情
+          const encodedPath = encodeURIComponent(data);
+          const response = await fetch(`${API_BASE_URL}/db/file/${encodedPath}`);
+          return await response.json();
+        }
+
+        case 'db-file-tags': {
+          // 更新文件标签
+          const { path, tags } = data;
+          const encodedPath = encodeURIComponent(path);
+          const response = await fetch(`${API_BASE_URL}/db/file/${encodedPath}/tags`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(tags)
+          });
+          return await response.json();
+        }
+
+        case 'db-file-delete': {
+          // 从数据库删除文件
+          const encodedPath = encodeURIComponent(data);
+          const response = await fetch(`${API_BASE_URL}/db/file/${encodedPath}`, {
+            method: 'DELETE'
+          });
+          return await response.json();
+        }
+
+        case 'db-stats': {
+          // 获取数据库统计
+          const response = await fetch(`${API_BASE_URL}/db/stats`);
+          return await response.json();
+        }
+
+        case 'import-async': {
+          // 异步导入（带进度推送）
+          const response = await fetch(`${API_BASE_URL}/import/async`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              folder_path: data.folderPath,
+              recursive: data.recursive
+            })
+          });
+          return await response.json();
+        }
+
         case 'audio-url': {
           // 返回音频文件的 API URL
           const encodedPath = encodeURIComponent(data);
