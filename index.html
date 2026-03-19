@@ -2543,6 +2543,8 @@
             document.documentElement.classList.toggle('dark');
             drawMiniWaveforms();
             drawMainWaveform();
+            // 重新渲染图标以更新主题图标
+            lucide.createIcons();
         }
 
         function updateSetting(type, value) {
