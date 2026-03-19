@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 # 支持的音频格式
-SUPPORTED_AUDIO_FORMATS = {'.wav', '.mp3', '.flac', '.aiff', '.ogg', '.m4a'}
+SUPPORTED_AUDIO_FORMATS = {'.wav', '.mp3', '.aac', '.flac', '.aiff', '.ogg', '.m4a'}
 
 
 class AudioFile(BaseModel):

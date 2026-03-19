@@ -294,20 +294,53 @@ async def _scan_and_import_task(
     import librosa
     import numpy as np
 
+    # #region agent log
+    import json as json_module
+    def write_log(msg_type, msg, data=None):
+        try:
+            log_path = '/Users/huyang/Downloads/SoundMind/.cursor/debug-95ddf7.log'
+            log_entry = {
+                'sessionId': '95ddf7',
+                'id': f'log_{int(time.time()*1000)}',
+                'timestamp': int(time.time()*1000),
+                'location': 'main.py:_scan_and_import_task',
+                'message': msg,
+                'data': data or {},
+                'runId': 'debug',
+                'hypothesisId': 'H1'
+            }
+            with open(log_path, 'a', encoding='utf-8') as f:
+                f.write(json_module.dumps(log_entry) + '\n')
+        except Exception:
+            pass
+    write_log('info', '任务开始', {'task_id': task_id, 'folder_path': folder_path, 'recursive': recursive, 'client_id': client_id})
+    # #endregion
+    
+    # 添加详细日志
+    logger.info(f"[SCAN_TASK] 任务ID: {task_id}, 文件夹: {folder_path}, 递归: {recursive}, 客户端: {client_id}")
+    logger.info(f"[SCAN_TASK] ws_manager 连接数: {ws_manager.get_connection_count()}")
+    logger.info(f"[SCAN_TASK] 活跃连接: {list(ws_manager.active_connections.keys())}")
+
     ws_manager = get_ws_manager()
     db_manager = get_db_manager()
     scanner = AudioScanner()
 
     try:
         # 第一步：扫描所有文件
+        logger.info(f"[SCAN_TASK] 发送扫描状态: 正在扫描文件...")
         await ws_manager.send_scan_status(
             client_id, task_id, "scanning", "正在扫描文件..."
         )
+        logger.info(f"[SCAN_TASK] 扫描状态已发送，当前连接数: {ws_manager.get_connection_count()}")
+        write_log('info', '开始扫描文件夹', {'folder_path': folder_path})
 
         audio_files = scanner.scan(folder_path, recursive)
         total = len(audio_files)
+        logger.info(f"[SCAN_TASK] 扫描完成，找到 {total} 个音频文件")
+        write_log('info', '扫描完成', {'total': total, 'files': [f.path for f in audio_files[:5]]})  # 只记录前5个
 
         if total == 0:
+            write_log('warning', '未找到音频文件')
             await ws_manager.send_scan_complete(
                 client_id, task_id, 0, 0, 0, "未找到音频文件"
             )
@@ -315,6 +348,7 @@ async def _scan_and_import_task(
             return
 
         logger.info(f"开始导入 {total} 个文件到 SQLite")
+        write_log('info', '开始导入文件', {'total': total})
 
         # 第二步：逐个处理文件
         added = 0
@@ -323,6 +357,7 @@ async def _scan_and_import_task(
         for i, audio_file in enumerate(audio_files):
             # 检查是否取消
             if ws_manager.is_task_cancelled(task_id):
+                write_log('info', '任务被取消', {'processed': i, 'added': added})
                 await ws_manager.send_scan_complete(
                     client_id, task_id, total, added, i - added,
                     "用户取消"
@@ -362,6 +397,7 @@ async def _scan_and_import_task(
                 peaks_json = json.dumps(peaks)
             except Exception as e:
                 logger.warning(f"计算波形失败 {audio_file.path}: {e}")
+                write_log('warning', '计算波形失败', {'path': audio_file.path, 'error': str(e)})
 
             # 写入数据库
             record = AudioFileRecord(
@@ -374,9 +410,13 @@ async def _scan_and_import_task(
                 peaks_json=peaks_json,
                 tags='[]'
             )
-            db_manager.add_file(record)
-            added += 1
+            success = db_manager.add_file(record)
+            if success:
+                added += 1
+                if added % 10 == 0:  # 每10个文件记录一次
+                    write_log('info', '已添加文件', {'added': added, 'current': current_file})
 
+        write_log('info', '导入完成', {'total': total, 'added': added, 'skipped': skipped})
         # 完成
         await ws_manager.send_scan_complete(
             client_id, task_id, total, added, skipped
@@ -386,6 +426,7 @@ async def _scan_and_import_task(
 
     except Exception as e:
         logger.error(f"扫描导入失败: {e}")
+        write_log('error', '扫描导入失败', {'error': str(e)})
         await ws_manager.send_scan_error(client_id, task_id, str(e))
         ws_manager.unregister_task(task_id)
 
@@ -415,29 +456,77 @@ async def get_all_db_files():
         ]
     }
     """
+    import time
+    start_time = time.time()
+
+    # #region agent log
+    import json as json_module
+    def write_log(msg_type, msg, data=None):
+        try:
+            log_path = '/Users/huyang/Downloads/SoundMind/.cursor/debug-95ddf7.log'
+            log_entry = {
+                'sessionId': '95ddf7',
+                'id': f'log_{int(time.time()*1000)}',
+                'timestamp': int(time.time()*1000),
+                'location': 'main.py:get_all_db_files',
+                'message': msg,
+                'data': data or {},
+                'runId': 'debug',
+                'hypothesisId': 'H2'
+            }
+            with open(log_path, 'a', encoding='utf-8') as f:
+                f.write(json_module.dumps(log_entry) + '\n')
+        except Exception:
+            pass
+    write_log('info', '开始获取文件列表')
+    # #endregion
+
     try:
         db_manager = get_db_manager()
         files = db_manager.get_all_files()
+        write_log('info', '从数据库读取文件', {'count': len(files)})
+
+        # 构建返回数据
+        result_files = []
+        total_peaks_size = 0
+        long_durations = []
+
+        for f in files:
+            peaks = f.get_peaks()
+            peaks_len = len(peaks) if peaks else 0
+            total_peaks_size += peaks_len
+
+            if f.duration > 60:
+                long_durations.append({'filename': f.filename, 'duration': f.duration, 'peaks_len': peaks_len})
+
+            result_files.append({
+                "path": f.path,
+                "filename": f.filename,
+                "duration": f.duration,
+                "sample_rate": f.sample_rate,
+                "channels": f.channels,
+                "size": f.file_size,
+                "peaks": peaks,
+                "tags": f.get_tags(),
+                "created_at": f.created_at
+            })
+
+        elapsed = time.time() - start_time
+        write_log('info', '构建返回数据完成', {
+            'file_count': len(files),
+            'total_peaks': total_peaks_size,
+            'long_durations_count': len(long_durations),
+            'elapsed_sec': round(elapsed, 3),
+            'top_long_durations': long_durations[:5]
+        })
 
         return {
             "total": len(files),
-            "files": [
-                {
-                    "path": f.path,
-                    "filename": f.filename,
-                    "duration": f.duration,
-                    "sample_rate": f.sample_rate,
-                    "channels": f.channels,
-                    "size": f.file_size,
-                    "peaks": f.get_peaks(),
-                    "tags": f.get_tags(),
-                    "created_at": f.created_at
-                }
-                for f in files
-            ]
+            "files": result_files
         }
     except Exception as e:
         logger.error(f"获取文件列表失败: {e}")
+        write_log('error', '获取文件列表失败', {'error': str(e)})
         raise HTTPException(status_code=500, detail=str(e))
 
 

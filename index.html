@@ -2502,33 +2502,46 @@
         function connectScanWebSocket(clientId) {
             const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//127.0.0.1:8000/ws/scan/${clientId}`;
+            console.log('[DEBUG] 正在连接 WebSocket:', wsUrl);
 
             try {
                 scanWebSocket = new WebSocket(wsUrl);
 
                 scanWebSocket.onopen = () => {
-                    console.log('WebSocket 连接已建立');
+                    console.log('[DEBUG] WebSocket 连接已建立');
+                    // #region agent log
+                    fetch('http://127.0.0.1:7372/ingest/3c3f52f3-6db5-4914-96be-520517f5d25c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'95ddf7'},body:JSON.stringify({sessionId:'95ddf7',location:'index.html:2510',message:'WebSocket连接已建立',data:{clientId},timestamp:Date.now(),runId:'debug',hypothesisId:'H1'})}).catch(()=>{});
+                    // #endregion
+                    // 立即发送ping测试连接
+                    scanWebSocket.send(JSON.stringify({type: 'ping'}));
                 };
 
                 scanWebSocket.onmessage = (event) => {
                     try {
                         const message = JSON.parse(event.data);
+                        console.log('[DEBUG] WebSocket 收到消息:', message);
+                        // #region agent log
+                        fetch('http://127.0.0.1:7372/ingest/3c3f52f3-6db5-4914-96be-520517f5d25c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'95ddf7'},body:JSON.stringify({sessionId:'95ddf7',location:'index.html:2523',message:'WebSocket收到消息',data:{type:message.type,taskId:message.task_id,data:message.data},timestamp:Date.now(),runId:'debug',hypothesisId:'H1'})}).catch(()=>{});
+                        // #endregion
                         handleScanMessage(message);
                     } catch (e) {
-                        console.error('解析 WebSocket 消息失败:', e);
+                        console.error('[DEBUG] 解析 WebSocket 消息失败:', e);
                     }
                 };
 
                 scanWebSocket.onerror = (error) => {
-                    console.error('WebSocket 错误:', error);
+                    console.error('[DEBUG] WebSocket 错误:', error);
+                    // #region agent log
+                    fetch('http://127.0.0.1:7372/ingest/3c3f52f3-6db5-4914-96be-520517f5d25c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'95ddf7'},body:JSON.stringify({sessionId:'95ddf7',location:'index.html:2537',message:'WebSocket错误',data:{error:String(error)},timestamp:Date.now(),runId:'debug',hypothesisId:'H1'})}).catch(()=>{});
+                    // #endregion
                 };
 
                 scanWebSocket.onclose = () => {
-                    console.log('WebSocket 连接已关闭');
+                    console.log('[DEBUG] WebSocket 连接已关闭');
                     scanWebSocket = null;
                 };
             } catch (error) {
-                console.error('创建 WebSocket 失败:', error);
+                console.error('[DEBUG] 创建 WebSocket 失败:', error);
             }
         }
 
@@ -2665,10 +2678,29 @@
 
         // 从 SQLite 数据库加载文件列表（启动时调用）
         async function loadFilesFromDatabase() {
+            console.log('[DEBUG] 开始从 SQLite 加载文件列表');
+            // #region agent log
+            fetch('http://127.0.0.1:7372/ingest/3c3f52f3-6db5-4914-96be-520517f5d25c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'95ddf7'},body:JSON.stringify({sessionId:'95ddf7',location:'index.html:2679',message:'loadFilesFromDatabase开始',timestamp:Date.now(),runId:'debug',hypothesisId:'H2'})}).catch(()=>{});
+            // #endregion
+
+            const startTime = Date.now();
             try {
                 const result = await window.electronAPI.backendAPI.getAllDbFiles();
+                const fetchTime = Date.now() - startTime;
+                console.log('[DEBUG] getAllDbFiles 返回，耗时:', fetchTime, 'ms', '文件数:', result?.files?.length);
+                // #region agent log
+                fetch('http://127.0.0.1:7372/ingest/3c3f52f3-6db5-4914-96be-520517f5d25c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'95ddf7'},body:JSON.stringify({sessionId:'95ddf7',location:'index.html:2687',message:'getAllDbFiles返回',data:{fetchTime,fileCount:result?.files?.length},timestamp:Date.now(),runId:'debug',hypothesisId:'H2'})}).catch(()=>{});
+                // #endregion
 
                 if (result && result.files && result.files.length > 0) {
+                    // 检查是否有长音频
+                    const longFiles = result.files.filter(f => (f.duration || 0) > 60);
+                    console.log('[DEBUG] 长音频文件（>60秒）数量:', longFiles.length);
+                    if (longFiles.length > 0) {
+                        console.log('[DEBUG] 最长的5个文件:', longFiles.slice(0, 5).map(f => ({name: f.filename, duration: f.duration})));
+                    }
+
+                    const mapStart = Date.now();
                     soundData = result.files.map((file, index) => ({
                         id: index + 1,
                         name: file.filename,
@@ -2682,18 +2714,19 @@
                         createdAt: file.created_at,
                         folderPath: file.path.substring(0, file.path.lastIndexOf('/'))
                     }));
+                    const mapTime = Date.now() - mapStart;
+                    console.log('[DEBUG] 映射 soundData 耗时:', mapTime, 'ms');
 
                     renderSoundList();
-
-                    if (result.total > 0) {
-                        console.log(`从 SQLite 加载了 ${result.total} 个文件`);
-                    }
+                    console.log('[DEBUG] 从 SQLite 加载完成，总耗时:', Date.now() - startTime, 'ms');
                 } else {
-                    console.log('SQLite 数据库为空');
+                    console.log('[DEBUG] SQLite 数据库为空');
                 }
             } catch (error) {
-                console.error('从数据库加载失败:', error);
-                // 静默失败，使用空数据
+                console.error('[DEBUG] 从数据库加载失败:', error);
+                // #region agent log
+                fetch('http://127.0.0.1:7372/ingest/3c3f52f3-6db5-4914-96be-520517f5d25c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'95ddf7'},body:JSON.stringify({sessionId:'95ddf7',location:'index.html:2714',message:'loadFilesFromDatabase错误',data:{error:String(error)},timestamp:Date.now(),runId:'debug',hypothesisId:'H2'})}).catch(()=>{});
+                // #endregion
             }
         }
 
@@ -3582,9 +3615,14 @@
             // 导入文件夹 - 使用新的异步导入 API（带进度）
             document.getElementById('importFolderBtn').addEventListener('click', async () => {
                 document.getElementById('importDropdown').classList.add('hidden');
+                console.log('[DEBUG] 点击导入文件夹按钮');
+                // #region agent log
+                fetch('http://127.0.0.1:7372/ingest/3c3f52f3-6db5-4914-96be-520517f5d25c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'95ddf7'},body:JSON.stringify({sessionId:'95ddf7',location:'index.html:3597',message:'点击导入文件夹按钮',timestamp:Date.now(),runId:'debug',hypothesisId:'H1'})}).catch(()=>{});
+                // #endregion
 
                 try {
                     if (!window.electronAPI || !window.electronAPI.fileImport || !window.electronAPI.backendAPI) {
+                        console.error('[DEBUG] Electron API 不可用');
                         showNotification('Electron API 不可用', 'error');
                         return;
                     }
@@ -3592,12 +3630,21 @@
                     const folderResult = await window.electronAPI.fileImport.selectFolder({
                         title: '选择音频文件夹'
                     });
+                    console.log('[DEBUG] 选择文件夹结果:', folderResult);
+                    // #region agent log
+                    fetch('http://127.0.0.1:7372/ingest/3c3f52f3-6db5-4914-96be-520517f5d25c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'95ddf7'},body:JSON.stringify({sessionId:'95ddf7',location:'index.html:3610',message:'选择文件夹结果',data:{folderResult},timestamp:Date.now(),runId:'debug',hypothesisId:'H1'})}).catch(()=>{});
+                    // #endregion
 
                     if (folderResult.success && folderResult.folder) {
                         const folderPath = folderResult.folder;
+                        console.log('[DEBUG] 选择的文件夹路径:', folderPath);
+                        // #region agent log
+                        fetch('http://127.0.0.1:7372/ingest/3c3f52f3-6db5-4914-96be-520517f5d25c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'95ddf7'},body:JSON.stringify({sessionId:'95ddf7',location:'index.html:3616',message:'选择的文件夹路径',data:{folderPath},timestamp:Date.now(),runId:'debug',hypothesisId:'H1'})}).catch(()=>{});
+                        // #endregion
 
                         // 生成客户端ID用于 WebSocket
                         const clientId = `client_${Date.now()}`;
+                        console.log('[DEBUG] 生成 clientId:', clientId);
 
                         // 连接 WebSocket 获取进度
                         connectScanWebSocket(clientId);
@@ -3607,16 +3654,22 @@
 
                         // 调用异步导入 API
                         try {
+                            console.log('[DEBUG] 调用 importFolderAsync API');
                             const result = await window.electronAPI.backendAPI.importFolderAsync(folderPath, true, clientId);
+                            console.log('[DEBUG] importFolderAsync 返回:', result);
+                            // #region agent log
+                            fetch('http://127.0.0.1:7372/ingest/3c3f52f3-6db5-4914-96be-520517f5d25c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'95ddf7'},body:JSON.stringify({sessionId:'95ddf7',location:'index.html:3634',message:'importFolderAsync返回',data:{result},timestamp:Date.now(),runId:'debug',hypothesisId:'H1'})}).catch(()=>{});
+                            // #endregion
 
                             if (result && result.task_id) {
                                 currentScanTaskId = result.task_id;
                                 showNotification('正在导入音频文件...', 'info');
                             } else {
+                                console.error('[DEBUG] 启动导入任务失败，无 task_id');
                                 showNotification('启动导入任务失败', 'error');
                             }
                         } catch (error) {
-                            console.error('导入启动失败:', error);
+                            console.error('[DEBUG] importFolderAsync 异常:', error);
                             showNotification('导入启动失败: ' + error.message, 'error');
 
                             // 关闭 WebSocket
@@ -3626,11 +3679,11 @@
                             }
                         }
                     } else if (!folderResult.canceled) {
-                        console.error('选择文件夹失败:', folderResult.error);
+                        console.error('[DEBUG] 选择文件夹失败:', folderResult.error);
                         showNotification('选择文件夹失败', 'error');
                     }
                 } catch (error) {
-                    console.error('导入文件夹时出错:', error);
+                    console.error('[DEBUG] 导入文件夹时出错:', error);
                     showNotification('导入失败: ' + error.message, 'error');
                 }
             });

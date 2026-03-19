@@ -427,7 +427,16 @@ function setupIpcHandlers() {
 
         case 'import-async': {
           // 异步导入（带进度推送）
-          const response = await fetch(`${API_BASE_URL}/import/async`, {
+          const url = new URL(`${API_BASE_URL}/import/async`);
+          if (data.clientId) {
+            url.searchParams.append('client_id', data.clientId);
+          }
+          console.log('[Electron] import-async 请求 URL:', url.toString());
+          console.log('[Electron] import-async 请求体:', JSON.stringify({
+            folder_path: data.folderPath,
+            recursive: data.recursive
+          }));
+          const response = await fetch(url.toString(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -435,7 +444,10 @@ function setupIpcHandlers() {
               recursive: data.recursive
             })
           });
-          return await response.json();
+          console.log('[Electron] import-async 响应状态:', response.status);
+          const result = await response.json();
+          console.log('[Electron] import-async 响应内容:', result);
+          return result;
         }
 
         case 'audio-url': {
