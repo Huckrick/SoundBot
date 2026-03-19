@@ -23,6 +23,28 @@ from core.embedder import get_embedder, reset_embedder, is_embedder_available
 from utils.logger import logger
 
 
+def cleanup_old_clips(max_keep=100):
+    """清理多余的临时文件，只保留最新的max_keep个"""
+    import glob
+    temp_dir = Path(config.TEMP_CLIP_DIR)
+    if not temp_dir.exists():
+        return
+
+    files = sorted(
+        glob.glob(str(temp_dir / "clip_*.wav")),
+        key=os.path.getctime,
+        reverse=True
+    )
+
+    if len(files) > max_keep:
+        for f in files[max_keep:]:
+            try:
+                os.remove(f)
+                logger.info(f"已清理过期临时文件: {f}")
+            except Exception as e:
+                logger.warning(f"清理文件失败 {f}: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
@@ -30,9 +52,20 @@ async def lifespan(app: FastAPI):
     logger.info(f"设备: {config.get_device()}")
     logger.info(f"数据库路径: {config.get_db_path()}")
 
+    temp_dir = Path(config.TEMP_CLIP_DIR)
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    logger.info(f"临时文件目录: {temp_dir}")
+
+    # 清理启动时可能存在的旧临时文件
+    cleanup_old_clips(max_keep=0)  # 启动时清理所有旧文件
+    logger.info("已清理启动时的旧临时文件")
+
     yield
 
     logger.info("SoundMind API 关闭中...")
+    # 只清理文件，不删除目录，以便后续调试
+    cleanup_old_clips(max_keep=0)
+    logger.info("已清理所有临时文件")
     reset_embedder()
     reset_indexer()
     reset_searcher()
@@ -378,8 +411,9 @@ async def export_clip(request: schemas.ClipRequest):
     """
     import soundfile as sf
     import numpy as np
-    import tempfile
     import os
+
+    logger.info(f"[裁切请求] path={request.path}, start={request.start}, end={request.end}, temp_file={request.temp_file}")
 
     source_file = config.validate_audio_path(request.path)
 
@@ -418,22 +452,30 @@ async def export_clip(request: schemas.ClipRequest):
 
         # 生成输出路径
         if request.temp_file:
-            # 使用系统临时目录
-            temp_dir = tempfile.gettempdir()
-            # 生成唯一的临时文件名
             import uuid
-            temp_name = f"soundmind_clip_{uuid.uuid4().hex[:8]}{source_file.suffix}"
-            output_path = Path(temp_dir) / temp_name
+            temp_name = f"clip_{int(time.time())}_{uuid.uuid4().hex[:8]}{source_file.suffix}"
+            output_path = Path(config.TEMP_CLIP_DIR) / temp_name
+            logger.info(f"[裁切] 使用临时目录: {output_path}")
         elif request.output:
             output_path = Path(request.output)
+            logger.info(f"[裁切] 使用指定输出路径: {output_path}")
         else:
             output_path = source_file.parent / f"{source_file.stem}_clip{source_file.suffix}"
+            logger.info(f"[裁切] 使用原目录: {output_path}")
+
+        # 确保输出目录存在
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        logger.info(f"[裁切] 保存文件到: {output_path}")
 
         # 保存 - 保留原始采样率和格式
         if subtype:
             sf.write(str(output_path), clipped_audio, sr, subtype=subtype)
         else:
             sf.write(str(output_path), clipped_audio, sr)
+
+        # 保存后清理多余的临时文件
+        if request.temp_file:
+            cleanup_old_clips(max_keep=100)
 
         duration = len(clipped_audio) / sr
 
@@ -466,11 +508,9 @@ async def delete_temp_file(file_path: str):
         file_path = unquote(file_path)
 
         # 安全检查：确保文件在临时目录内
-        import tempfile
-        temp_dir = tempfile.gettempdir()
         abs_path = os.path.abspath(file_path)
 
-        if not abs_path.startswith(temp_dir):
+        if not abs_path.startswith(config.TEMP_CLIP_DIR):
             raise HTTPException(status_code=400, detail="只能删除临时目录中的文件")
 
         # 删除文件
@@ -551,6 +591,119 @@ async def audio_fade(request: schemas.FadeRequest):
     except Exception as e:
         logger.error(f"淡入淡出处理失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== 裁切并淡入淡出 ====================
+
+@app.post("/api/export/clip_with_fade", response_model=schemas.ClipResponse)
+async def export_clip_with_fade(request: schemas.ClipWithFadeRequest):
+    """
+    裁切音频片段并应用淡入淡出
+
+    - **path**: 源音频文件路径
+    - **start**: 裁切起始时间（秒）
+    - **end**: 裁切结束时间（秒）
+    - **fade_in**: 淡入时长（秒）
+    - **fade_out**: 淡出时长（秒）
+    - **temp_file**: 是否创建临时文件
+    """
+    import soundfile as sf
+    import numpy as np
+    import uuid
+
+    source_file = config.validate_audio_path(request.path)
+
+    if request.start >= request.end:
+        raise HTTPException(status_code=400, detail="起始时间必须小于结束时间")
+
+    try:
+        info = sf.info(str(source_file))
+        sr = info.samplerate
+        channels = info.channels
+        subtype = info.subtype if hasattr(info, 'subtype') else 'PCM_16'
+
+        start_sample = int(request.start * sr)
+        end_sample = int(request.end * sr)
+
+        if start_sample >= info.frames:
+            raise HTTPException(status_code=400, detail="起始时间超出音频时长")
+
+        end_sample = min(end_sample, info.frames)
+
+        with sf.SoundFile(str(source_file)) as f:
+            f.seek(start_sample)
+            clipped_audio = f.read(frames=end_sample - start_sample, dtype='float32')
+
+        if clipped_audio.ndim > 1 and clipped_audio.shape[1] != channels:
+            channels = clipped_audio.shape[1]
+
+        duration_samples = len(clipped_audio)
+        fade_in_samples = min(int(request.fade_in * sr), duration_samples)
+        fade_out_samples = min(int(request.fade_out * sr), duration_samples)
+
+        if fade_in_samples > 0:
+            fade_in_curve = np.linspace(0, 1, fade_in_samples)
+            if clipped_audio.ndim == 1:
+                clipped_audio[:fade_in_samples] = clipped_audio[:fade_in_samples] * fade_in_curve
+            else:
+                for ch in range(clipped_audio.shape[1]):
+                    clipped_audio[:fade_in_samples, ch] = clipped_audio[:fade_in_samples, ch] * fade_in_curve.reshape(-1, 1)
+
+        if fade_out_samples > 0:
+            fade_out_curve = np.linspace(1, 0, fade_out_samples)
+            start_idx = duration_samples - fade_out_samples
+            if clipped_audio.ndim == 1:
+                clipped_audio[start_idx:] = clipped_audio[start_idx:] * fade_out_curve
+            else:
+                for ch in range(clipped_audio.shape[1]):
+                    clipped_audio[start_idx:, ch] = clipped_audio[start_idx:, ch] * fade_out_curve.reshape(-1, 1)
+
+        if request.temp_file:
+            temp_name = f"clip_fade_{int(time.time())}_{uuid.uuid4().hex[:8]}{source_file.suffix}"
+            output_path = Path(config.TEMP_CLIP_DIR) / temp_name
+        else:
+            output_path = source_file.parent / f"{source_file.stem}_clip_fade{source_file.suffix}"
+
+        sf.write(str(output_path), clipped_audio, sr, subtype=subtype)
+
+        duration = len(clipped_audio) / sr
+
+        return schemas.ClipResponse(
+            success=True,
+            output_path=str(output_path),
+            duration=duration,
+            message=f"裁切 {request.start:.2f}s - {request.end:.2f}s, 淡入 {request.fade_in}s, 淡出 {request.fade_out}s"
+        )
+
+    except Exception as e:
+        logger.error(f"裁切并淡入淡出失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== 验证临时文件 ====================
+
+@app.get("/api/clip/verify")
+async def verify_clip(file_path: str = Query(..., description="临时文件路径")):
+    """
+    验证临时文件是否存在
+
+    - **file_path**: 临时文件路径（URL编码）
+    """
+    import urllib.parse
+
+    decoded_path = urllib.parse.unquote(file_path)
+    abs_path = Path(decoded_path).resolve()
+
+    if not str(abs_path).startswith(config.TEMP_CLIP_DIR):
+        raise HTTPException(status_code=400, detail="只能验证临时目录中的文件")
+
+    exists = abs_path.exists() and abs_path.is_file()
+
+    return {
+        "exists": exists,
+        "path": str(abs_path),
+        "size": abs_path.stat().st_size if exists else 0
+    }
 
 
 # ==================== 主入口 ====================

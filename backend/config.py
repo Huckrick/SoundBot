@@ -47,6 +47,10 @@ CHROMA_DB_PATH = BASE_DIR / "db" / "chroma_store"
 SUPPORTED_FORMATS = ['.wav', '.mp3', '.flac', '.aiff', '.ogg', '.m4a', '.aac']
 MAX_AUDIO_DURATION = 300  # 最大处理 5 分钟音频
 
+# ==================== 临时文件配置 ====================
+
+TEMP_CLIP_DIR = "/tmp/soundmind"  # 裁切临时文件存放目录
+
 # ==================== 搜索配置 ====================
 
 TOP_K_RESULTS = 20  # 默认返回 20 个结果

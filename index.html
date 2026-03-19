@@ -13,7 +13,7 @@
     
     <!-- WaveSurfer.js CDN (v6 更稳定) -->
     <script src="https://unpkg.com/wavesurfer.js@6/dist/wavesurfer.min.js"></script>
-    <script src="https://unpkg.com/wavesurfer.js@6/dist/plugins/wavesurfer.regions.min.js"></script>
+    <script src="https://unpkg.com/wavesurfer.js@6/dist/plugin/wavesurfer.regions.min.js"></script>
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -735,7 +735,8 @@
                     const result = await window.electronAPI.backendAPI.exportClip(
                         currentSound.filePath,
                         start,
-                        end
+                        end,
+                        true  // tempFile = true，强制使用临时目录
                     );
                     
                     if (result && result.success) {
@@ -2196,6 +2197,18 @@
             renderSoundList();
             drawMainWaveform();
             lucide.createIcons();
+
+            // 窗口调整大小时重新绘制波形和更新拖拽按钮位置
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    drawMainWaveform();
+                    if (selectionStart !== null && selectionEnd !== null) {
+                        updateDragHandlePosition();
+                    }
+                }, 100);
+            });
             // Settings
             document.getElementById('settingsBtn').addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -2532,6 +2545,12 @@
                         // 拖拽结束
                         isSelecting = false;
 
+                        // 调试：确认选区数据（选区在波形显示上是以毫秒存储，但显示时/1000转为秒）
+                        console.log("选区开始:", selectionStart, "毫秒");
+                        console.log("选区结束:", selectionEnd, "毫秒");
+                        console.log("选区开始:", selectionStart / 1000, "秒");
+                        console.log("选区结束:", selectionEnd / 1000, "秒");
+
                         // 移除选区最小限制，允许单线选区
                         // 即使选区很小也保持有效选择
                         requestAnimationFrame(() => drawMainWaveform());
@@ -2598,80 +2617,68 @@
                 }
             }
 
-            // ==================== 拖出导出功能 ====================
-            let isDraggingSelection = false;
-            let dragStartX = 0;
-            let draggedClipPath = null;  // 存储裁剪后的文件路径
+            // ==================== 拖拽导出功能（原生拖拽到DAW）====================
+            let pendingDragPath = null;
+            let isDraggingFile = false;
 
-            // 拖拽手柄的拖拽事件
             if (dragHandle) {
-                dragHandle.addEventListener('dragstart', async (e) => {
+                // mousedown: 开始创建临时文件
+                dragHandle.addEventListener('mousedown', async (e) => {
+                    if (e.button !== 0) return;
                     if (!currentSound || selectionStart === null || selectionEnd === null) {
-                        e.preventDefault();
                         return;
                     }
 
-                    isDraggingSelection = true;
+                    const startSec = selectionStart / 1000;
+                    const endSec = selectionEnd / 1000;
+                    const filePath = currentSound.path || currentSound.filePath;
 
-                    // 调用后端API创建临时裁剪文件
+                    console.log('[拖拽] mousedown - 开始创建临时文件');
+                    isDraggingFile = true;
+
                     try {
-                        const response = await fetch('/api/export/clip', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                path: currentSound.path || currentSound.filePath,
-                                start: selectionStart / 1000,  // 转换为秒
-                                end: selectionEnd / 1000,        // 转换为秒
-                                temp_file: true  // 使用临时文件模式
-                            })
-                        });
-
-                        if (response.ok) {
-                            const result = await response.json();
-                            draggedClipPath = result.output_path;
-
-                            // 使用Windows兼容的file协议格式
-                            const filePath = draggedClipPath.replace(/\\/g, '/');
-                            e.dataTransfer.setData('text/uri-list', 'file:///' + filePath);
-                            e.dataTransfer.setData('text/plain', 'file:///' + filePath);
-
-                            // 设置 JSON 数据
-                            e.dataTransfer.setData('application/json', JSON.stringify({
-                                path: currentSound.path || currentSound.filePath,
-                                start: selectionStart,
-                                end: selectionEnd,
-                                outputPath: draggedClipPath
-                            }));
-                            e.dataTransfer.effectAllowed = 'copy';
-
-                            // 使用波形作为拖拽图像
-                            e.dataTransfer.setDragImage(waveformCanvas, e.offsetX, e.offsetY);
+                        let result;
+                        if (window.electronAPI && window.electronAPI.backendAPI) {
+                            result = await window.electronAPI.backendAPI.exportClip(filePath, startSec, endSec);
                         } else {
-                            console.error('裁剪失败:', await response.text());
-                            e.preventDefault();
+                            const response = await fetch('http://127.0.0.1:8000/api/export/clip', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ path: filePath, start: startSec, end: endSec, temp_file: true })
+                            });
+                            result = await response.json();
+                        }
+
+                        if (result.success && result.output_path) {
+                            pendingDragPath = result.output_path;
+                            console.log('[拖拽] 文件已生成:', pendingDragPath);
+
+                            // 立即开始原生拖拽
+                            if (window.electronAPI && window.electronAPI.startDrag) {
+                                window.electronAPI.startDrag(pendingDragPath);
+                                console.log('[拖拽] startDrag 已调用');
+                            }
+                        } else {
+                            console.error('[拖拽] 失败:', result.message);
                         }
                     } catch (error) {
-                        console.error('裁剪请求失败:', error);
-                        e.preventDefault();
+                        console.error('[拖拽] 异常:', error);
                     }
                 });
 
-                dragHandle.addEventListener('dragend', async (e) => {
-                    isDraggingSelection = false;
+                // mouseup: 结束拖拽
+                dragHandle.addEventListener('mouseup', (e) => {
+                    console.log('[拖拽] mouseup');
+                    isDraggingFile = false;
+                    pendingDragPath = null;
+                });
 
-                    // 删除临时文件
-                    if (draggedClipPath) {
-                        try {
-                            // URL 编码文件路径
-                            const encodedPath = encodeURIComponent(draggedClipPath);
-                            await fetch(`/api/temp/${encodedPath}`, {
-                                method: 'DELETE'
-                            });
-                            console.log('已删除临时文件:', draggedClipPath);
-                        } catch (error) {
-                            console.error('删除临时文件失败:', error);
-                        }
-                        draggedClipPath = null;
+                // 鼠标离开时也清理
+                dragHandle.addEventListener('mouseleave', (e) => {
+                    if (isDraggingFile) {
+                        console.log('[拖拽] mouseleave');
+                        isDraggingFile = false;
+                        pendingDragPath = null;
                     }
                 });
             }

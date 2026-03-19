@@ -262,6 +262,33 @@ function setupIpcHandlers() {
   });
 
   // 处理后端 API 请求
+  ipcMain.handle('start-drag', async (event, filePath) => {
+    console.log('[IPC] start-drag called with:', filePath);
+    try {
+      if (!filePath || !fs.existsSync(filePath)) {
+        console.error('[IPC] Drag file not exists:', filePath);
+        return { success: false, error: '文件不存在' };
+      }
+
+      // 使用默认音频图标或创建临时图标
+      // 注意：音频文件本身不能作为拖拽图标，需要使用图片格式
+      const iconPath = path.join(__dirname, 'assets', 'audio-icon.png');
+      
+      // 如果图标文件不存在，使用一个默认的空白图标
+      const finalIconPath = fs.existsSync(iconPath) ? iconPath : undefined;
+
+      mainWindow.webContents.startDrag({
+        file: filePath,
+        icon: finalIconPath
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error('[IPC] start-drag error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   ipcMain.handle('backend-api', async (event, action, data) => {
     try {
       switch (action) {
@@ -339,13 +366,26 @@ function setupIpcHandlers() {
 
         case 'export-clip': {
           // 裁切音频
-          const { filePath, start, end } = data;
+          const { filePath, start, end, tempFile } = data;
+          console.log('[Electron] export-clip:', { filePath, start, end, tempFile });
+
+          // 强制 temp_file 为 true，确保使用临时目录
+          const requestBody = {
+            path: filePath,
+            start: start,
+            end: end,
+            temp_file: true  // 强制使用临时目录
+          };
+          console.log('[Electron] export-clip request:', JSON.stringify(requestBody));
+
           const clipResponse = await fetch(`http://127.0.0.1:${BACKEND_PORT}/api/export/clip`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ path: filePath, start, end })
+            body: JSON.stringify(requestBody)
           });
-          return await clipResponse.json();
+          const result = await clipResponse.json();
+          console.log('[Electron] export-clip result:', result);
+          return result;
         }
 
         case 'audio-fade': {

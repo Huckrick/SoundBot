@@ -101,6 +101,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     show: (title, body, options) => ipcRenderer.invoke('notification-show', { title, body, options })
   },
 
+  // 原生拖拽导出（用于拖拽文件到 DAW）
+  startDrag: (filePath) => ipcRenderer.invoke('start-drag', filePath),
+
   // 读取本地音频文件并返回 ArrayBuffer（用于播放）
   readAudioFile: (filePath) => ipcRenderer.invoke('read-audio-file', filePath),
 
@@ -140,7 +143,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getWaveform: (filePath) => ipcRenderer.invoke('backend-api', 'waveform', filePath),
     
     // 裁切音频片段
-    exportClip: (filePath, start, end) => ipcRenderer.invoke('backend-api', 'export-clip', { filePath, start, end }),
+    exportClip: (filePath, start, end, tempFile = true) => ipcRenderer.invoke('backend-api', 'export-clip', { filePath, start, end, tempFile }),
     
     // 音频淡入淡出
     applyFade: (filePath, fadeIn, fadeOut) => ipcRenderer.invoke('backend-api', 'audio-fade', { filePath, fadeIn, fadeOut })
