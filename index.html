@@ -3186,6 +3186,7 @@
             // ==================== 拖拽导出功能（原生拖拽到DAW）====================
             let pendingDragPath = null;
             let isDraggingFile = false;
+            let isGeneratingClip = false;  // 标记是否正在生成片段
 
             if (dragHandle) {
                 // mousedown: 开始创建临时文件
@@ -3194,13 +3195,20 @@
                     if (!currentSound || selectionStart === null || selectionEnd === null) {
                         return;
                     }
+                    // 如果正在生成中，忽略重复点击
+                    if (isGeneratingClip) {
+                        console.log('[拖拽] 正在生成中，忽略重复点击');
+                        return;
+                    }
 
                     const startSec = selectionStart / 1000;
                     const endSec = selectionEnd / 1000;
                     const filePath = currentSound.path || currentSound.filePath;
+                    const clipDuration = endSec - startSec;
 
-                    console.log('[拖拽] mousedown - 开始创建临时文件');
+                    console.log('[拖拽] mousedown - 开始创建临时文件，时长:', clipDuration.toFixed(2), '秒');
                     isDraggingFile = true;
+                    isGeneratingClip = true;
 
                     try {
                         let result;
@@ -3221,16 +3229,20 @@
                             pendingDragPath = result.output_path;
                             console.log('[拖拽] 文件已生成:', pendingDragPath);
 
-                            // 立即开始原生拖拽
-                            if (window.electronAPI && window.electronAPI.startDrag) {
+                            // 长音频生成需要时间，检查鼠标是否还在拖拽状态
+                            if (isDraggingFile && window.electronAPI && window.electronAPI.startDrag) {
                                 window.electronAPI.startDrag(pendingDragPath);
                                 console.log('[拖拽] startDrag 已调用');
+                            } else {
+                                console.log('[拖拽] 鼠标已释放，跳过 startDrag');
                             }
                         } else {
                             console.error('[拖拽] 失败:', result?.message || result?.detail || result?.error || '未知错误', result);
                         }
                     } catch (error) {
                         console.error('[拖拽] 异常:', error);
+                    } finally {
+                        isGeneratingClip = false;
                     }
                 });
 
@@ -3238,7 +3250,10 @@
                 dragHandle.addEventListener('mouseup', (e) => {
                     console.log('[拖拽] mouseup');
                     isDraggingFile = false;
-                    pendingDragPath = null;
+                    // 注意：不立即清理 pendingDragPath，让 startDrag 有机会被调用
+                    setTimeout(() => {
+                        pendingDragPath = null;
+                    }, 500);
                 });
 
                 // 鼠标离开时也清理
@@ -3246,7 +3261,9 @@
                     if (isDraggingFile) {
                         console.log('[拖拽] mouseleave');
                         isDraggingFile = false;
-                        pendingDragPath = null;
+                        setTimeout(() => {
+                            pendingDragPath = null;
+                        }, 500);
                     }
                 });
             }
