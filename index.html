@@ -129,6 +129,10 @@
                         <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
                         恢复默认位置
                     </button>
+                    <button id="clearTempClipsBtn" class="w-full px-3 py-2 text-sm text-left hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2 text-red-500 hover:text-red-600 mt-1">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        <span>清理临时裁切文件</span>
+                    </button>
                     <div class="border-t my-2" style="border-color: var(--border-color);"></div>
                     <div class="px-3 py-2 text-xs font-medium uppercase tracking-wider opacity-50">AI 模型</div>
                     <button class="w-full px-4 py-2 text-sm text-left hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between setting-option" data-type="model" data-value="gpt4">
@@ -159,8 +163,16 @@
             </div>
         </nav>
         
-        <!-- Right: Search -->
+        <!-- Right: Search & Disk Space -->
         <div class="flex items-center gap-3">
+            <!-- 磁盘空间显示 -->
+            <div id="diskSpaceDisplay" class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs border opacity-80 hover:opacity-100 transition-opacity cursor-help"
+                 style="background-color: var(--bg-tertiary); border-color: var(--border-color);"
+                 title="当前文件夹所在磁盘剩余空间">
+                <i data-lucide="hard-drive" class="w-3.5 h-3.5"></i>
+                <span id="diskSpaceText">计算中...</span>
+            </div>
+            
             <div class="relative">
                 <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 opacity-50"></i>
                 <input type="text" id="searchInput" placeholder="搜索音效..." 
@@ -437,6 +449,46 @@
         const WAVEFORM_MAX_ZOOM = 50.0;
         const WAVEFORM_ZOOM_FACTOR = 1.1;       // 滚轮缩放因子
         const ZOOM_BUTTON_FACTOR = 1.5;         // 按钮缩放因子
+        
+        // ==================== 工具函数 ====================
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        // 更新磁盘空间显示
+        async function updateDiskSpaceDisplay() {
+            try {
+                let result;
+                if (window.electronAPI && window.electronAPI.backendAPI) {
+                    result = await window.electronAPI.backendAPI.getDiskSpace();
+                } else {
+                    const response = await fetch('http://127.0.0.1:8000/api/v1/disk-space');
+                    result = await response.json();
+                }
+                
+                if (result && result.success) {
+                    const freeSpace = formatFileSize(result.free_bytes);
+                    const totalSpace = formatFileSize(result.total_bytes);
+                    const percentUsed = ((result.total_bytes - result.free_bytes) / result.total_bytes * 100).toFixed(1);
+                    
+                    const diskSpaceText = document.getElementById('diskSpaceText');
+                    if (diskSpaceText) {
+                        diskSpaceText.textContent = `${freeSpace} 可用`;
+                        diskSpaceText.title = `总空间: ${totalSpace}\n已用: ${percentUsed}%\n路径: ${result.path}`;
+                    }
+                }
+            } catch (error) {
+                console.error('获取磁盘空间失败:', error);
+                const diskSpaceText = document.getElementById('diskSpaceText');
+                if (diskSpaceText) {
+                    diskSpaceText.textContent = '无法获取';
+                }
+            }
+        }
         
         // ==================== NOTIFICATIONS ====================
         function showNotification(message, type = 'info') {
@@ -2743,6 +2795,11 @@
             renderSoundList();
             drawMainWaveform();
             lucide.createIcons();
+            
+            // 初始化磁盘空间显示
+            updateDiskSpaceDisplay();
+            // 定期更新磁盘空间（每30秒）
+            setInterval(updateDiskSpaceDisplay, 30000);
 
             // 窗口调整大小时重新绘制波形和更新拖拽按钮位置
             let resizeTimeout;
@@ -2797,6 +2854,51 @@
             document.getElementById('resetTempDirBtn').addEventListener('click', (e) => {
                 e.stopPropagation();
                 resetTempDirToDefault();
+            });
+            
+            // 清理临时裁切文件按钮
+            document.getElementById('clearTempClipsBtn').addEventListener('click', async (e) => {
+                e.stopPropagation();
+                
+                // 显示确认对话框
+                const confirmed = confirm(
+                    '⚠️ 警告：清理临时裁切文件\n\n' +
+                    '请确保当前临时文件已经不再需要，否则会导致：\n' +
+                    '• 工程无法检索到相关裁切音频\n' +
+                    '• DAW 中已导入的音频链接失效\n' +
+                    '• 之前的工作可能丢失\n\n' +
+                    '确定要清理所有临时裁切文件吗？'
+                );
+                
+                if (!confirmed) {
+                    return;
+                }
+                
+                try {
+                    showNotification('正在清理临时文件...', 'info');
+                    
+                    let result;
+                    if (window.electronAPI && window.electronAPI.backendAPI) {
+                        result = await window.electronAPI.backendAPI.clearTempClips();
+                    } else {
+                        const response = await fetch('http://127.0.0.1:8000/api/v1/temp-clips/clear', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                        result = await response.json();
+                    }
+                    
+                    if (result && result.success) {
+                        showNotification(`已清理 ${result.deleted_count || 0} 个临时文件，释放 ${formatFileSize(result.freed_space || 0)}`, 'success');
+                        // 清理完成后更新磁盘空间显示
+                        updateDiskSpaceDisplay();
+                    } else {
+                        showNotification('清理失败: ' + (result.error || '未知错误'), 'error');
+                    }
+                } catch (error) {
+                    console.error('清理临时文件失败:', error);
+                    showNotification('清理失败: ' + error.message, 'error');
+                }
             });
             
             document.querySelectorAll('.setting-option').forEach(btn => {

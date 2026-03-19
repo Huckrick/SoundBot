@@ -1197,6 +1197,83 @@ async def set_temp_dir(request: schemas.TempDirRequest):
         raise HTTPException(status_code=500, detail=f"设置失败: {str(e)}")
 
 
+@app.get("/api/v1/disk-space")
+async def get_disk_space():
+    """
+    获取临时文件目录所在磁盘的空间信息
+    """
+    try:
+        import shutil
+        temp_dir = config.get_temp_clip_dir()
+        
+        # 获取磁盘使用情况
+        usage = shutil.disk_usage(temp_dir)
+        
+        return {
+            "success": True,
+            "path": temp_dir,
+            "total_bytes": usage.total,
+            "used_bytes": usage.used,
+            "free_bytes": usage.free
+        }
+    except Exception as e:
+        logger.error(f"获取磁盘空间失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取磁盘空间失败: {str(e)}")
+
+
+@app.post("/api/v1/temp-clips/clear")
+async def clear_temp_clips():
+    """
+    清理所有临时裁切文件
+    """
+    try:
+        temp_dir = config.get_temp_clip_dir()
+        
+        if not os.path.exists(temp_dir):
+            return {
+                "success": True,
+                "deleted_count": 0,
+                "freed_space": 0,
+                "message": "临时文件目录不存在"
+            }
+        
+        deleted_count = 0
+        freed_space = 0
+        
+        # 遍历并删除所有文件
+        for item in os.listdir(temp_dir):
+            item_path = os.path.join(temp_dir, item)
+            try:
+                if os.path.isfile(item_path):
+                    file_size = os.path.getsize(item_path)
+                    os.remove(item_path)
+                    deleted_count += 1
+                    freed_space += file_size
+                elif os.path.isdir(item_path):
+                    # 递归删除子目录
+                    import shutil
+                    dir_size = sum(os.path.getsize(os.path.join(dirpath, filename)) 
+                                  for dirpath, dirnames, filenames in os.walk(item_path) 
+                                  for filename in filenames)
+                    shutil.rmtree(item_path)
+                    deleted_count += 1
+                    freed_space += dir_size
+            except Exception as e:
+                logger.warning(f"删除文件失败 {item_path}: {e}")
+        
+        logger.info(f"清理临时文件完成: 删除 {deleted_count} 项, 释放 {freed_space} 字节")
+        
+        return {
+            "success": True,
+            "deleted_count": deleted_count,
+            "freed_space": freed_space,
+            "message": f"已清理 {deleted_count} 个文件，释放 {freed_space / (1024*1024):.2f} MB"
+        }
+    except Exception as e:
+        logger.error(f"清理临时文件失败: {e}")
+        raise HTTPException(status_code=500, detail=f"清理失败: {str(e)}")
+
+
 # ==================== 主入口 ====================
 
 if __name__ == "__main__":

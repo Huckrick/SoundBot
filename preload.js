@@ -171,7 +171,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
         getTempDir: () => ipcRenderer.invoke('backend-api', 'get-temp-dir'),
 
         // 设置临时文件目录
-        setTempDir: (tempDir) => ipcRenderer.invoke('backend-api', 'set-temp-dir', { tempDir })
+        setTempDir: (tempDir) => ipcRenderer.invoke('backend-api', 'set-temp-dir', { tempDir }),
+
+        // 获取磁盘空间信息
+        getDiskSpace: () => ipcRenderer.invoke('backend-api', 'disk-space'),
+
+        // 清理临时裁切文件
+        clearTempClips: () => ipcRenderer.invoke('backend-api', 'clear-temp-clips')
     },
 
   // 平台信息

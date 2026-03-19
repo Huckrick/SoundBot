@@ -544,6 +544,31 @@ function setupIpcHandlers() {
           }
         }
 
+        case 'disk-space': {
+          // 获取磁盘空间信息
+          try {
+            const response = await fetch(`http://127.0.0.1:${BACKEND_PORT}/api/v1/disk-space`);
+            return await response.json();
+          } catch (error) {
+            console.error('[IPC] disk-space error:', error);
+            return { success: false, error: error.message };
+          }
+        }
+
+        case 'clear-temp-clips': {
+          // 清理临时裁切文件
+          try {
+            const response = await fetch(`http://127.0.0.1:${BACKEND_PORT}/api/v1/temp-clips/clear`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' }
+            });
+            return await response.json();
+          } catch (error) {
+            console.error('[IPC] clear-temp-clips error:', error);
+            return { success: false, error: error.message };
+          }
+        }
+
         case 'audio-processing': {
           console.log('[IPC] audio-processing:', data.action);
           switch (data.action) {
