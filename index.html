@@ -154,10 +154,10 @@
                     </button>
                     <div class="border-t my-2" style="border-color: var(--border-color);"></div>
                     <button id="themeToggle" class="w-full px-4 py-2 text-sm text-left hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2">
-                        <i data-lucide="sun" class="w-4 h-4 dark:hidden"></i>
-                        <i data-lucide="moon" class="w-4 h-4 hidden dark:block"></i>
-                        <span class="dark:hidden">切换深色模式</span>
-                        <span class="hidden dark:block">切换浅色模式</span>
+                        <i data-lucide="sun" id="themeIconSun" class="w-4 h-4"></i>
+                        <i data-lucide="moon" id="themeIconMoon" class="w-4 h-4 hidden"></i>
+                        <span id="themeTextLight">切换深色模式</span>
+                        <span id="themeTextDark" class="hidden">切换浅色模式</span>
                     </button>
                 </div>
             </div>
@@ -2540,11 +2540,27 @@
         }
 
         function toggleTheme() {
-            document.documentElement.classList.toggle('dark');
+            const isDark = document.documentElement.classList.toggle('dark');
             drawMiniWaveforms();
             drawMainWaveform();
-            // 重新渲染图标以更新主题图标
-            lucide.createIcons();
+            
+            // 更新主题切换按钮的图标和文字
+            const sunIcon = document.getElementById('themeIconSun');
+            const moonIcon = document.getElementById('themeIconMoon');
+            const lightText = document.getElementById('themeTextLight');
+            const darkText = document.getElementById('themeTextDark');
+            
+            if (isDark) {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+                lightText.classList.add('hidden');
+                darkText.classList.remove('hidden');
+            } else {
+                sunIcon.classList.remove('hidden');
+                moonIcon.classList.add('hidden');
+                lightText.classList.remove('hidden');
+                darkText.classList.add('hidden');
+            }
         }
 
         function updateSetting(type, value) {
@@ -2804,6 +2820,26 @@
             renderSoundList();
             drawMainWaveform();
             lucide.createIcons();
+            
+            // 初始化主题切换按钮状态
+            const isDark = document.documentElement.classList.contains('dark');
+            const sunIcon = document.getElementById('themeIconSun');
+            const moonIcon = document.getElementById('themeIconMoon');
+            const lightText = document.getElementById('themeTextLight');
+            const darkText = document.getElementById('themeTextDark');
+            if (sunIcon && moonIcon && lightText && darkText) {
+                if (isDark) {
+                    sunIcon.classList.add('hidden');
+                    moonIcon.classList.remove('hidden');
+                    lightText.classList.add('hidden');
+                    darkText.classList.remove('hidden');
+                } else {
+                    sunIcon.classList.remove('hidden');
+                    moonIcon.classList.add('hidden');
+                    lightText.classList.remove('hidden');
+                    darkText.classList.add('hidden');
+                }
+            }
             
             // 初始化磁盘空间显示
             updateDiskSpaceDisplay();
