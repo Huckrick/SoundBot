@@ -245,10 +245,16 @@
             </div>
             
             <div class="relative">
-                <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 opacity-50"></i>
-                <input type="text" id="searchInput" placeholder="搜索音效..." 
-                       class="w-64 h-9 pl-9 pr-4 rounded-lg text-sm border transition-all focus:outline-none focus:ring-2 focus:ring-gray-500/50"
+                <i data-lucide="search" id="searchIcon" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 opacity-50"></i>
+                <input type="text" id="searchInput" placeholder="搜索音效..."
+                       class="w-64 h-9 pl-9 pr-8 rounded-lg text-sm border transition-all focus:outline-none focus:ring-2 focus:ring-gray-500/50"
                        style="background-color: var(--bg-tertiary); border-color: var(--border-color); color: var(--text-primary);">
+                <div id="searchLoadingSpinner" class="absolute right-2.5 top-1/2 -translate-y-1/2 hidden">
+                    <svg class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="31.4 31.4" opacity="0.25"></circle>
+                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path>
+                    </svg>
+                </div>
             </div>
         </div>
     </header>
@@ -4532,17 +4538,34 @@
             // 加载搜索结果（分页）
             async function loadSearchResults(query, page, isNewSearch = false) {
                 if (isLoadingMore || !hasMoreResults) return;
-                
+
                 isLoadingMore = true;
-                
+
+                // 显示搜索框加载动画
+                document.getElementById('searchIcon').classList.add('hidden');
+                document.getElementById('searchLoadingSpinner').classList.remove('hidden');
+
+                // 清空结果区并显示搜索状态
+                const soundListContainer = document.getElementById('soundList');
+                if (isNewSearch) {
+                    soundListContainer.innerHTML = `
+                        <div class="flex flex-col items-center justify-center py-16 opacity-60">
+                            <div class="animate-spin w-8 h-8 mb-3" viewBox="0 0 24 24" fill="none">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="31.4 31.4" opacity="0.25"></circle>
+                                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path>
+                            </div>
+                            <p class="text-sm opacity-70">正在搜索"${query}"...</p>
+                        </div>`;
+                }
+
                 try {
-                    if (isNewSearch) {
-                        showNotification('正在搜索...', 'info');
-                    }
-                    
                     const result = await window.electronAPI.backendAPI.searchAudio(query, 10000, currentSearchThreshold, page, 50);
-                    
-                    if (result && result.results) {
+
+                    // 隐藏加载动画
+                    document.getElementById('searchIcon').classList.remove('hidden');
+                    document.getElementById('searchLoadingSpinner').classList.add('hidden');
+
+                    if (result && result.results && result.results.length > 0) {
                         // 将后端结果转换为前端格式
                         const newSounds = result.results.map((r, index) => ({
                             id: Date.now() + index + (page - 1) * 50,
@@ -4577,11 +4600,17 @@
                         if (isNewSearch) {
                             showNotification(`找到 ${result.total} 个结果，已显示 ${allSearchResults.length} 个`, 'success');
                         }
+                    } else if (isNewSearch) {
+                        // 搜索返回空结果
+                        allSearchResults = [];
+                        renderSoundList('', []);
                     }
                 } catch (error) {
                     console.error('搜索失败:', error);
                     showNotification('搜索失败: ' + error.message, 'error');
-                    // 降级到本地搜索
+                    // 隐藏加载动画并降级到本地搜索
+                    document.getElementById('searchIcon').classList.remove('hidden');
+                    document.getElementById('searchLoadingSpinner').classList.add('hidden');
                     renderSoundList(query);
                 } finally {
                     isLoadingMore = false;
@@ -5448,9 +5477,9 @@
                         console.log('[DEBUG] 生成 clientId:', clientId);
 
                         // 立即显示进度弹窗（不依赖后端 WebSocket 消息）
-                        if (!window.scanProgressModal) {
-                            window.scanProgressModal = createScanProgressModal();
-                            document.body.appendChild(window.scanProgressModal);
+                        if (!scanProgressModal) {
+                            scanProgressModal = createScanProgressModal();
+                            document.body.appendChild(scanProgressModal);
                         }
 
                         connectScanWebSocket(clientId);
