@@ -37,6 +37,24 @@ function createWindow() {
     backgroundColor: '#0a0a0a' // 深色主题背景色
   });
 
+  // 设置 CSP（内容安全策略）
+  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self'; " +
+          "script-src 'self' 'unsafe-inline' https://unpkg.com; " +
+          "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+          "font-src 'self' https://fonts.gstatic.com; " +
+          "img-src 'self' data: blob:; " +
+          "media-src 'self' blob: soundmind-audio:; " +
+          "connect-src 'self' http://127.0.0.1:8000 ws://127.0.0.1:8000;"
+        ]
+      }
+    });
+  });
+
   // 加载本地 index.html 文件
   mainWindow.loadFile('index.html');
 
