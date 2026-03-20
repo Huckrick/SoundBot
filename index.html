@@ -39,6 +39,23 @@
         }
         input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
         
+        /* 阈值滑块样式 */
+        #thresholdSlider::-webkit-slider-track { 
+            height: 6px; 
+            border-radius: 3px; 
+            background: linear-gradient(to right, #22c55e 0%, #22c55e var(--threshold-percent, 15%), var(--bg-tertiary) var(--threshold-percent, 15%), var(--bg-tertiary) 100%);
+        }
+        #thresholdSlider::-webkit-slider-thumb {
+            width: 16px; height: 16px; margin-top: -5px;
+            background: #22c55e; border: 2px solid var(--bg-secondary);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        #thresholdPopup.visible { display: block; animation: popupFadeIn 0.15s ease; }
+        @keyframes popupFadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
         @keyframes sound-bar {
             from { transform: scaleY(0.3); }
             to { transform: scaleY(1); }
@@ -189,12 +206,34 @@
         
         <!-- Right: Search & Disk Space -->
         <div class="flex items-center gap-3">
-            <!-- 模型加载状态 -->
-            <div id="modelStatusDisplay" class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs border opacity-80 hover:opacity-100 transition-opacity cursor-help"
-                 style="background-color: var(--bg-tertiary); border-color: var(--border-color); display: none;"
-                 title="AI搜索模型加载状态">
-                <div id="modelStatusIcon" class="w-3.5 h-3.5 rounded-full border-2 border-t-transparent animate-spin" style="border-color: var(--text-secondary); border-top-color: transparent;"></div>
-                <span id="modelStatusText">模型加载中...</span>
+            <!-- 模型加载状态（带阈值调整） -->
+            <div class="relative">
+                <div id="modelStatusDisplay" class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs border opacity-80 hover:opacity-100 transition-opacity cursor-pointer"
+                     style="background-color: var(--bg-tertiary); border-color: var(--border-color); display: none;"
+                     title="点击调整搜索相似度阈值">
+                    <div id="modelStatusIcon" class="w-3.5 h-3.5 rounded-full border-2 border-t-transparent animate-spin" style="border-color: var(--text-secondary); border-top-color: transparent;"></div>
+                    <span id="modelStatusText">模型加载中...</span>
+                </div>
+                
+                <!-- 阈值调整弹窗 -->
+                <div id="thresholdPopup" class="absolute top-full right-0 mt-2 p-4 rounded-lg border shadow-lg z-50 hidden"
+                     style="background-color: var(--bg-secondary); border-color: var(--border-color); min-width: 220px;">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-medium" style="color: var(--text-primary);">搜索相似度阈值</span>
+                        <span id="thresholdValue" class="text-xs font-bold px-2 py-0.5 rounded" style="background-color: var(--bg-tertiary); color: var(--text-secondary);">0.15</span>
+                    </div>
+                    <input type="range" id="thresholdSlider" min="0" max="100" value="15" 
+                           class="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                           style="background-color: var(--bg-tertiary);">
+                    <div class="flex justify-between mt-2 text-xs" style="color: var(--text-secondary);">
+                        <span>宽松 (0)</span>
+                        <span>严格 (1.0)</span>
+                    </div>
+                    <div class="mt-3 pt-3 border-t text-xs" style="border-color: var(--border-color); color: var(--text-secondary);">
+                        <p>• 值越低，结果越多</p>
+                        <p>• 值越高，结果越精确</p>
+                    </div>
+                </div>
             </div>
 
             <!-- 磁盘空间显示 -->
@@ -4236,6 +4275,68 @@
             // 定期更新模型状态（每5秒）
             setInterval(checkModelStatus, 5000);
 
+            // ==================== 阈值调整功能 ====================
+            let currentSearchThreshold = 0.15; // 默认阈值
+            const modelStatusDisplay = document.getElementById('modelStatusDisplay');
+            const thresholdPopup = document.getElementById('thresholdPopup');
+            const thresholdSlider = document.getElementById('thresholdSlider');
+            const thresholdValue = document.getElementById('thresholdValue');
+            
+            // 点击模型状态按钮显示/隐藏阈值弹窗
+            modelStatusDisplay.addEventListener('click', (e) => {
+                e.stopPropagation();
+                thresholdPopup.classList.toggle('hidden');
+                thresholdPopup.classList.toggle('visible');
+            });
+            
+            // 点击其他地方关闭阈值弹窗
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#thresholdPopup') && !e.target.closest('#modelStatusDisplay')) {
+                    thresholdPopup.classList.add('hidden');
+                    thresholdPopup.classList.remove('visible');
+                }
+            });
+            
+            // 滑块值变化时更新显示
+            thresholdSlider.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                currentSearchThreshold = value / 100;
+                thresholdValue.textContent = currentSearchThreshold.toFixed(2);
+                
+                // 更新滑块颜色渐变
+                const percent = value;
+                thresholdSlider.style.setProperty('--threshold-percent', percent + '%');
+                
+                // 根据阈值改变数值颜色
+                if (value < 15) {
+                    thresholdValue.style.backgroundColor = '#22c55e'; // 绿色-宽松
+                    thresholdValue.style.color = '#fff';
+                } else if (value < 40) {
+                    thresholdValue.style.backgroundColor = '#3b82f6'; // 蓝色-适中
+                    thresholdValue.style.color = '#fff';
+                } else if (value < 70) {
+                    thresholdValue.style.backgroundColor = '#f59e0b'; // 橙色-严格
+                    thresholdValue.style.color = '#fff';
+                } else {
+                    thresholdValue.style.backgroundColor = '#ef4444'; // 红色-非常严格
+                    thresholdValue.style.color = '#fff';
+                }
+            });
+            
+            // 滑块释放时触发搜索（如果有搜索词）
+            thresholdSlider.addEventListener('change', () => {
+                const searchQuery = document.getElementById('searchInput').value.trim();
+                if (searchQuery && searchQuery.length >= 2) {
+                    // 重新搜索
+                    currentSearchQuery = searchQuery;
+                    currentSearchPage = 1;
+                    allSearchResults = [];
+                    hasMoreResults = true;
+                    loadSearchResults(searchQuery, 1, true);
+                }
+                showNotification(`搜索阈值已调整为 ${currentSearchThreshold.toFixed(2)}`, 'success');
+            });
+
             // 窗口调整大小时重新绘制波形和更新拖拽按钮位置
             let resizeTimeout;
             window.addEventListener('resize', () => {
@@ -4406,7 +4507,7 @@
                         showNotification('正在搜索...', 'info');
                     }
                     
-                    const result = await window.electronAPI.backendAPI.searchAudio(query, 10000, 0.1, page, 50);
+                    const result = await window.electronAPI.backendAPI.searchAudio(query, 10000, currentSearchThreshold, page, 50);
                     
                     if (result && result.results) {
                         // 将后端结果转换为前端格式
