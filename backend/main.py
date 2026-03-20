@@ -2450,17 +2450,10 @@ async def switch_project(project_id: str):
     会将工程添加到最近工程列表，同时切换向量数据库和清理缓存
     """
     try:
-        db_manager = get_db_manager()
-
-        # 检查工程是否存在
-        project = db_manager.get_project(project_id)
-        if not project:
-            raise HTTPException(status_code=404, detail="工程不存在")
-
         # 获取当前工程ID（用于判断是否真的切换了）
         old_project_id = getattr(config, 'CURRENT_PROJECT_ID', None)
 
-        # 如果确实切换了工程，清理旧工程的缓存
+        # 如果确实切换了工程，清理旧工程的缓存和连接
         if old_project_id and old_project_id != project_id:
             logger.info(f"切换工程: {old_project_id} -> {project_id}，清理缓存")
 
@@ -2474,6 +2467,19 @@ async def switch_project(project_id: str):
             searcher = get_optimized_searcher()
             asyncio.create_task(searcher.clear_cache())
             logger.info("查询缓存已清理")
+
+            # 重置数据库连接（避免WAL模式冲突）
+            from core.database import reset_db_manager
+            reset_db_manager()
+            logger.info("数据库连接已重置")
+
+        # 获取数据库管理器（可能是新的连接）
+        db_manager = get_db_manager()
+
+        # 检查工程是否存在
+        project = db_manager.get_project(project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="工程不存在")
 
         # 添加到最近工程
         db_manager.add_to_recent_projects(project_id)
