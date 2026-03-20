@@ -192,8 +192,9 @@ class DatabaseManager:
                     timeout=30.0
                 )
                 self._local.conn.row_factory = sqlite3.Row
-                # 启用 WAL 模式提升并发性能
-                self._local.conn.execute("PRAGMA journal_mode=WAL")
+                # 禁用 WAL 模式避免 acquire_write 错误
+                # 使用 DELETE 模式更稳定
+                self._local.conn.execute("PRAGMA journal_mode=DELETE")
                 self._local.conn.execute("PRAGMA synchronous=NORMAL")
             except sqlite3.Error as e:
                 _get_logger().error(f"数据库连接失败: {e}")
@@ -206,7 +207,7 @@ class DatabaseManager:
                     timeout=30.0
                 )
                 self._local.conn.row_factory = sqlite3.Row
-                self._local.conn.execute("PRAGMA journal_mode=WAL")
+                self._local.conn.execute("PRAGMA journal_mode=DELETE")
                 self._local.conn.execute("PRAGMA synchronous=NORMAL")
         return self._local.conn
 
