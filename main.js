@@ -821,13 +821,15 @@ async function startBackendServer() {
       // 收集启动日志
       let startupOutput = '';
       let errorOutput = '';
+      let isStarting = true;  // 启动阶段标志
 
       backendProcess.stdout.on('data', (data) => {
         try {
           const text = data.toString();
           startupOutput += text;
-          if (backendProcess) {
-            console.log('[Backend]', text);
+          // 只在启动阶段输出日志，避免导入时大量日志导致EPIPE
+          if (isStarting && backendProcess) {
+            console.log('[Backend]', text.trim());
           }
         } catch (e) {
           // 忽略管道错误
@@ -839,8 +841,8 @@ async function startBackendServer() {
           const text = data.toString();
           errorOutput += text;
           // 只在启动阶段记录错误
-          if (attempt <= maxRetries && backendProcess) {
-            console.error('[Backend Warning]', text);
+          if (isStarting && backendProcess) {
+            console.error('[Backend Warning]', text.trim());
           }
         } catch (e) {
           // 忽略管道错误
@@ -872,6 +874,7 @@ async function startBackendServer() {
             .then((response) => {
               if (response.ok) {
                 clearInterval(checkServer);
+                isStarting = false;  // 启动完成，停止输出日志
                 console.log('[Backend] 服务健康检查通过');
                 resolve();
               } else {
