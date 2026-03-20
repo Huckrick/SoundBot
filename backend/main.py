@@ -936,7 +936,7 @@ async def _scan_and_import_task(
 @app.get("/api/v1/db/files")
 async def get_all_db_files():
     """
-    从 SQLite 获取所有文件列表（启动时加载）
+    从 SQLite 获取当前工程的所有文件列表（启动时加载）
 
     返回格式：
     {
@@ -983,8 +983,10 @@ async def get_all_db_files():
 
     try:
         db_manager = get_db_manager()
-        files = db_manager.get_all_files()
-        write_log('info', '从数据库读取文件', {'count': len(files)})
+        # 获取当前工程ID，只加载当前工程的文件
+        current_project_id = getattr(config, 'CURRENT_PROJECT_ID', 'default')
+        files = db_manager.get_files_by_project(current_project_id)
+        write_log('info', '从数据库读取文件', {'count': len(files), 'project_id': current_project_id})
 
         # 构建返回数据
         result_files = []
