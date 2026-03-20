@@ -1537,6 +1537,215 @@ async def get_project_files(project_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ==================== 用户自定义文件夹 API ====================
+
+class CreateFolderRequest(BaseModel):
+    name: str
+    description: Optional[str] = None
+    color: Optional[str] = '#3b82f6'
+
+
+class UpdateFolderRequest(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    color: Optional[str] = None
+    sort_order: Optional[int] = None
+
+
+@app.get("/api/v1/projects/{project_id}/folders")
+async def get_user_folders(project_id: str):
+    """
+    获取指定工程的所有用户自定义文件夹
+    """
+    try:
+        db_manager = get_db_manager()
+
+        # 检查工程是否存在
+        project = db_manager.get_project(project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="工程不存在")
+
+        folders = db_manager.get_user_folders(project_id)
+
+        # 获取每个文件夹下的导入文件夹数量
+        for folder in folders:
+            mappings = db_manager.get_imported_folder_mappings(project_id, folder['id'])
+            folder['imported_folder_count'] = len(mappings)
+            folder['total_file_count'] = sum(m['file_count'] for m in mappings)
+
+        return {
+            "project_id": project_id,
+            "total": len(folders),
+            "folders": folders
+        }
+    except Exception as e:
+        logger.error(f"获取用户文件夹失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/projects/{project_id}/folders")
+async def create_user_folder(project_id: str, request: CreateFolderRequest):
+    """
+    创建用户自定义文件夹
+    """
+    try:
+        db_manager = get_db_manager()
+
+        # 检查工程是否存在
+        project = db_manager.get_project(project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="工程不存在")
+
+        # 生成文件夹ID
+        import uuid
+        folder_id = f"folder_{uuid.uuid4().hex[:8]}"
+
+        # 获取当前最大排序号
+        existing_folders = db_manager.get_user_folders(project_id)
+        sort_order = len(existing_folders)
+
+        success = db_manager.create_user_folder(
+            folder_id=folder_id,
+            project_id=project_id,
+            name=request.name,
+            description=request.description,
+            color=request.color,
+            sort_order=sort_order
+        )
+
+        if not success:
+            raise HTTPException(status_code=400, detail="创建文件夹失败")
+
+        return {
+            "success": True,
+            "folder_id": folder_id,
+            "name": request.name,
+            "message": f"文件夹 '{request.name}' 创建成功"
+        }
+    except Exception as e:
+        logger.error(f"创建用户文件夹失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/api/v1/projects/{project_id}/folders/{folder_id}")
+async def update_user_folder(project_id: str, folder_id: str, request: UpdateFolderRequest):
+    """
+    更新用户自定义文件夹
+    """
+    try:
+        db_manager = get_db_manager()
+
+        # 检查文件夹是否存在
+        folder = db_manager.get_user_folder(folder_id)
+        if not folder or folder['project_id'] != project_id:
+            raise HTTPException(status_code=404, detail="文件夹不存在")
+
+        success = db_manager.update_user_folder(
+            folder_id=folder_id,
+            name=request.name,
+            description=request.description,
+            color=request.color,
+            sort_order=request.sort_order
+        )
+
+        if not success:
+            raise HTTPException(status_code=400, detail="更新文件夹失败")
+
+        return {
+            "success": True,
+            "message": "文件夹更新成功"
+        }
+    except Exception as e:
+        logger.error(f"更新用户文件夹失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/v1/projects/{project_id}/folders/{folder_id}")
+async def delete_user_folder(project_id: str, folder_id: str):
+    """
+    删除用户自定义文件夹
+
+    删除后，该文件夹下的导入文件夹将变为未分类状态
+    """
+    try:
+        db_manager = get_db_manager()
+
+        # 检查文件夹是否存在
+        folder = db_manager.get_user_folder(folder_id)
+        if not folder or folder['project_id'] != project_id:
+            raise HTTPException(status_code=404, detail="文件夹不存在")
+
+        success = db_manager.delete_user_folder(folder_id)
+
+        if not success:
+            raise HTTPException(status_code=400, detail="删除文件夹失败")
+
+        return {
+            "success": True,
+            "message": f"文件夹 '{folder['name']}' 已删除"
+        }
+    except Exception as e:
+        logger.error(f"删除用户文件夹失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/projects/{project_id}/folder-mappings")
+async def get_imported_folder_mappings(project_id: str, user_folder_id: Optional[str] = None):
+    """
+    获取导入文件夹的映射关系
+    """
+    try:
+        db_manager = get_db_manager()
+
+        # 检查工程是否存在
+        project = db_manager.get_project(project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="工程不存在")
+
+        mappings = db_manager.get_imported_folder_mappings(project_id, user_folder_id)
+
+        return {
+            "project_id": project_id,
+            "total": len(mappings),
+            "mappings": mappings
+        }
+    except Exception as e:
+        logger.error(f"获取导入文件夹映射失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/projects/{project_id}/folder-mappings/{folder_path:path}")
+async def update_folder_mapping(project_id: str, folder_path: str, user_folder_id: Optional[str] = None):
+    """
+    更新导入文件夹的用户文件夹关联
+
+    - **user_folder_id**: 用户文件夹ID，为空表示取消关联（变为未分类）
+    """
+    try:
+        db_manager = get_db_manager()
+        import urllib.parse
+
+        decoded_path = urllib.parse.unquote(folder_path)
+
+        # 检查工程是否存在
+        project = db_manager.get_project(project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="工程不存在")
+
+        success = db_manager.update_imported_folder_mapping(project_id, decoded_path, user_folder_id)
+
+        if not success:
+            raise HTTPException(status_code=400, detail="更新文件夹映射失败")
+
+        return {
+            "success": True,
+            "message": "文件夹分类已更新"
+        }
+    except Exception as e:
+        logger.error(f"更新文件夹映射失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ==================== 主入口 ====================
 
 if __name__ == "__main__":

@@ -409,9 +409,12 @@
         // 初始为空，用户导入音频后会自动添加
         let soundData = [];
         
-        let folderData = [
-            { id: 'root', name: '音效库', expanded: true, children: [] }
-        ];
+        // 用户自定义文件夹数据
+        let userFolders = [];
+        // 导入的文件夹结构数据
+        let importedFolderData = [];
+        // 文件夹映射关系（导入文件夹 -> 用户文件夹）
+        let folderMappings = {};
 
         // 当前工程信息
         let currentProject = {
@@ -1102,71 +1105,320 @@
         }
         
         // ==================== FOLDER TREE ====================
-        function renderFolderTree() {
-            const container = document.getElementById('folderTree');
-            container.innerHTML = '';
-            
-            folderData.forEach(folder => {
-                container.appendChild(createFolderItem(folder, 0));
-            });
+        // 加载用户自定义文件夹
+        async function loadUserFolders() {
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/projects/${currentProject.id}/folders`);
+                if (response.ok) {
+                    const result = await response.json();
+                    userFolders = result.folders || [];
+                    console.log('[FOLDER] 加载用户文件夹:', userFolders);
+                }
+
+                // 加载文件夹映射
+                const mappingResponse = await fetch(`${API_BASE}/api/v1/projects/${currentProject.id}/folder-mappings`);
+                if (mappingResponse.ok) {
+                    const mappingResult = await mappingResponse.json();
+                    folderMappings = {};
+                    (mappingResult.mappings || []).forEach(m => {
+                        folderMappings[m.folder_path] = m.user_folder_id;
+                    });
+                    console.log('[FOLDER] 加载文件夹映射:', folderMappings);
+                }
+            } catch (error) {
+                console.error('[FOLDER] 加载用户文件夹失败:', error);
+            }
         }
 
-        function createFolderItem(folder, level) {
-            const div = document.createElement('div');
-            div.className = 'sidebar-item rounded-md cursor-pointer';
-            div.style.paddingLeft = `${level * 12 + 8}px`;
-            div.dataset.id = folder.id;
-            
-            const hasChildren = folder.children && folder.children.length > 0;
-            const expandIcon = hasChildren ? (folder.expanded ? 'chevron-down' : 'chevron-right') : 'minus';
-            
-            div.innerHTML = `
-                <div class="flex items-center gap-2 py-2 px-2 rounded-md">
-                    <i data-lucide="${expandIcon}" class="w-4 h-4 opacity-50 folder-toggle"></i>
-                    <i data-lucide="folder" class="w-4 h-4 opacity-70"></i>
-                    <span class="text-sm flex-1">${folder.name}</span>
-                    ${folder.count !== undefined ? `<span class="text-xs opacity-50">${folder.count}</span>` : ''}
-                </div>
-            `;
-            
-            if (hasChildren && folder.expanded) {
-                const childrenContainer = document.createElement('div');
-                folder.children.forEach(child => {
-                    childrenContainer.appendChild(createFolderItem(child, level + 1));
+        // 创建用户文件夹
+        async function createUserFolder(name, description = '', color = '#3b82f6') {
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/projects/${currentProject.id}/folders`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, description, color })
                 });
-                div.appendChild(childrenContainer);
+
+                if (response.ok) {
+                    const result = await response.json();
+                    showNotification(result.message, 'success');
+                    await loadUserFolders();
+                    renderFolderTree();
+                    lucide.createIcons();
+                    return result.folder_id;
+                } else {
+                    const error = await response.json();
+                    showNotification('创建文件夹失败: ' + (error.detail || '未知错误'), 'error');
+                }
+            } catch (error) {
+                console.error('[FOLDER] 创建文件夹失败:', error);
+                showNotification('创建文件夹失败: ' + error.message, 'error');
             }
-            
-            div.addEventListener('click', (e) => {
-                if (e.target.closest('.folder-toggle')) {
-                    folder.expanded = !folder.expanded;
+        }
+
+        // 删除用户文件夹
+        async function deleteUserFolder(folderId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/projects/${currentProject.id}/folders/${folderId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    showNotification(result.message, 'success');
+                    await loadUserFolders();
                     renderFolderTree();
                     lucide.createIcons();
                 } else {
-                    // 点击文件夹时筛选显示该文件夹下的文件
-                    document.querySelectorAll('#folderTree .sidebar-item').forEach(item => item.classList.remove('active'));
-                    div.classList.add('active');
+                    const error = await response.json();
+                    showNotification('删除文件夹失败: ' + (error.detail || '未知错误'), 'error');
+                }
+            } catch (error) {
+                console.error('[FOLDER] 删除文件夹失败:', error);
+                showNotification('删除文件夹失败: ' + error.message, 'error');
+            }
+        }
 
-                    // 筛选该文件夹下的文件（包含子文件夹）
-                    if (folder.path !== undefined) {
-                        // 使用相对路径筛选，匹配该文件夹及其子文件夹下的所有文件
-                        const folderPrefix = folder.path ? folder.path + '/' : '';
-                        const filtered = soundData.filter(s => {
-                            // 完全匹配
-                            if (s.folderPath === folder.path) return true;
-                            // 子文件夹匹配（以该文件夹路径开头）
-                            if (s.folderPath && s.folderPath.startsWith(folderPrefix)) return true;
-                            return false;
-                        });
-                        renderSoundList('', filtered);
-                    } else if (folder.children) {
-                        // 根文件夹内的分类
-                        filterByFolder(folder.id);
-                    }
+        // 更新导入文件夹的分类
+        async function updateFolderMapping(folderPath, userFolderId) {
+            try {
+                const encodedPath = encodeURIComponent(folderPath);
+                const url = `${API_BASE}/api/v1/projects/${currentProject.id}/folder-mappings/${encodedPath}` +
+                           (userFolderId ? `?user_folder_id=${userFolderId}` : '');
+
+                const response = await fetch(url, { method: 'POST' });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    showNotification(result.message, 'success');
+                    folderMappings[folderPath] = userFolderId;
+                    await loadUserFolders();
+                    renderFolderTree();
+                } else {
+                    const error = await response.json();
+                    showNotification('更新分类失败: ' + (error.detail || '未知错误'), 'error');
+                }
+            } catch (error) {
+                console.error('[FOLDER] 更新分类失败:', error);
+                showNotification('更新分类失败: ' + error.message, 'error');
+            }
+        }
+
+        function renderFolderTree() {
+            const container = document.getElementById('folderTree');
+            container.innerHTML = '';
+
+            // 添加"新建文件夹"按钮
+            const addFolderBtn = document.createElement('div');
+            addFolderBtn.className = 'sidebar-item rounded-md cursor-pointer mb-2';
+            addFolderBtn.innerHTML = `
+                <div class="flex items-center gap-2 py-2 px-2 rounded-md hover:bg-white/5">
+                    <i data-lucide="plus" class="w-4 h-4 opacity-70"></i>
+                    <span class="text-sm flex-1">新建文件夹</span>
+                </div>
+            `;
+            addFolderBtn.addEventListener('click', () => {
+                const name = prompt('请输入文件夹名称:');
+                if (name && name.trim()) {
+                    createUserFolder(name.trim());
                 }
             });
+            container.appendChild(addFolderBtn);
+
+            // 如果没有用户文件夹，显示提示
+            if (userFolders.length === 0 && importedFolderData.length === 0) {
+                const emptyTip = document.createElement('div');
+                emptyTip.className = 'text-xs opacity-50 px-4 py-2';
+                emptyTip.textContent = '暂无文件夹，点击上方按钮创建';
+                container.appendChild(emptyTip);
+                return;
+            }
+
+            // 渲染用户自定义文件夹
+            userFolders.forEach(folder => {
+                container.appendChild(createUserFolderItem(folder));
+            });
+
+            // 渲染未分类的导入文件夹
+            const unclassifiedFolders = importedFolderData.filter(f => !folderMappings[f.fullPath]);
+            if (unclassifiedFolders.length > 0) {
+                const unclassifiedDiv = document.createElement('div');
+                unclassifiedDiv.className = 'mt-4';
+                unclassifiedDiv.innerHTML = `
+                    <div class="text-xs opacity-50 px-2 py-1 mb-1">未分类</div>
+                `;
+                unclassifiedFolders.forEach(folder => {
+                    unclassifiedDiv.appendChild(createImportedFolderItem(folder, 0, true));
+                });
+                container.appendChild(unclassifiedDiv);
+            }
+        }
+
+        function createUserFolderItem(folder) {
+            const div = document.createElement('div');
+            div.className = 'sidebar-item rounded-md cursor-pointer mb-1';
+            div.dataset.id = folder.id;
+
+            // 获取该文件夹下的导入文件夹
+            const childFolders = importedFolderData.filter(f => folderMappings[f.fullPath] === folder.id);
+            const hasChildren = childFolders.length > 0;
+            const expanded = folder.expanded !== false;
+
+            const folderColor = folder.color || '#3b82f6';
+
+            div.innerHTML = `
+                <div class="flex items-center gap-2 py-2 px-2 rounded-md hover:bg-white/5 group">
+                    ${hasChildren ? `<i data-lucide="${expanded ? 'chevron-down' : 'chevron-right'}" class="w-4 h-4 opacity-50 folder-toggle"></i>` : '<span class="w-4"></span>'}
+                    <div class="w-4 h-4 rounded" style="background-color: ${folderColor};"></div>
+                    <span class="text-sm flex-1">${folder.name}</span>
+                    <span class="text-xs opacity-50">${folder.total_file_count || 0}</span>
+                    <button class="folder-menu-btn opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded">
+                        <i data-lucide="more-vertical" class="w-3 h-3"></i>
+                    </button>
+                </div>
+            `;
+
+            // 展开/折叠
+            const toggleBtn = div.querySelector('.folder-toggle');
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    folder.expanded = !expanded;
+                    renderFolderTree();
+                    lucide.createIcons();
+                });
+            }
+
+            // 菜单按钮
+            const menuBtn = div.querySelector('.folder-menu-btn');
+            if (menuBtn) {
+                menuBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    showFolderContextMenu(e, folder);
+                });
+            }
+
+            // 点击文件夹筛选
+            div.addEventListener('click', () => {
+                document.querySelectorAll('#folderTree .sidebar-item').forEach(item => item.classList.remove('active'));
+                div.classList.add('active');
+
+                // 筛选该用户文件夹下的所有文件
+                const folderPaths = childFolders.map(f => f.path);
+                const filtered = soundData.filter(s => {
+                    return folderPaths.some(fp => s.folderPath === fp || s.folderPath.startsWith(fp + '/'));
+                });
+                renderSoundList('', filtered);
+            });
+
+            // 渲染子文件夹
+            if (hasChildren && expanded) {
+                const childrenContainer = document.createElement('div');
+                childrenContainer.style.marginLeft = '16px';
+                childFolders.forEach(child => {
+                    childrenContainer.appendChild(createImportedFolderItem(child, 1, false));
+                });
+                div.appendChild(childrenContainer);
+            }
 
             return div;
+        }
+
+        function createImportedFolderItem(folder, level, isUnclassified) {
+            const div = document.createElement('div');
+            div.className = 'sidebar-item rounded-md cursor-pointer';
+            div.style.paddingLeft = `${level * 12 + 8}px`;
+            div.dataset.path = folder.fullPath;
+
+            const hasChildren = folder.children && folder.children.length > 0;
+            const expanded = folder.expanded !== false;
+            const expandIcon = hasChildren ? (expanded ? 'chevron-down' : 'chevron-right') : 'minus';
+
+            div.innerHTML = `
+                <div class="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-white/5">
+                    <i data-lucide="${expandIcon}" class="w-3 h-3 opacity-40 folder-toggle"></i>
+                    <i data-lucide="folder-open" class="w-3 h-3 opacity-60"></i>
+                    <span class="text-sm flex-1 truncate">${folder.name}</span>
+                    ${folder.count !== undefined ? `<span class="text-xs opacity-40">${folder.count}</span>` : ''}
+                </div>
+            `;
+
+            // 展开/折叠
+            const toggleBtn = div.querySelector('.folder-toggle');
+            if (toggleBtn && hasChildren) {
+                toggleBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    folder.expanded = !expanded;
+                    renderFolderTree();
+                    lucide.createIcons();
+                });
+            }
+
+            // 点击筛选
+            div.addEventListener('click', () => {
+                document.querySelectorAll('#folderTree .sidebar-item').forEach(item => item.classList.remove('active'));
+                div.classList.add('active');
+
+                // 使用相对路径筛选
+                const folderPrefix = folder.path ? folder.path + '/' : '';
+                const filtered = soundData.filter(s => {
+                    if (s.folderPath === folder.path) return true;
+                    if (s.folderPath && s.folderPath.startsWith(folderPrefix)) return true;
+                    return false;
+                });
+                renderSoundList('', filtered);
+            });
+
+            // 右键菜单（移动到其他文件夹）
+            if (isUnclassified) {
+                div.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    showMoveToFolderMenu(e, folder);
+                });
+            }
+
+            // 渲染子文件夹
+            if (hasChildren && expanded) {
+                const childrenContainer = document.createElement('div');
+                folder.children.forEach(child => {
+                    childrenContainer.appendChild(createImportedFolderItem(child, level + 1, isUnclassified));
+                });
+                div.appendChild(childrenContainer);
+            }
+
+            return div;
+        }
+
+        // 显示文件夹右键菜单
+        function showFolderContextMenu(event, folder) {
+            // 简单的确认删除
+            if (confirm(`确定要删除文件夹 "${folder.name}" 吗？\n文件夹内的导入内容将变为未分类。`)) {
+                deleteUserFolder(folder.id);
+            }
+        }
+
+        // 显示移动到文件夹菜单
+        function showMoveToFolderMenu(event, folder) {
+            const options = userFolders.map(f => ({
+                label: f.name,
+                action: () => updateFolderMapping(folder.fullPath, f.id)
+            }));
+
+            if (options.length === 0) {
+                showNotification('请先创建文件夹', 'info');
+                return;
+            }
+
+            // 简单的选择对话框
+            const folderNames = options.map((o, i) => `${i + 1}. ${o.label}`).join('\n');
+            const choice = prompt(`移动到文件夹:\n${folderNames}\n\n输入序号:`);
+
+            if (choice) {
+                const index = parseInt(choice) - 1;
+                if (index >= 0 && index < options.length) {
+                    options[index].action();
+                }
+            }
         }
 
         // ==================== CATEGORY TREE ====================
@@ -2689,10 +2941,13 @@
 
                     // 清空当前数据
                     soundData = [];
-                    folderData = [{ id: 'root', name: '音效库', expanded: true, children: [] }];
+                    userFolders = [];
+                    importedFolderData = [];
+                    folderMappings = {};
 
-                    // 重新加载该工程的文件
+                    // 重新加载该工程的文件和文件夹
                     await loadFilesFromDatabase();
+                    await loadUserFolders();
 
                     // 刷新UI
                     renderFolderTree();
@@ -3037,22 +3292,22 @@
             // 转换后端结构为前端格式
             const convertedRoot = convertBackendFolderToFrontend(backendStructure);
 
-            // 添加到 folderData（如果根节点已存在则替换，否则添加）
-            const existingIndex = folderData.findIndex(f => f.id === convertedRoot.id);
+            // 添加到 importedFolderData（如果根节点已存在则替换，否则添加）
+            const existingIndex = importedFolderData.findIndex(f => f.id === convertedRoot.id);
             if (existingIndex >= 0) {
-                folderData[existingIndex] = convertedRoot;
+                importedFolderData[existingIndex] = convertedRoot;
             } else {
-                folderData.push(convertedRoot);
+                importedFolderData.push(convertedRoot);
             }
 
             // 重新渲染文件夹树
             renderFolderTree();
             lucide.createIcons();
 
-            console.log('[FOLDER] 文件夹结构已更新:', folderData);
+            console.log('[FOLDER] 导入文件夹结构已更新:', importedFolderData);
         }
 
-        // 将后端 FolderNode 转换为前端 folderData 格式
+        // 将后端 FolderNode 转换为前端 importedFolderData 格式
         function convertBackendFolderToFrontend(backendNode) {
             const nodeId = 'folder_' + backendNode.path.replace(/[^a-zA-Z0-9]/g, '_');
 
@@ -3242,6 +3497,9 @@
         document.addEventListener('DOMContentLoaded', async () => {
             // 从 SQLite 数据库加载文件列表（秒加载）
             await loadFilesFromDatabase();
+
+            // 加载用户自定义文件夹
+            await loadUserFolders();
 
             // Initialize
             initAudioPlayer();

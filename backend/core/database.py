@@ -81,6 +81,39 @@ CREATE TABLE IF NOT EXISTS recent_projects (
     opened_at TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
+
+-- 用户自定义文件夹表
+CREATE TABLE IF NOT EXISTS user_folders (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    color TEXT DEFAULT '#3b82f6',  -- 文件夹颜色（用于UI显示）
+    sort_order INTEGER DEFAULT 0,   -- 排序顺序
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_folders_project ON user_folders(project_id);
+CREATE INDEX IF NOT EXISTS idx_user_folders_order ON user_folders(sort_order);
+
+-- 导入文件夹与用户文件夹的关联表（用于分类管理）
+CREATE TABLE IF NOT EXISTS imported_folder_mappings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id TEXT NOT NULL,
+    folder_path TEXT NOT NULL,      -- 导入的文件夹路径
+    user_folder_id TEXT,            -- 关联的用户自定义文件夹ID（可为空表示未分类）
+    folder_name TEXT,               -- 文件夹显示名称
+    file_count INTEGER DEFAULT 0,   -- 文件数量
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_folder_id) REFERENCES user_folders(id) ON DELETE SET NULL,
+    UNIQUE(project_id, folder_path)
+);
+
+CREATE INDEX IF NOT EXISTS idx_imported_mappings_project ON imported_folder_mappings(project_id);
+CREATE INDEX IF NOT EXISTS idx_imported_mappings_user_folder ON imported_folder_mappings(user_folder_id);
 """
 
 
@@ -245,6 +278,47 @@ class DatabaseManager:
             cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_files_project'")
             if cursor.fetchone() is None:
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_files_project ON files(project_id)")
+
+            # 5. 创建 user_folders 表（如果不存在）
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user_folders'")
+            if cursor.fetchone() is None:
+                _get_logger().info("迁移：创建 user_folders 表")
+                cursor.execute("""
+                    CREATE TABLE user_folders (
+                        id TEXT PRIMARY KEY,
+                        project_id TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        description TEXT,
+                        color TEXT DEFAULT '#3b82f6',
+                        sort_order INTEGER DEFAULT 0,
+                        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+                    )
+                """)
+                cursor.execute("CREATE INDEX idx_user_folders_project ON user_folders(project_id)")
+                cursor.execute("CREATE INDEX idx_user_folders_order ON user_folders(sort_order)")
+
+            # 6. 创建 imported_folder_mappings 表（如果不存在）
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='imported_folder_mappings'")
+            if cursor.fetchone() is None:
+                _get_logger().info("迁移：创建 imported_folder_mappings 表")
+                cursor.execute("""
+                    CREATE TABLE imported_folder_mappings (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        project_id TEXT NOT NULL,
+                        folder_path TEXT NOT NULL,
+                        user_folder_id TEXT,
+                        folder_name TEXT,
+                        file_count INTEGER DEFAULT 0,
+                        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                        FOREIGN KEY (user_folder_id) REFERENCES user_folders(id) ON DELETE SET NULL,
+                        UNIQUE(project_id, folder_path)
+                    )
+                """)
+                cursor.execute("CREATE INDEX idx_imported_mappings_project ON imported_folder_mappings(project_id)")
+                cursor.execute("CREATE INDEX idx_imported_mappings_user_folder ON imported_folder_mappings(user_folder_id)")
 
             _get_logger().info("数据库迁移完成")
         except Exception as e:
@@ -780,8 +854,8 @@ class DatabaseManager:
         try:
             with self.get_cursor() as cursor:
                 cursor.execute("""
-                    INSERT OR REPLACE INTO files 
-                    (path, project_id, filename, duration, sample_rate, channels, 
+                    INSERT OR REPLACE INTO files
+                    (path, project_id, filename, duration, sample_rate, channels,
                      file_size, peaks_json, tags, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
@@ -799,6 +873,240 @@ class DatabaseManager:
             return True
         except Exception as e:
             _get_logger().error(f"添加文件到工程失败 {record.path}: {e}")
+            return False
+
+    # ========== 用户自定义文件夹操作 ==========
+
+    def create_user_folder(self, folder_id: str, project_id: str, name: str,
+                          description: str = None, color: str = '#3b82f6',
+                          sort_order: int = 0) -> bool:
+        """
+        创建用户自定义文件夹
+
+        Args:
+            folder_id: 文件夹ID
+            project_id: 所属工程ID
+            name: 文件夹名称
+            description: 描述
+            color: 颜色
+            sort_order: 排序顺序
+
+        Returns:
+            是否成功
+        """
+        try:
+            with self.get_cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO user_folders (id, project_id, name, description, color, sort_order, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (folder_id, project_id, name, description, color, sort_order, datetime.now().isoformat()))
+            return True
+        except Exception as e:
+            _get_logger().error(f"创建用户文件夹失败 {name}: {e}")
+            return False
+
+    def get_user_folders(self, project_id: str) -> List[Dict[str, Any]]:
+        """
+        获取指定工程的所有用户自定义文件夹
+
+        Args:
+            project_id: 工程ID
+
+        Returns:
+            文件夹列表
+        """
+        with self.get_cursor() as cursor:
+            cursor.execute("""
+                SELECT * FROM user_folders
+                WHERE project_id = ?
+                ORDER BY sort_order ASC, created_at ASC
+            """, (project_id,))
+            return [{
+                'id': row['id'],
+                'project_id': row['project_id'],
+                'name': row['name'],
+                'description': row['description'],
+                'color': row['color'],
+                'sort_order': row['sort_order'],
+                'created_at': row['created_at'],
+                'updated_at': row['updated_at']
+            } for row in cursor.fetchall()]
+
+    def get_user_folder(self, folder_id: str) -> Optional[Dict[str, Any]]:
+        """
+        获取单个用户文件夹
+
+        Args:
+            folder_id: 文件夹ID
+
+        Returns:
+            文件夹信息或None
+        """
+        with self.get_cursor() as cursor:
+            cursor.execute("SELECT * FROM user_folders WHERE id = ?", (folder_id,))
+            row = cursor.fetchone()
+            if row:
+                return {
+                    'id': row['id'],
+                    'project_id': row['project_id'],
+                    'name': row['name'],
+                    'description': row['description'],
+                    'color': row['color'],
+                    'sort_order': row['sort_order'],
+                    'created_at': row['created_at'],
+                    'updated_at': row['updated_at']
+                }
+            return None
+
+    def update_user_folder(self, folder_id: str, name: str = None,
+                          description: str = None, color: str = None,
+                          sort_order: int = None) -> bool:
+        """
+        更新用户文件夹
+
+        Args:
+            folder_id: 文件夹ID
+            name: 新名称
+            description: 新描述
+            color: 新颜色
+            sort_order: 新排序顺序
+
+        Returns:
+            是否成功
+        """
+        try:
+            with self.get_cursor() as cursor:
+                updates = []
+                params = []
+                if name is not None:
+                    updates.append("name = ?")
+                    params.append(name)
+                if description is not None:
+                    updates.append("description = ?")
+                    params.append(description)
+                if color is not None:
+                    updates.append("color = ?")
+                    params.append(color)
+                if sort_order is not None:
+                    updates.append("sort_order = ?")
+                    params.append(sort_order)
+                updates.append("updated_at = ?")
+                params.append(datetime.now().isoformat())
+                params.append(folder_id)
+
+                cursor.execute(f"""
+                    UPDATE user_folders SET {', '.join(updates)} WHERE id = ?
+                """, params)
+            return True
+        except Exception as e:
+            _get_logger().error(f"更新用户文件夹失败 {folder_id}: {e}")
+            return False
+
+    def delete_user_folder(self, folder_id: str) -> bool:
+        """
+        删除用户文件夹
+
+        Args:
+            folder_id: 文件夹ID
+
+        Returns:
+            是否成功
+        """
+        try:
+            with self.get_cursor() as cursor:
+                cursor.execute("DELETE FROM user_folders WHERE id = ?", (folder_id,))
+            return True
+        except Exception as e:
+            _get_logger().error(f"删除用户文件夹失败 {folder_id}: {e}")
+            return False
+
+    # ========== 导入文件夹映射操作 ==========
+
+    def add_imported_folder_mapping(self, project_id: str, folder_path: str,
+                                    folder_name: str, user_folder_id: str = None,
+                                    file_count: int = 0) -> bool:
+        """
+        添加或更新导入文件夹的映射
+
+        Args:
+            project_id: 工程ID
+            folder_path: 导入的文件夹路径
+            folder_name: 文件夹显示名称
+            user_folder_id: 关联的用户文件夹ID
+            file_count: 文件数量
+
+        Returns:
+            是否成功
+        """
+        try:
+            with self.get_cursor() as cursor:
+                cursor.execute("""
+                    INSERT OR REPLACE INTO imported_folder_mappings
+                    (project_id, folder_path, folder_name, user_folder_id, file_count, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (project_id, folder_path, folder_name, user_folder_id, file_count, datetime.now().isoformat()))
+            return True
+        except Exception as e:
+            _get_logger().error(f"添加导入文件夹映射失败 {folder_path}: {e}")
+            return False
+
+    def get_imported_folder_mappings(self, project_id: str, user_folder_id: str = None) -> List[Dict[str, Any]]:
+        """
+        获取导入文件夹的映射
+
+        Args:
+            project_id: 工程ID
+            user_folder_id: 筛选特定用户文件夹（可选）
+
+        Returns:
+            映射列表
+        """
+        with self.get_cursor() as cursor:
+            if user_folder_id:
+                cursor.execute("""
+                    SELECT * FROM imported_folder_mappings
+                    WHERE project_id = ? AND user_folder_id = ?
+                    ORDER BY created_at DESC
+                """, (project_id, user_folder_id))
+            else:
+                cursor.execute("""
+                    SELECT * FROM imported_folder_mappings
+                    WHERE project_id = ?
+                    ORDER BY created_at DESC
+                """, (project_id,))
+            return [{
+                'id': row['id'],
+                'project_id': row['project_id'],
+                'folder_path': row['folder_path'],
+                'folder_name': row['folder_name'],
+                'user_folder_id': row['user_folder_id'],
+                'file_count': row['file_count'],
+                'created_at': row['created_at']
+            } for row in cursor.fetchall()]
+
+    def update_imported_folder_mapping(self, project_id: str, folder_path: str,
+                                       user_folder_id: str = None) -> bool:
+        """
+        更新导入文件夹的用户文件夹关联
+
+        Args:
+            project_id: 工程ID
+            folder_path: 导入的文件夹路径
+            user_folder_id: 新的用户文件夹ID
+
+        Returns:
+            是否成功
+        """
+        try:
+            with self.get_cursor() as cursor:
+                cursor.execute("""
+                    UPDATE imported_folder_mappings
+                    SET user_folder_id = ?
+                    WHERE project_id = ? AND folder_path = ?
+                """, (user_folder_id, project_id, folder_path))
+            return True
+        except Exception as e:
+            _get_logger().error(f"更新导入文件夹映射失败 {folder_path}: {e}")
             return False
 
 
