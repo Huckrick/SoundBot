@@ -1071,6 +1071,73 @@ async def preload_audio_to_cache(file_path: str):
         raise HTTPException(status_code=500, detail=f"预加载失败: {str(e)}")
 
 
+@app.get("/api/v1/audio/stream/{file_path:path}")
+async def stream_audio_from_cache(file_path: str):
+    """
+    从 LRU 缓存流式获取音频数据（返回 WAV bytes）
+
+    如果缓存命中则直接返回缓存数据（已解码的 numpy 数组转 WAV）
+    如果缓存未命中则先加载到缓存再返回
+
+    用于前端播放，实现真正的内存缓存加速
+
+    返回：audio/wav 格式的二进制数据
+    """
+    import urllib.parse
+    import io
+    import soundfile as sf
+    import numpy as np
+
+    file_path = urllib.parse.unquote(file_path)
+    audio_file = config.validate_audio_path(file_path)
+
+    cache = get_audio_cache()
+
+    cached_entry = cache.get(file_path)
+
+    if cached_entry:
+        audio_data = cached_entry.audio_data
+        sample_rate = cached_entry.sample_rate
+    else:
+        try:
+            audio_data, sample_rate = librosa.load(str(audio_file), sr=None, mono=False)
+            info = sf.info(str(audio_file))
+
+            from core.audio_cache import AudioCacheEntry
+            entry = AudioCacheEntry(
+                audio_data=audio_data,
+                sample_rate=sample_rate,
+                duration=info.duration,
+                last_access=time.time(),
+                file_size=audio_file.stat().st_size,
+                channels=info.channels
+            )
+            cache.put(file_path, entry)
+        except Exception as e:
+            logger.error(f"加载音频失败 {file_path}: {e}")
+            raise HTTPException(status_code=500, detail=f"加载失败: {str(e)}")
+
+    try:
+        buffer = io.BytesIO()
+        sf.write(buffer, audio_data.T if audio_data.ndim > 1 else audio_data, sample_rate, format='WAV')
+        buffer.seek(0)
+        wav_bytes = buffer.read()
+
+        filename = audio_file.name
+        return Response(
+            content=wav_bytes,
+            media_type="audio/wav",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "X-Cached": "true" if cached_entry else "false",
+                "X-Duration": str(audio_data.shape[-1] / sample_rate if audio_data.ndim > 1 else len(audio_data) / sample_rate),
+            }
+        )
+    except Exception as e:
+        logger.error(f"生成 WAV 失败 {file_path}: {e}")
+        raise HTTPException(status_code=500, detail=f"生成音频失败: {str(e)}")
+
+
 # ==================== 索引状态 ====================
 
 @app.get("/api/v1/index/status", response_model=schemas.IndexStatus)

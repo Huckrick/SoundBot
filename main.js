@@ -456,6 +456,34 @@ function setupIpcHandlers() {
           return `${API_BASE_URL}/audio/${encodedPath}`;
         }
 
+        case 'audio-stream': {
+          // 从 LRU 缓存流式获取音频（WAV 格式）
+          // 这个接口返回二进制数据，不能用 json()
+          const encodedPath = encodeURIComponent(data);
+          const response = await fetch(`${API_BASE_URL}/audio/stream/${encodedPath}`);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          const arrayBuffer = await response.arrayBuffer();
+          return { success: true, data: Array.from(new Uint8Array(arrayBuffer)) };
+        }
+
+        case 'audio-preload': {
+          // 预加载音频到 LRU 缓存
+          const encodedPath = encodeURIComponent(data);
+          const response = await fetch(`${API_BASE_URL}/audio/preload/${encodedPath}`, {
+            method: 'POST'
+          });
+          return await response.json();
+        }
+
+        case 'audio-decoded': {
+          // 获取已解码的音频数据（JSON 格式，包含波形峰值）
+          const encodedPath = encodeURIComponent(data);
+          const response = await fetch(`${API_BASE_URL}/audio/decoded/${encodedPath}`);
+          return await response.json();
+        }
+
         case 'start-server': {
           return await startBackendServer();
         }

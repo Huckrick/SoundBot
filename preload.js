@@ -161,6 +161,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
         // 获取音频波形数据
         getWaveform: (filePath) => ipcRenderer.invoke('backend-api', 'waveform', filePath),
 
+        // 预加载音频到 LRU 缓存（用于加速后续播放）
+        preloadAudio: (filePath) => ipcRenderer.invoke('backend-api', 'audio-preload', filePath),
+
+        // 获取已解码的音频数据（使用 LRU 缓存）
+        getDecodedAudio: (filePath) => ipcRenderer.invoke('backend-api', 'audio-decoded', filePath),
+
+        // 从 LRU 缓存流式获取音频（WAV 格式，用于前端播放）
+        streamAudio: (filePath) => ipcRenderer.invoke('backend-api', 'audio-stream', filePath),
+
         // 裁切音频片段
         exportClip: (filePath, start, end, tempFile = true) => ipcRenderer.invoke('backend-api', 'export-clip', { filePath, start, end, tempFile }),
 

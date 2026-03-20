@@ -2016,15 +2016,37 @@
         }
         
         // 预加载音频源到audioPlayer.src，但不播放
+        // 优先使用后端 LRU 缓存，避免重复从磁盘读取
         async function preloadAudioSource(sound) {
             if (!sound || !sound.filePath) return;
-            
+
             try {
                 let audioSrc;
-                
-                if (window.electronAPI && window.electronAPI.readAudioFile) {
+
+                // 优先使用后端 LRU 缓存的 streamAudio API
+                if (window.electronAPI && window.electronAPI.backendAPI && window.electronAPI.backendAPI.streamAudio) {
+                    console.log('[preloadAudioSource] 使用后端 LRU 缓存:', sound.filePath);
+
+                    const response = await window.electronAPI.backendAPI.streamAudio(sound.filePath);
+                    console.log('[preloadAudioSource] streamAudio response:', response);
+
+                    if (response && response.data) {
+                        const uint8Array = new Uint8Array(response.data);
+                        const blob = new Blob([uint8Array], { type: 'audio/wav' });
+                        audioSrc = URL.createObjectURL(blob);
+
+                        if (currentBlobUrl) {
+                            URL.revokeObjectURL(currentBlobUrl);
+                        }
+                        currentBlobUrl = audioSrc;
+                        console.log('[preloadAudioSource] 使用缓存音频:', sound.filePath);
+                    } else {
+                        console.warn('[preloadAudioSource] streamAudio 返回无效数据，使用后备方案');
+                        audioSrc = 'file://' + encodeURI(sound.filePath).replace(/#/g, '%23');
+                    }
+                } else if (window.electronAPI && window.electronAPI.readAudioFile) {
                     const result = await window.electronAPI.readAudioFile(sound.filePath);
-                    
+
                     if (result && result.success) {
                         const uint8Array = new Uint8Array(result.data);
                         const fileExt = sound.filePath.split('.').pop().toLowerCase();
@@ -2041,8 +2063,7 @@
                         const mimeType = mimeTypes[fileExt] || 'audio/wav';
                         const blob = new Blob([uint8Array], { type: mimeType });
                         audioSrc = URL.createObjectURL(blob);
-                        
-                        // 释放旧的Blob URL
+
                         if (currentBlobUrl) {
                             URL.revokeObjectURL(currentBlobUrl);
                         }
@@ -2053,7 +2074,7 @@
                 } else {
                     audioSrc = 'file://' + encodeURI(sound.filePath).replace(/#/g, '%23');
                 }
-                
+
                 if (audioPlayer) {
                     audioPlayer.src = audioSrc;
                     audioPlayer.load();
