@@ -190,10 +190,10 @@
         <!-- Right: Search & Disk Space -->
         <div class="flex items-center gap-3">
             <!-- 模型加载状态 -->
-            <div id="modelStatusDisplay" class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs border opacity-80 hover:opacity-100 transition-opacity cursor-help hidden"
-                 style="background-color: var(--bg-tertiary); border-color: var(--border-color);"
+            <div id="modelStatusDisplay" class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs border opacity-80 hover:opacity-100 transition-opacity cursor-help"
+                 style="background-color: var(--bg-tertiary); border-color: var(--border-color); display: none;"
                  title="AI搜索模型加载状态">
-                <div class="w-3.5 h-3.5 rounded-full border-2 border-t-transparent animate-spin" style="border-color: var(--text-secondary); border-top-color: transparent;"></div>
+                <div id="modelStatusIcon" class="w-3.5 h-3.5 rounded-full border-2 border-t-transparent animate-spin" style="border-color: var(--text-secondary); border-top-color: transparent;"></div>
                 <span id="modelStatusText">模型加载中...</span>
             </div>
 
@@ -639,24 +639,44 @@
 
                 const modelDisplay = document.getElementById('modelStatusDisplay');
                 const modelText = document.getElementById('modelStatusText');
+                const modelIcon = document.getElementById('modelStatusIcon');
 
                 if (result && result.model_status) {
                     if (result.model_status.loading) {
-                        // 模型加载中
-                        modelDisplay.classList.remove('hidden');
+                        // 模型加载中 - 显示旋转动画
+                        modelDisplay.style.display = 'flex';
+                        modelIcon.className = 'w-3.5 h-3.5 rounded-full border-2 border-t-transparent animate-spin';
+                        modelIcon.style.borderColor = 'var(--text-secondary)';
+                        modelIcon.style.borderTopColor = 'transparent';
                         modelText.textContent = '模型加载中...';
+                        modelDisplay.style.borderColor = 'var(--border-color)';
                     } else if (result.model_status.loaded) {
-                        // 模型已加载
-                        modelDisplay.classList.add('hidden');
+                        // 模型已加载 - 显示绿色对勾
+                        modelDisplay.style.display = 'flex';
+                        modelIcon.className = 'w-3.5 h-3.5 flex items-center justify-center';
+                        modelIcon.style.border = 'none';
+                        modelIcon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+                        modelText.textContent = '模型就绪';
+                        modelText.style.color = '#22c55e';
+                        modelDisplay.style.borderColor = '#22c55e';
                     } else if (result.model_status.error) {
-                        // 模型加载失败
-                        modelDisplay.classList.remove('hidden');
-                        modelText.textContent = '模型加载失败';
+                        // 模型加载失败 - 显示红色错误
+                        modelDisplay.style.display = 'flex';
+                        modelIcon.className = 'w-3.5 h-3.5 flex items-center justify-center';
+                        modelIcon.style.border = 'none';
+                        modelIcon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+                        modelText.textContent = '模型错误';
+                        modelText.style.color = '#ef4444';
                         modelDisplay.style.borderColor = '#ef4444';
                     } else {
                         // 模型未加载
-                        modelDisplay.classList.remove('hidden');
+                        modelDisplay.style.display = 'flex';
+                        modelIcon.className = 'w-3.5 h-3.5 rounded-full border-2';
+                        modelIcon.style.borderColor = '#f59e0b';
+                        modelIcon.innerHTML = '';
                         modelText.textContent = '模型未加载';
+                        modelText.style.color = '#f59e0b';
+                        modelDisplay.style.borderColor = '#f59e0b';
                     }
                 }
             } catch (error) {
@@ -664,7 +684,7 @@
                 // 后端不可用时不显示模型状态
                 const modelDisplay = document.getElementById('modelStatusDisplay');
                 if (modelDisplay) {
-                    modelDisplay.classList.add('hidden');
+                    modelDisplay.style.display = 'none';
                 }
             }
         }
