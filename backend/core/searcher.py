@@ -117,9 +117,11 @@ class AudioSearcher:
             
             for i, file_id in enumerate(ids):
                 # 计算相似度（ChromaDB 使用欧氏距离，越小越相似）
-                # 对于归一化的向量，欧氏距离与余弦相似度的关系：cos_sim = 1 - dist^2 / 2
+                # 使用高斯核函数将距离转换为相似度，适用于非归一化向量
                 distance = distances[i]
-                similarity = 1.0 - (distance ** 2) / 2.0
+                # 高斯核：similarity = exp(-distance^2 / (2 * sigma^2))
+                # sigma 控制衰减速度，使用 1.0 作为默认值
+                similarity = np.exp(-(distance ** 2) / 2.0)
 
                 # 过滤低相似度结果
                 if similarity < min_similarity:

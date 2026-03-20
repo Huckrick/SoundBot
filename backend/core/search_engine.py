@@ -317,9 +317,9 @@ class OptimizedAudioSearcher(AudioSearcher):
             metadatas = results["metadatas"][0]
             
             for i, file_id in enumerate(ids):
-                # 欧氏距离转余弦相似度
+                # 使用高斯核函数将距离转换为相似度
                 distance = distances[i]
-                similarity = 1.0 - (distance ** 2) / 2.0
+                similarity = np.exp(-(distance ** 2) / 2.0)
                 
                 if similarity < min_similarity:
                     continue
