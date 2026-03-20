@@ -21,28 +21,34 @@ from core.scanner import AudioScanner
 logger = logging.getLogger(__name__)
 
 
-# 全局 ChromaDB 客户端（单例）
-_chroma_client: Optional[chromadb.PersistentClient] = None
+# 全局 ChromaDB 客户端（按路径缓存）
+_chroma_clients: Dict[str, chromadb.PersistentClient] = {}
 
 
 def get_chroma_client(persist_directory: Optional[str] = None) -> chromadb.PersistentClient:
-    """获取全局 ChromaDB 客户端（单例）"""
-    global _chroma_client
-    if _chroma_client is None:
-        if persist_directory is None:
-            persist_directory = str(config.get_db_path())
+    """获取 ChromaDB 客户端（按路径缓存）"""
+    global _chroma_clients
+    if persist_directory is None:
+        persist_directory = str(config.get_db_path())
+
+    # 按路径缓存客户端，不同工程使用不同客户端
+    if persist_directory not in _chroma_clients:
         Path(persist_directory).mkdir(parents=True, exist_ok=True)
-        _chroma_client = chromadb.PersistentClient(
+        _chroma_clients[persist_directory] = chromadb.PersistentClient(
             path=persist_directory,
             settings=Settings(anonymized_telemetry=False)
         )
-    return _chroma_client
+    return _chroma_clients[persist_directory]
 
 
-def reset_chroma_client() -> None:
+def reset_chroma_client(persist_directory: Optional[str] = None) -> None:
     """重置 ChromaDB 客户端（用于测试或重新初始化）"""
-    global _chroma_client
-    _chroma_client = None
+    global _chroma_clients
+    if persist_directory is None:
+        # 重置所有客户端
+        _chroma_clients.clear()
+    elif persist_directory in _chroma_clients:
+        del _chroma_clients[persist_directory]
 
 
 class AudioIndexer:

@@ -2468,10 +2468,15 @@ async def switch_project(project_id: str):
             asyncio.create_task(searcher.clear_cache())
             logger.info("查询缓存已清理")
 
-            # 重置数据库连接（避免WAL模式冲突）
+            # 重置数据库连接
             from core.database import reset_db_manager
             reset_db_manager()
             logger.info("数据库连接已重置")
+
+            # 重置 ChromaDB 客户端（避免跨工程缓存问题）
+            from core.indexer import reset_chroma_client
+            reset_chroma_client()
+            logger.info("ChromaDB 客户端已重置")
 
         # 获取数据库管理器（可能是新的连接）
         db_manager = get_db_manager()
