@@ -271,9 +271,8 @@ class OptimizedAudioSearcher(AudioSearcher):
                 # 计算关键词匹配分数（0-1）
                 keyword_sim = self._keyword_match_score(query, filename, metadata)
 
-                # 混合分数计算（关键词绝对优先）：
-                # 关键词匹配 > 语义相似
-                # 目的是：搜"wood"时，带wood的文件必须排在前面
+                # 混合分数计算（关键词优先但语义搜索仍然有效）：
+                # 目的是：搜"wood"时，带wood的文件排前面，语义相关的也显示
                 if keyword_sim >= 0.7:  # 强关键词匹配
                     # 关键词匹配好的，给予最高优先级
                     # 基础分0.8 + 关键词分数*0.2 = 0.8-1.0
@@ -286,8 +285,8 @@ class OptimizedAudioSearcher(AudioSearcher):
                     # 关键词略有匹配，语义搜索辅助
                     hybrid_sim = keyword_sim * 0.5 + semantic_sim * 0.5
                 else:  # 无关键词匹配
-                    # 纯语义搜索，但降低权重
-                    hybrid_sim = semantic_sim * 0.4
+                    # 纯语义搜索，保持原有权重确保结果不丢失
+                    hybrid_sim = semantic_sim * 0.9  # 提高到0.9，避免被阈值过滤
 
                 # 确保不超过1.0
                 hybrid_sim = min(hybrid_sim, 1.0)
