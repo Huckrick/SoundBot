@@ -466,18 +466,22 @@ class DatabaseManager:
             )
             return [self._row_to_record(row) for row in cursor.fetchall()]
 
-    def file_exists(self, path: str) -> bool:
+    def file_exists(self, path: str, project_id: str = None) -> bool:
         """
         检查文件记录是否存在
 
         Args:
             path: 文件路径
+            project_id: 工程ID（可选，如果提供则只检查该工程）
 
         Returns:
             是否存在
         """
         with self.get_cursor() as cursor:
-            cursor.execute("SELECT 1 FROM files WHERE path = ?", (path,))
+            if project_id:
+                cursor.execute("SELECT 1 FROM files WHERE path = ? AND project_id = ?", (path, project_id))
+            else:
+                cursor.execute("SELECT 1 FROM files WHERE path = ?", (path,))
             return cursor.fetchone() is not None
 
     def update_peaks(self, path: str, peaks: List[float]) -> bool:

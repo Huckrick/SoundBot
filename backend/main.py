@@ -839,8 +839,8 @@ async def _scan_and_import_task(
                 progress=int(progress_pct * 0.4)
             )
 
-            # 检查是否已存在
-            if db_manager.file_exists(audio_file.path):
+            # 检查是否已存在（按当前工程过滤）
+            if db_manager.file_exists(audio_file.path, project_id=config.CURRENT_PROJECT_ID):
                 skipped += 1
                 continue
 
