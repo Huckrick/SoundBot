@@ -143,6 +143,24 @@ class TempDirRequest(BaseModel):
     temp_dir: str = Field(..., description="临时文件存放目录路径")
 
 
+# ==================== 工程管理请求模型 ====================
+
+class CreateProjectRequest(BaseModel):
+    """创建工程请求"""
+    id: Optional[str] = Field(None, description="工程唯一标识（可选，不传则自动生成）")
+    name: str = Field(..., description="工程名称")
+    description: str = Field(default="", description="工程描述")
+    temp_dir: Optional[str] = Field(None, description="工程特定的临时文件目录")
+
+
+class UpdateProjectRequest(BaseModel):
+    """更新工程请求"""
+    name: Optional[str] = Field(None, description="工程名称")
+    description: Optional[str] = Field(None, description="工程描述")
+    temp_dir: Optional[str] = Field(None, description="工程特定的临时文件目录")
+    settings: Optional[dict] = Field(None, description="工程特定配置（JSON格式）")
+
+
 class TempDirResponse(BaseModel):
     """临时文件目录响应"""
     temp_dir: str = Field(..., description="当前临时文件目录")

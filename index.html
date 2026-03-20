@@ -85,7 +85,29 @@
         
         <!-- Center: Menu -->
         <nav class="flex items-center gap-1">
-            <button class="menu-btn px-3 py-1.5 rounded-md text-sm font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5">文件</button>
+            <!-- 文件菜单 -->
+            <div class="relative">
+                <button id="fileMenuBtn" class="menu-btn px-3 py-1.5 rounded-md text-sm font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5">文件</button>
+                <!-- 文件下拉菜单 -->
+                <div id="fileDropdown" class="dropdown-menu hidden absolute top-full left-0 mt-2 w-56 rounded-lg shadow-xl border py-2 z-50"
+                     style="background-color: var(--bg-secondary); border-color: var(--border-color);">
+                    <div class="px-3 py-2 text-xs font-medium uppercase tracking-wider opacity-50">工程</div>
+                    <button id="newProjectBtn" class="w-full px-4 py-2 text-sm text-left hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2">
+                        <i data-lucide="folder-plus" class="w-4 h-4"></i>新建工程
+                    </button>
+                    <button id="openProjectBtn" class="w-full px-4 py-2 text-sm text-left hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2">
+                        <i data-lucide="folder-open" class="w-4 h-4"></i>打开工程
+                    </button>
+                    <button id="recentProjectsBtn" class="w-full px-4 py-2 text-sm text-left hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2">
+                        <i data-lucide="clock" class="w-4 h-4"></i>最近工程
+                    </button>
+                    <div class="border-t my-2" style="border-color: var(--border-color);"></div>
+                    <div class="px-3 py-2 text-xs font-medium uppercase tracking-wider opacity-50">当前工程</div>
+                    <div id="currentProjectInfo" class="px-4 py-2 text-sm opacity-70">
+                        <span id="currentProjectName">默认工程</span>
+                    </div>
+                </div>
+            </div>
             <div class="relative">
                 <button id="importBtn" class="menu-btn px-3 py-1.5 rounded-md text-sm font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-1.5">
                     <i data-lucide="upload" class="w-4 h-4"></i>导入
@@ -390,6 +412,12 @@
         let folderData = [
             { id: 'root', name: '音效库', expanded: true, children: [] }
         ];
+
+        // 当前工程信息
+        let currentProject = {
+            id: 'default',
+            name: '默认工程'
+        };
 
         // 分类数据（动态生成）
         let categoryData = [
@@ -1118,11 +1146,18 @@
                     // 点击文件夹时筛选显示该文件夹下的文件
                     document.querySelectorAll('#folderTree .sidebar-item').forEach(item => item.classList.remove('active'));
                     div.classList.add('active');
-                    
-                    // 筛选该文件夹下的文件
-                    if (folder.path) {
-                        // 动态导入的文件夹，按 folderPath 筛选
-                        const filtered = soundData.filter(s => s.folderPath === folder.path);
+
+                    // 筛选该文件夹下的文件（包含子文件夹）
+                    if (folder.path !== undefined) {
+                        // 使用相对路径筛选，匹配该文件夹及其子文件夹下的所有文件
+                        const folderPrefix = folder.path ? folder.path + '/' : '';
+                        const filtered = soundData.filter(s => {
+                            // 完全匹配
+                            if (s.folderPath === folder.path) return true;
+                            // 子文件夹匹配（以该文件夹路径开头）
+                            if (s.folderPath && s.folderPath.startsWith(folderPrefix)) return true;
+                            return false;
+                        });
                         renderSoundList('', filtered);
                     } else if (folder.children) {
                         // 根文件夹内的分类
@@ -1130,7 +1165,7 @@
                     }
                 }
             });
-            
+
             return div;
         }
 
@@ -2390,7 +2425,317 @@
                 showNotification('恢复默认路径失败: ' + error.message, 'error');
             }
         }
-        
+
+        // ==================== 工程管理 ====================
+
+        // 初始化工程管理
+        function initProjectManagement() {
+            // 文件菜单按钮
+            const fileMenuBtn = document.getElementById('fileMenuBtn');
+            const fileDropdown = document.getElementById('fileDropdown');
+
+            fileMenuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                fileDropdown.classList.toggle('hidden');
+                fileDropdown.classList.toggle('visible');
+            });
+
+            // 点击其他地方关闭文件菜单
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#fileDropdown') && !e.target.closest('#fileMenuBtn')) {
+                    fileDropdown.classList.add('hidden');
+                    fileDropdown.classList.remove('visible');
+                }
+            });
+
+            // 新建工程按钮
+            document.getElementById('newProjectBtn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                showNewProjectModal();
+                fileDropdown.classList.add('hidden');
+                fileDropdown.classList.remove('visible');
+            });
+
+            // 打开工程按钮
+            document.getElementById('openProjectBtn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                showOpenProjectModal();
+                fileDropdown.classList.add('hidden');
+                fileDropdown.classList.remove('visible');
+            });
+
+            // 最近工程按钮
+            document.getElementById('recentProjectsBtn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                showOpenProjectModal(true); // 显示最近工程
+                fileDropdown.classList.add('hidden');
+                fileDropdown.classList.remove('visible');
+            });
+
+            // 新建工程弹窗事件
+            document.getElementById('closeNewProjectModal').addEventListener('click', hideNewProjectModal);
+            document.getElementById('cancelNewProjectBtn').addEventListener('click', hideNewProjectModal);
+            document.getElementById('confirmNewProjectBtn').addEventListener('click', createNewProject);
+            document.getElementById('selectProjectTempDirBtn').addEventListener('click', selectProjectTempDir);
+
+            // 打开工程弹窗事件
+            document.getElementById('closeOpenProjectModal').addEventListener('click', hideOpenProjectModal);
+            document.getElementById('cancelOpenProjectBtn').addEventListener('click', hideOpenProjectModal);
+
+            // 加载当前工程信息
+            loadCurrentProject();
+        }
+
+        // 显示新建工程弹窗
+        function showNewProjectModal() {
+            const modal = document.getElementById('newProjectModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            // 清空表单
+            document.getElementById('newProjectName').value = '';
+            document.getElementById('newProjectDesc').value = '';
+            document.getElementById('newProjectTempDir').value = '';
+
+            lucide.createIcons();
+        }
+
+        // 隐藏新建工程弹窗
+        function hideNewProjectModal() {
+            const modal = document.getElementById('newProjectModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // 选择工程临时文件目录
+        async function selectProjectTempDir() {
+            try {
+                let selectedPath = null;
+
+                if (window.electronAPI && window.electronAPI.dialogOpen) {
+                    const result = await window.electronAPI.dialogOpen({
+                        properties: ['openDirectory'],
+                        title: '选择工程临时文件目录'
+                    });
+                    if (result && result.length > 0) {
+                        selectedPath = result[0];
+                    }
+                } else {
+                    // 浏览器环境使用 input
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.webkitdirectory = true;
+                    input.directory = true;
+                    input.addEventListener('change', (e) => {
+                        if (e.target.files && e.target.files.length > 0) {
+                            const path = e.target.files[0].path || e.target.files[0].webkitRelativePath.split('/')[0];
+                            document.getElementById('newProjectTempDir').value = path;
+                        }
+                    });
+                    input.click();
+                    return;
+                }
+
+                if (selectedPath) {
+                    document.getElementById('newProjectTempDir').value = selectedPath;
+                }
+            } catch (error) {
+                console.error('选择目录失败:', error);
+                showNotification('选择目录失败: ' + error.message, 'error');
+            }
+        }
+
+        // 创建新工程
+        async function createNewProject() {
+            const name = document.getElementById('newProjectName').value.trim();
+            const description = document.getElementById('newProjectDesc').value.trim();
+            const tempDir = document.getElementById('newProjectTempDir').value.trim();
+
+            if (!name) {
+                showNotification('请输入工程名称', 'error');
+                return;
+            }
+
+            try {
+                showNotification('正在创建工程...', 'info');
+
+                const response = await fetch('http://127.0.0.1:8000/api/v1/projects', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: name,
+                        description: description,
+                        temp_dir: tempDir || null
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result && result.success) {
+                    showNotification(`工程 "${name}" 创建成功`, 'success');
+                    hideNewProjectModal();
+
+                    // 切换到新创建的工程
+                    await switchProject(result.project_id, name);
+                } else {
+                    showNotification('创建工程失败: ' + (result.detail || '未知错误'), 'error');
+                }
+            } catch (error) {
+                console.error('创建工程失败:', error);
+                showNotification('创建工程失败: ' + error.message, 'error');
+            }
+        }
+
+        // 显示打开工程弹窗
+        async function showOpenProjectModal(showRecent = false) {
+            const modal = document.getElementById('openProjectModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            // 加载工程列表
+            await loadProjectList(showRecent);
+
+            lucide.createIcons();
+        }
+
+        // 隐藏打开工程弹窗
+        function hideOpenProjectModal() {
+            const modal = document.getElementById('openProjectModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // 加载工程列表
+        async function loadProjectList(showRecent = false) {
+            const container = document.getElementById('projectList');
+            container.innerHTML = '<div class="text-center py-8 opacity-50"><i data-lucide="loader-2" class="w-8 h-8 mx-auto mb-2 animate-spin"></i><p class="text-sm">加载中...</p></div>';
+            lucide.createIcons();
+
+            try {
+                let url = showRecent ? 'http://127.0.0.1:8000/api/v1/projects/recent' : 'http://127.0.0.1:8000/api/v1/projects';
+                const response = await fetch(url);
+                const result = await response.json();
+
+                if (result && result.projects && result.projects.length > 0) {
+                    container.innerHTML = '';
+                    result.projects.forEach(project => {
+                        const item = document.createElement('div');
+                        item.className = 'flex items-center justify-between p-3 rounded-md cursor-pointer transition-colors hover:bg-black/5 dark:hover:bg-white/5';
+                        if (project.id === currentProject.id) {
+                            item.classList.add('bg-black/5', 'dark:bg-white/5');
+                        }
+
+                        item.innerHTML = `
+                            <div class="flex items-center gap-3 flex-1">
+                                <i data-lucide="folder" class="w-5 h-5 opacity-70"></i>
+                                <div class="flex-1 min-w-0">
+                                    <div class="font-medium text-sm truncate">${project.name}</div>
+                                    <div class="text-xs opacity-60 truncate">${project.description || '无描述'} · ${project.file_count || 0} 个文件</div>
+                                </div>
+                            </div>
+                            ${project.id === currentProject.id ? '<span class="text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-600 dark:text-green-400">当前</span>' : ''}
+                        `;
+
+                        item.addEventListener('click', () => {
+                            switchProject(project.id, project.name);
+                            hideOpenProjectModal();
+                        });
+
+                        container.appendChild(item);
+                    });
+                    lucide.createIcons();
+                } else {
+                    container.innerHTML = `
+                        <div class="text-center py-8 opacity-50">
+                            <i data-lucide="folder-x" class="w-8 h-8 mx-auto mb-2"></i>
+                            <p class="text-sm">${showRecent ? '暂无最近工程' : '暂无工程'}</p>
+                        </div>
+                    `;
+                    lucide.createIcons();
+                }
+            } catch (error) {
+                console.error('加载工程列表失败:', error);
+                container.innerHTML = `
+                    <div class="text-center py-8 opacity-50">
+                        <i data-lucide="alert-circle" class="w-8 h-8 mx-auto mb-2"></i>
+                        <p class="text-sm">加载失败: ${error.message}</p>
+                    </div>
+                `;
+                lucide.createIcons();
+            }
+        }
+
+        // 切换到指定工程
+        async function switchProject(projectId, projectName) {
+            try {
+                showNotification(`正在切换到工程 "${projectName}"...`, 'info');
+
+                const response = await fetch(`http://127.0.0.1:8000/api/v1/projects/${projectId}/switch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const result = await response.json();
+
+                if (result && result.success) {
+                    // 更新当前工程信息
+                    currentProject = {
+                        id: projectId,
+                        name: projectName
+                    };
+
+                    // 更新UI显示
+                    document.getElementById('currentProjectName').textContent = projectName;
+
+                    // 清空当前数据
+                    soundData = [];
+                    folderData = [{ id: 'root', name: '音效库', expanded: true, children: [] }];
+
+                    // 重新加载该工程的文件
+                    await loadFilesFromDatabase();
+
+                    // 刷新UI
+                    renderFolderTree();
+                    updateCategoryData();
+                    renderSoundList();
+
+                    showNotification(`已切换到工程 "${projectName}"`, 'success');
+
+                    // 保存到本地存储
+                    localStorage.setItem('soundmind_current_project', JSON.stringify(currentProject));
+                } else {
+                    showNotification('切换工程失败: ' + (result.detail || '未知错误'), 'error');
+                }
+            } catch (error) {
+                console.error('切换工程失败:', error);
+                showNotification('切换工程失败: ' + error.message, 'error');
+            }
+        }
+
+        // 加载当前工程信息
+        async function loadCurrentProject() {
+            // 尝试从本地存储加载
+            const saved = localStorage.getItem('soundmind_current_project');
+            if (saved) {
+                try {
+                    const savedProject = JSON.parse(saved);
+                    // 验证工程是否存在
+                    const response = await fetch(`http://127.0.0.1:8000/api/v1/projects/${savedProject.id}`);
+                    if (response.ok) {
+                        currentProject = savedProject;
+                        document.getElementById('currentProjectName').textContent = currentProject.name;
+                        return;
+                    }
+                } catch (error) {
+                    console.error('加载保存的工程失败:', error);
+                }
+            }
+
+            // 默认使用 default 工程
+            currentProject = { id: 'default', name: '默认工程' };
+            document.getElementById('currentProjectName').textContent = currentProject.name;
+        }
+
         // ==================== 首次启动设置弹窗 ====================
         let firstTimeSelectedPath = null;
         
@@ -2647,6 +2992,10 @@
                     // 扫描调试日志 - 在 F12 控制台显示
                     handleScanLog(message.data);
                     break;
+                case 'folder_structure':
+                    // 接收文件夹结构
+                    handleFolderStructure(message.data);
+                    break;
                 case 'pong':
                     // 心跳响应
                     break;
@@ -2673,6 +3022,58 @@
                     console.log(`%c${prefix} ${message}`, 'color: #6b7280;', logData || '');
                     break;
             }
+        }
+
+        // 处理文件夹结构 - 将后端传来的结构转换为前端格式
+        function handleFolderStructure(data) {
+            if (!data || !data.structure) {
+                console.warn('[FOLDER] 未收到文件夹结构');
+                return;
+            }
+
+            const backendStructure = data.structure;
+            console.log('[FOLDER] 收到文件夹结构:', backendStructure);
+
+            // 转换后端结构为前端格式
+            const convertedRoot = convertBackendFolderToFrontend(backendStructure);
+
+            // 添加到 folderData（如果根节点已存在则替换，否则添加）
+            const existingIndex = folderData.findIndex(f => f.id === convertedRoot.id);
+            if (existingIndex >= 0) {
+                folderData[existingIndex] = convertedRoot;
+            } else {
+                folderData.push(convertedRoot);
+            }
+
+            // 重新渲染文件夹树
+            renderFolderTree();
+            lucide.createIcons();
+
+            console.log('[FOLDER] 文件夹结构已更新:', folderData);
+        }
+
+        // 将后端 FolderNode 转换为前端 folderData 格式
+        function convertBackendFolderToFrontend(backendNode) {
+            const nodeId = 'folder_' + backendNode.path.replace(/[^a-zA-Z0-9]/g, '_');
+
+            const frontendNode = {
+                id: nodeId,
+                name: backendNode.name,
+                path: backendNode.relative_path,  // 相对路径用于筛选
+                fullPath: backendNode.path,       // 完整路径
+                expanded: true,                   // 默认展开
+                count: backendNode.file_count,    // 文件数量
+                children: []
+            };
+
+            // 递归转换子文件夹
+            if (backendNode.children && backendNode.children.length > 0) {
+                frontendNode.children = backendNode.children.map(child =>
+                    convertBackendFolderToFrontend(child)
+                );
+            }
+
+            return frontendNode;
         }
 
         // 扫描进度弹窗
@@ -2993,7 +3394,10 @@
             
             // 检查是否需要显示首次启动弹窗
             checkFirstTimeSetup();
-            
+
+            // ==================== 工程管理事件监听 ====================
+            initProjectManagement();
+
             // Search - 支持本地和后端语义搜索
             let searchTimeout = null;
             document.getElementById('searchInput').addEventListener('input', (e) => {
@@ -4139,6 +4543,98 @@
                         class="px-4 py-2 rounded-md text-sm font-medium transition-colors opacity-50 cursor-not-allowed"
                         style="background-color: var(--text-primary); color: var(--bg-primary);">
                     确认设置
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ==================== 新建工程弹窗 ==================== -->
+    <div id="newProjectModal" class="fixed inset-0 z-[100] hidden items-center justify-center" style="background-color: rgba(0, 0, 0, 0.5);">
+        <div class="rounded-lg shadow-2xl p-6 w-[480px] max-w-[90vw] transition-colors duration-300"
+             style="background-color: var(--bg-secondary); border: 1px solid var(--border-color);">
+            <!-- 标题 -->
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-semibold">新建工程</h3>
+                <button id="closeNewProjectModal" class="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <!-- 表单 -->
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2 opacity-80">工程名称 <span class="text-red-500">*</span></label>
+                    <input type="text" id="newProjectName" placeholder="输入工程名称"
+                           class="w-full h-10 px-3 rounded-md border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-gray-500/50"
+                           style="background-color: var(--bg-primary); border-color: var(--border-color); color: var(--text-primary);">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2 opacity-80">工程描述</label>
+                    <textarea id="newProjectDesc" placeholder="输入工程描述（可选）" rows="2"
+                              class="w-full px-3 py-2 rounded-md border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-gray-500/50 resize-none"
+                              style="background-color: var(--bg-primary); border-color: var(--border-color); color: var(--text-primary);"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2 opacity-80">临时文件目录</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="newProjectTempDir" placeholder="使用默认目录（可选）" readonly
+                               class="flex-1 h-10 px-3 rounded-md border text-sm transition-all focus:outline-none"
+                               style="background-color: var(--bg-tertiary); border-color: var(--border-color); color: var(--text-secondary);">
+                        <button id="selectProjectTempDirBtn" class="px-3 py-2 rounded-md border text-sm font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                                style="border-color: var(--border-color);">
+                            选择
+                        </button>
+                    </div>
+                    <p class="text-xs mt-1 opacity-60">不选择则使用全局默认临时文件目录</p>
+                </div>
+            </div>
+            
+            <!-- 按钮 -->
+            <div class="flex justify-end gap-3 mt-6">
+                <button id="cancelNewProjectBtn"
+                        class="px-4 py-2 rounded-md text-sm font-medium transition-colors hover:opacity-80"
+                        style="background-color: var(--bg-tertiary); color: var(--text-secondary);">
+                    取消
+                </button>
+                <button id="confirmNewProjectBtn"
+                        class="px-4 py-2 rounded-md text-sm font-medium transition-colors hover:opacity-80"
+                        style="background-color: var(--text-primary); color: var(--bg-primary);">
+                    创建工程
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ==================== 打开工程弹窗 ==================== -->
+    <div id="openProjectModal" class="fixed inset-0 z-[100] hidden items-center justify-center" style="background-color: rgba(0, 0, 0, 0.5);">
+        <div class="rounded-lg shadow-2xl p-6 w-[520px] max-w-[90vw] max-h-[80vh] flex flex-col transition-colors duration-300"
+             style="background-color: var(--bg-secondary); border: 1px solid var(--border-color);">
+            <!-- 标题 -->
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold">打开工程</h3>
+                <button id="closeOpenProjectModal" class="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <!-- 工程列表 -->
+            <div class="flex-1 overflow-y-auto min-h-[200px] max-h-[400px] border rounded-lg mb-4"
+                 style="border-color: var(--border-color); background-color: var(--bg-primary);">
+                <div id="projectList" class="p-2 space-y-1">
+                    <!-- 工程列表将动态生成 -->
+                    <div class="text-center py-8 opacity-50">
+                        <i data-lucide="folder-open" class="w-8 h-8 mx-auto mb-2"></i>
+                        <p class="text-sm">加载中...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 按钮 -->
+            <div class="flex justify-end gap-3">
+                <button id="cancelOpenProjectBtn"
+                        class="px-4 py-2 rounded-md text-sm font-medium transition-colors hover:opacity-80"
+                        style="background-color: var(--bg-tertiary); color: var(--text-secondary);">
+                    取消
                 </button>
             </div>
         </div>

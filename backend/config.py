@@ -97,6 +97,11 @@ def get_temp_clip_dir() -> str:
 # 向后兼容的变量（实际使用 get_temp_clip_dir() 函数）
 TEMP_CLIP_DIR = get_temp_clip_dir()
 
+# ==================== 工程管理配置 ====================
+
+# 当前激活的工程ID（默认工程）
+CURRENT_PROJECT_ID = "default"
+
 # ==================== 搜索配置 ====================
 
 TOP_K_RESULTS = 20  # 默认返回 20 个结果

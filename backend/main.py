@@ -338,16 +338,22 @@ async def _scan_and_import_task(
         logger.info(f"[SCAN_TASK] 扫描状态已发送，当前连接数: {ws_manager.get_connection_count()}")
         write_log('info', '开始扫描文件夹', {'folder_path': folder_path})
 
-        audio_files = scanner.scan(folder_path, recursive)
+        # 使用 scan_with_structure 获取文件列表和文件夹结构
+        audio_files, folder_structure = scanner.scan_with_structure(folder_path, recursive)
         total = len(audio_files)
         logger.info(f"[SCAN_TASK] 扫描完成，找到 {total} 个音频文件")
         write_log('info', '扫描完成', {'total': total, 'files': [f.path for f in audio_files[:5]]})  # 只记录前5个
-        
+
         # 发送扫描统计日志到前端
         await ws_manager.send_scan_log(
-            client_id, task_id, 'info', 
+            client_id, task_id, 'info',
             f"扫描完成统计: 找到 {total} 个音频文件",
             {'total': total, 'folder_path': folder_path}
+        )
+
+        # 发送文件夹结构到前端
+        await ws_manager.send_folder_structure(
+            client_id, task_id, folder_structure.dict()
         )
 
         if total == 0:
@@ -410,7 +416,7 @@ async def _scan_and_import_task(
                 logger.warning(f"计算波形失败 {audio_file.path}: {e}")
                 write_log('warning', '计算波形失败', {'path': audio_file.path, 'error': str(e)})
 
-            # 写入数据库
+            # 写入数据库（使用当前工程ID）
             record = AudioFileRecord(
                 path=audio_file.path,
                 filename=audio_file.filename,
@@ -421,7 +427,7 @@ async def _scan_and_import_task(
                 peaks_json=peaks_json,
                 tags='[]'
             )
-            success = db_manager.add_file(record)
+            success = db_manager.add_file(record, config.CURRENT_PROJECT_ID)
             if success:
                 added += 1
                 if added % 10 == 0:  # 每10个文件记录一次
@@ -1280,6 +1286,234 @@ async def clear_temp_clips():
     except Exception as e:
         logger.error(f"清理临时文件失败: {e}")
         raise HTTPException(status_code=500, detail=f"清理失败: {str(e)}")
+
+
+# ==================== 工程管理 API ====================
+
+@app.post("/api/v1/projects")
+async def create_project(request: schemas.CreateProjectRequest):
+    """
+    创建新工程
+
+    - **id**: 工程唯一标识（可选，不传则自动生成）
+    - **name**: 工程名称
+    - **description**: 工程描述
+    - **temp_dir**: 工程特定的临时文件目录
+    """
+    try:
+        import uuid
+        project_id = request.id or f"proj_{uuid.uuid4().hex[:8]}"
+
+        db_manager = get_db_manager()
+        success = db_manager.create_project(
+            project_id=project_id,
+            name=request.name,
+            description=request.description,
+            temp_dir=request.temp_dir
+        )
+
+        if not success:
+            raise HTTPException(status_code=400, detail="创建工程失败，可能ID已存在")
+
+        return {
+            "success": True,
+            "project_id": project_id,
+            "message": f"工程 '{request.name}' 创建成功"
+        }
+    except Exception as e:
+        logger.error(f"创建工程失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/projects")
+async def get_all_projects():
+    """
+    获取所有工程列表
+    """
+    try:
+        db_manager = get_db_manager()
+        projects = db_manager.get_all_projects()
+
+        # 添加每个工程的文件数量
+        for project in projects:
+            project['file_count'] = db_manager.get_project_file_count(project['id'])
+
+        return {
+            "total": len(projects),
+            "projects": projects
+        }
+    except Exception as e:
+        logger.error(f"获取工程列表失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/projects/{project_id}")
+async def get_project(project_id: str):
+    """
+    获取工程详情
+    """
+    try:
+        db_manager = get_db_manager()
+        project = db_manager.get_project(project_id)
+
+        if not project:
+            raise HTTPException(status_code=404, detail="工程不存在")
+
+        # 添加文件数量
+        project['file_count'] = db_manager.get_project_file_count(project_id)
+
+        return project
+    except Exception as e:
+        logger.error(f"获取工程详情失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/api/v1/projects/{project_id}")
+async def update_project(project_id: str, request: schemas.UpdateProjectRequest):
+    """
+    更新工程信息
+    """
+    try:
+        db_manager = get_db_manager()
+
+        # 检查工程是否存在
+        existing = db_manager.get_project(project_id)
+        if not existing:
+            raise HTTPException(status_code=404, detail="工程不存在")
+
+        success = db_manager.update_project(
+            project_id=project_id,
+            name=request.name,
+            description=request.description,
+            temp_dir=request.temp_dir,
+            settings=request.settings
+        )
+
+        if not success:
+            raise HTTPException(status_code=400, detail="更新工程失败")
+
+        return {
+            "success": True,
+            "message": "工程更新成功"
+        }
+    except Exception as e:
+        logger.error(f"更新工程失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/v1/projects/{project_id}")
+async def delete_project(project_id: str):
+    """
+    删除工程（会级联删除所有相关文件）
+    """
+    try:
+        db_manager = get_db_manager()
+
+        # 检查工程是否存在
+        existing = db_manager.get_project(project_id)
+        if not existing:
+            raise HTTPException(status_code=404, detail="工程不存在")
+
+        # 不能删除默认工程
+        if project_id == 'default':
+            raise HTTPException(status_code=400, detail="不能删除默认工程")
+
+        success = db_manager.delete_project(project_id)
+
+        if not success:
+            raise HTTPException(status_code=400, detail="删除工程失败")
+
+        return {
+            "success": True,
+            "message": "工程已删除"
+        }
+    except Exception as e:
+        logger.error(f"删除工程失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/projects/{project_id}/switch")
+async def switch_project(project_id: str):
+    """
+    切换到指定工程
+
+    会将工程添加到最近工程列表
+    """
+    try:
+        db_manager = get_db_manager()
+
+        # 检查工程是否存在
+        project = db_manager.get_project(project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="工程不存在")
+
+        # 添加到最近工程
+        db_manager.add_to_recent_projects(project_id)
+
+        # 更新全局配置中的当前工程
+        config.CURRENT_PROJECT_ID = project_id
+
+        # 如果有工程特定的临时目录，更新配置
+        if project.get('temp_dir'):
+            config.TEMP_CLIP_DIR = project['temp_dir']
+
+        return {
+            "success": True,
+            "project_id": project_id,
+            "project_name": project['name'],
+            "message": f"已切换到工程 '{project['name']}'"
+        }
+    except Exception as e:
+        logger.error(f"切换工程失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/projects/recent")
+async def get_recent_projects(limit: int = 10):
+    """
+    获取最近使用的工程列表
+    """
+    try:
+        db_manager = get_db_manager()
+        projects = db_manager.get_recent_projects(limit)
+
+        # 添加每个工程的文件数量
+        for project in projects:
+            project['file_count'] = db_manager.get_project_file_count(project['id'])
+
+        return {
+            "total": len(projects),
+            "projects": projects
+        }
+    except Exception as e:
+        logger.error(f"获取最近工程失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/projects/{project_id}/files")
+async def get_project_files(project_id: str):
+    """
+    获取指定工程的所有文件
+    """
+    try:
+        db_manager = get_db_manager()
+
+        # 检查工程是否存在
+        project = db_manager.get_project(project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="工程不存在")
+
+        files = db_manager.get_files_by_project(project_id)
+
+        return {
+            "project_id": project_id,
+            "project_name": project['name'],
+            "total": len(files),
+            "files": [f.to_dict() for f in files]
+        }
+    except Exception as e:
+        logger.error(f"获取工程文件失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ==================== 主入口 ====================

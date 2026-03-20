@@ -244,6 +244,29 @@ class ConnectionManager:
         }
         await self.broadcast(msg, client_id)
 
+    async def send_folder_structure(
+        self,
+        client_id: str,
+        task_id: str,
+        folder_structure: dict
+    ):
+        """
+        发送文件夹结构到前端
+
+        Args:
+            client_id: 客户端标识
+            task_id: 任务ID
+            folder_structure: 文件夹树形结构
+        """
+        msg = {
+            "type": "folder_structure",
+            "task_id": task_id,
+            "data": {
+                "structure": folder_structure
+            }
+        }
+        await self.broadcast(msg, client_id)
+
     def is_task_cancelled(self, task_id: str) -> bool:
         """
         检查任务是否已取消

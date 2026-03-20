@@ -40,8 +40,24 @@ def _get_logger():
 
 # SQL 建表语句
 CREATE_TABLE_SQL = """
+-- 工程表
+CREATE TABLE IF NOT EXISTS projects (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    temp_dir TEXT,  -- 工程特定的临时文件目录
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    settings_json TEXT DEFAULT '{}'  -- 工程特定配置（JSON格式）
+);
+
+-- 插入默认工程
+INSERT OR IGNORE INTO projects (id, name, description) VALUES ('default', '默认工程', '系统默认工程');
+
+-- 音频文件表（添加 project_id 外键）
 CREATE TABLE IF NOT EXISTS files (
     path TEXT PRIMARY KEY,
+    project_id TEXT DEFAULT 'default',
     filename TEXT NOT NULL,
     duration REAL DEFAULT 0,
     sample_rate INTEGER DEFAULT 0,
@@ -50,12 +66,21 @@ CREATE TABLE IF NOT EXISTS files (
     peaks_json TEXT,
     tags TEXT DEFAULT '[]',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
+CREATE INDEX IF NOT EXISTS idx_files_project ON files(project_id);
 CREATE INDEX IF NOT EXISTS idx_filename ON files(filename);
 CREATE INDEX IF NOT EXISTS idx_created_at ON files(created_at);
 CREATE INDEX IF NOT EXISTS idx_duration ON files(duration);
+
+-- 最近工程列表（用于快速切换）
+CREATE TABLE IF NOT EXISTS recent_projects (
+    project_id TEXT PRIMARY KEY,
+    opened_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
 """
 
 
@@ -153,9 +178,78 @@ class DatabaseManager:
             cursor.close()
 
     def _init_db(self):
-        """初始化数据库（创建表和索引）"""
+        """初始化数据库（创建表和索引，支持迁移）"""
         with self.get_cursor() as cursor:
-            cursor.executescript(CREATE_TABLE_SQL)
+            # 检查 files 表是否存在
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='files'")
+            files_table_exists = cursor.fetchone() is not None
+
+            # 检查 projects 表是否存在
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='projects'")
+            projects_table_exists = cursor.fetchone() is not None
+
+            if not files_table_exists:
+                # 全新数据库，直接创建所有表
+                cursor.executescript(CREATE_TABLE_SQL)
+                _get_logger().info("数据库初始化完成：创建新表")
+            else:
+                # 现有数据库，需要迁移
+                _get_logger().info("检测到现有数据库，执行迁移...")
+                self._migrate_db(cursor, projects_table_exists)
+
+    def _migrate_db(self, cursor, projects_table_exists):
+        """迁移现有数据库到新版结构"""
+        try:
+            # 1. 检查 files 表是否有 project_id 列
+            cursor.execute("PRAGMA table_info(files)")
+            columns = [row[1] for row in cursor.fetchall()]
+
+            if 'project_id' not in columns:
+                _get_logger().info("迁移：添加 project_id 列到 files 表")
+                cursor.execute("ALTER TABLE files ADD COLUMN project_id TEXT DEFAULT 'default'")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_files_project ON files(project_id)")
+
+            # 2. 创建 projects 表（如果不存在）
+            if not projects_table_exists:
+                _get_logger().info("迁移：创建 projects 表")
+                cursor.execute("""
+                    CREATE TABLE projects (
+                        id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        description TEXT,
+                        temp_dir TEXT,
+                        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                        settings_json TEXT DEFAULT '{}'
+                    )
+                """)
+                # 插入默认工程
+                cursor.execute("""
+                    INSERT OR IGNORE INTO projects (id, name, description)
+                    VALUES ('default', '默认工程', '系统默认工程')
+                """)
+
+            # 3. 创建 recent_projects 表（如果不存在）
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='recent_projects'")
+            if cursor.fetchone() is None:
+                _get_logger().info("迁移：创建 recent_projects 表")
+                cursor.execute("""
+                    CREATE TABLE recent_projects (
+                        project_id TEXT PRIMARY KEY,
+                        opened_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+                    )
+                """)
+
+            # 4. 创建缺失的索引
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_files_project'")
+            if cursor.fetchone() is None:
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_files_project ON files(project_id)")
+
+            _get_logger().info("数据库迁移完成")
+        except Exception as e:
+            _get_logger().error(f"数据库迁移失败: {e}")
+            raise
 
     def _row_to_record(self, row: sqlite3.Row) -> AudioFileRecord:
         """将数据库行转换为记录对象"""
@@ -174,12 +268,13 @@ class DatabaseManager:
 
     # ========== CRUD 操作 ==========
 
-    def add_file(self, record: AudioFileRecord) -> bool:
+    def add_file(self, record: AudioFileRecord, project_id: str = 'default') -> bool:
         """
         添加或更新文件记录（INSERT OR REPLACE）
 
         Args:
             record: 音频文件记录
+            project_id: 所属工程ID
 
         Returns:
             是否成功
@@ -188,11 +283,12 @@ class DatabaseManager:
             with self.get_cursor() as cursor:
                 cursor.execute("""
                     INSERT OR REPLACE INTO files 
-                    (path, filename, duration, sample_rate, channels, 
+                    (path, project_id, filename, duration, sample_rate, channels, 
                      file_size, peaks_json, tags, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     record.path,
+                    project_id,
                     record.filename,
                     record.duration,
                     record.sample_rate,
@@ -459,6 +555,251 @@ class DatabaseManager:
                 DELETE FROM files WHERE path LIKE ?
             """, (f'{folder_path}%',))
             return cursor.rowcount
+
+    # ========== 工程管理方法 ==========
+
+    def create_project(self, project_id: str, name: str, description: str = "", temp_dir: Optional[str] = None) -> bool:
+        """
+        创建新工程
+
+        Args:
+            project_id: 工程唯一ID
+            name: 工程名称
+            description: 工程描述
+            temp_dir: 工程特定的临时文件目录
+
+        Returns:
+            是否成功
+        """
+        try:
+            with self.get_cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO projects (id, name, description, temp_dir, updated_at)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (project_id, name, description, temp_dir, datetime.now().isoformat()))
+            return True
+        except Exception as e:
+            _get_logger().error(f"创建工程失败 {project_id}: {e}")
+            return False
+
+    def get_project(self, project_id: str) -> Optional[Dict[str, Any]]:
+        """
+        获取工程信息
+
+        Args:
+            project_id: 工程ID
+
+        Returns:
+            工程信息字典
+        """
+        with self.get_cursor() as cursor:
+            cursor.execute("SELECT * FROM projects WHERE id = ?", (project_id,))
+            row = cursor.fetchone()
+            if row:
+                return {
+                    'id': row['id'],
+                    'name': row['name'],
+                    'description': row['description'],
+                    'temp_dir': row['temp_dir'],
+                    'created_at': row['created_at'],
+                    'updated_at': row['updated_at'],
+                    'settings': json.loads(row['settings_json'] or '{}')
+                }
+        return None
+
+    def get_all_projects(self) -> List[Dict[str, Any]]:
+        """
+        获取所有工程列表
+
+        Returns:
+            工程信息列表
+        """
+        with self.get_cursor() as cursor:
+            cursor.execute("SELECT * FROM projects ORDER BY updated_at DESC")
+            return [{
+                'id': row['id'],
+                'name': row['name'],
+                'description': row['description'],
+                'temp_dir': row['temp_dir'],
+                'created_at': row['created_at'],
+                'updated_at': row['updated_at'],
+                'settings': json.loads(row['settings_json'] or '{}')
+            } for row in cursor.fetchall()]
+
+    def update_project(self, project_id: str, name: Optional[str] = None, 
+                       description: Optional[str] = None, temp_dir: Optional[str] = None,
+                       settings: Optional[Dict] = None) -> bool:
+        """
+        更新工程信息
+
+        Args:
+            project_id: 工程ID
+            name: 新名称
+            description: 新描述
+            temp_dir: 新临时目录
+            settings: 新配置
+
+        Returns:
+            是否成功
+        """
+        try:
+            with self.get_cursor() as cursor:
+                updates = []
+                params = []
+                if name is not None:
+                    updates.append("name = ?")
+                    params.append(name)
+                if description is not None:
+                    updates.append("description = ?")
+                    params.append(description)
+                if temp_dir is not None:
+                    updates.append("temp_dir = ?")
+                    params.append(temp_dir)
+                if settings is not None:
+                    updates.append("settings_json = ?")
+                    params.append(json.dumps(settings))
+                updates.append("updated_at = ?")
+                params.append(datetime.now().isoformat())
+                params.append(project_id)
+
+                cursor.execute(f"""
+                    UPDATE projects SET {', '.join(updates)} WHERE id = ?
+                """, params)
+            return True
+        except Exception as e:
+            _get_logger().error(f"更新工程失败 {project_id}: {e}")
+            return False
+
+    def delete_project(self, project_id: str) -> bool:
+        """
+        删除工程（会级联删除相关文件）
+
+        Args:
+            project_id: 工程ID
+
+        Returns:
+            是否成功
+        """
+        try:
+            with self.get_cursor() as cursor:
+                cursor.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+            return True
+        except Exception as e:
+            _get_logger().error(f"删除工程失败 {project_id}: {e}")
+            return False
+
+    def add_to_recent_projects(self, project_id: str) -> bool:
+        """
+        添加到最近工程列表
+
+        Args:
+            project_id: 工程ID
+
+        Returns:
+            是否成功
+        """
+        try:
+            with self.get_cursor() as cursor:
+                cursor.execute("""
+                    INSERT OR REPLACE INTO recent_projects (project_id, opened_at)
+                    VALUES (?, ?)
+                """, (project_id, datetime.now().isoformat()))
+            return True
+        except Exception as e:
+            _get_logger().error(f"添加最近工程失败 {project_id}: {e}")
+            return False
+
+    def get_recent_projects(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        获取最近工程列表
+
+        Args:
+            limit: 返回数量
+
+        Returns:
+            工程信息列表
+        """
+        with self.get_cursor() as cursor:
+            cursor.execute("""
+                SELECT p.* FROM projects p
+                JOIN recent_projects r ON p.id = r.project_id
+                ORDER BY r.opened_at DESC
+                LIMIT ?
+            """, (limit,))
+            return [{
+                'id': row['id'],
+                'name': row['name'],
+                'description': row['description'],
+                'temp_dir': row['temp_dir'],
+                'created_at': row['created_at'],
+                'updated_at': row['updated_at'],
+                'settings': json.loads(row['settings_json'] or '{}')
+            } for row in cursor.fetchall()]
+
+    def get_project_file_count(self, project_id: str) -> int:
+        """
+        获取工程的文件数量
+
+        Args:
+            project_id: 工程ID
+
+        Returns:
+            文件数量
+        """
+        with self.get_cursor() as cursor:
+            cursor.execute("SELECT COUNT(*) FROM files WHERE project_id = ?", (project_id,))
+            return cursor.fetchone()[0]
+
+    def get_files_by_project(self, project_id: str) -> List[AudioFileRecord]:
+        """
+        获取指定工程的所有文件
+
+        Args:
+            project_id: 工程ID
+
+        Returns:
+            文件列表
+        """
+        with self.get_cursor() as cursor:
+            cursor.execute("""
+                SELECT * FROM files WHERE project_id = ? ORDER BY created_at DESC
+            """, (project_id,))
+            return [self._row_to_record(row) for row in cursor.fetchall()]
+
+    def add_file_with_project(self, record: AudioFileRecord, project_id: str = 'default') -> bool:
+        """
+        添加文件到指定工程
+
+        Args:
+            record: 音频文件记录
+            project_id: 工程ID
+
+        Returns:
+            是否成功
+        """
+        try:
+            with self.get_cursor() as cursor:
+                cursor.execute("""
+                    INSERT OR REPLACE INTO files 
+                    (path, project_id, filename, duration, sample_rate, channels, 
+                     file_size, peaks_json, tags, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    record.path,
+                    project_id,
+                    record.filename,
+                    record.duration,
+                    record.sample_rate,
+                    record.channels,
+                    record.file_size,
+                    record.peaks_json,
+                    record.tags,
+                    datetime.now().isoformat()
+                ))
+            return True
+        except Exception as e:
+            _get_logger().error(f"添加文件到工程失败 {record.path}: {e}")
+            return False
 
 
 # ========== 全局单例 ==========

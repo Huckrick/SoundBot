@@ -28,6 +28,19 @@ class AudioFile(BaseModel):
     channels: int
     format: str
     size: int
+    folder_path: str = ""  # 文件所在文件夹路径（相对于导入根目录）
+
+
+class FolderNode(BaseModel):
+    """文件夹节点模型（用于构建树形结构）"""
+    name: str
+    path: str  # 完整路径
+    relative_path: str  # 相对于导入根目录的路径
+    children: List['FolderNode'] = []  # 子文件夹
+    file_count: int = 0  # 该文件夹下的文件数量（包含子文件夹）
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class AudioScanner:
@@ -48,10 +61,10 @@ class AudioScanner:
             音频文件列表，包含完整路径和元数据
         """
         folder = Path(folder_path)
-        
+
         if not folder.exists():
             raise FileNotFoundError(f"文件夹不存在: {folder_path}")
-        
+
         if not folder.is_dir():
             raise NotADirectoryError(f"路径不是文件夹: {folder_path}")
 
@@ -171,6 +184,99 @@ class AudioScanner:
                 print(f"  - {f}", flush=True)
 
         return audio_files
+
+    def scan_with_structure(self, folder_path: str, recursive: bool = True) -> tuple[List[AudioFile], FolderNode]:
+        """
+        扫描文件夹并返回文件列表和文件夹结构
+
+        Args:
+            folder_path: 要扫描的文件夹路径
+            recursive: 是否递归扫描子文件夹
+
+        Returns:
+            (音频文件列表, 文件夹树形结构根节点)
+        """
+        folder = Path(folder_path)
+        root_name = folder.name or folder_path
+
+        # 先扫描所有文件
+        audio_files = self.scan(folder_path, recursive)
+
+        # 构建文件夹树形结构
+        root_node = FolderNode(
+            name=root_name,
+            path=str(folder.absolute()),
+            relative_path="",
+            children=[],
+            file_count=len(audio_files)
+        )
+
+        # 按文件夹路径分组文件
+        folder_files = {}
+        for audio_file in audio_files:
+            file_path = Path(audio_file.path)
+            parent_path = str(file_path.parent)
+            if parent_path not in folder_files:
+                folder_files[parent_path] = []
+            folder_files[parent_path].append(audio_file)
+
+        # 构建文件夹层级结构
+        folder_nodes = {str(folder.absolute()): root_node}
+
+        for parent_path, files in folder_files.items():
+            parent = Path(parent_path)
+
+            # 确保父文件夹节点存在
+            current_path = str(parent.absolute())
+            if current_path not in folder_nodes:
+                # 创建从根到当前文件夹的路径
+                relative = parent.relative_to(folder)
+                parts = list(relative.parts) if relative.parts else []
+
+                current_node = root_node
+                current_build_path = str(folder.absolute())
+
+                for part in parts:
+                    current_build_path = os.path.join(current_build_path, part)
+
+                    if current_build_path not in folder_nodes:
+                        new_node = FolderNode(
+                            name=part,
+                            path=current_build_path,
+                            relative_path=str(Path(current_build_path).relative_to(folder)),
+                            children=[],
+                            file_count=0
+                        )
+                        folder_nodes[current_build_path] = new_node
+                        current_node.children.append(new_node)
+
+                    current_node = folder_nodes[current_build_path]
+
+            # 更新文件计数
+            node = folder_nodes.get(current_path, root_node)
+            node.file_count = len(files)
+
+            # 为每个文件设置 folder_path
+            for audio_file in files:
+                try:
+                    file_parent = Path(audio_file.path).parent
+                    relative_folder = str(file_parent.relative_to(folder))
+                    audio_file.folder_path = relative_folder if relative_folder != "." else ""
+                except ValueError:
+                    audio_file.folder_path = ""
+
+        # 递归计算每个节点的总文件数（包含子文件夹）
+        def calc_file_count(node: FolderNode) -> int:
+            total = node.file_count
+            for child in node.children:
+                total += calc_file_count(child)
+            node.file_count = total
+            return total
+
+        calc_file_count(root_node)
+
+        logger.info(f"[SCANNER] 文件夹结构构建完成: {root_name}, 共 {len(audio_files)} 个文件")
+        return audio_files, root_node
 
     def _process_file(self, file_path: Path) -> Optional[AudioFile]:
         """
