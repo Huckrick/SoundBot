@@ -142,6 +142,7 @@ class OptimizedAudioSearcher(AudioSearcher):
     def _keyword_match_score(self, query: str, filename: str, metadata: Dict[str, Any]) -> float:
         """
         计算关键词匹配分数（文件名和标签优先）
+        支持中英文混合搜索
 
         Args:
             query: 查询文本
@@ -155,7 +156,8 @@ class OptimizedAudioSearcher(AudioSearcher):
         if not query_lower:
             return 0.0
 
-        query_tokens = set(re.findall(r'\b\w+\b', query_lower))
+        # 支持中英文的分词（按空格、下划线、连字符分隔）
+        query_tokens = [t.strip() for t in re.split(r'[_\-\s]+', query_lower) if t.strip()]
 
         scores = []
 
@@ -166,8 +168,9 @@ class OptimizedAudioSearcher(AudioSearcher):
         # 完全匹配（查询词完整出现在文件名中）
         if query_lower in filename_base:
             scores.append(1.0)
-        # 文件名包含查询词的大部分
-        elif len(query_tokens) > 1:
+
+        # 文件名包含查询词的大部分（支持中英文）
+        if len(query_tokens) > 1:
             matching_tokens = sum(1 for t in query_tokens if t in filename_base)
             if matching_tokens == len(query_tokens):
                 scores.append(0.95)  # 所有词都匹配
@@ -177,9 +180,9 @@ class OptimizedAudioSearcher(AudioSearcher):
                 scores.append(0.7 * (matching_tokens / len(query_tokens)))
         elif len(query_tokens) == 1:
             # 单 token 匹配
-            token = list(query_tokens)[0]
+            token = query_tokens[0]
             if token in filename_base:
-                scores.append(0.8)
+                scores.append(0.9)  # 提高单token匹配分数
 
         # 2. 解析后的文件名描述匹配
         name_description = metadata.get("name_description", "")
@@ -222,11 +225,11 @@ class OptimizedAudioSearcher(AudioSearcher):
         top_k: int,
         min_similarity: float,
         filters: Optional[Dict[str, Any]] = None,
-        keyword_weight: float = 0.5  # 关键词权重50%，与语义搜索同等重要
+        keyword_weight: float = 0.7  # 关键词权重70%，优先于语义搜索
     ) -> List[SearchResult]:
         """
-        执行混合搜索（关键词匹配优先 + 语义搜索辅助）
-        文件名和标签匹配优先，语义搜索作为补充
+        执行混合搜索（关键词匹配绝对优先 + 语义搜索辅助）
+        文件名和标签匹配绝对优先，语义搜索仅作为补充
 
         Args:
             query: 查询文本
@@ -234,13 +237,13 @@ class OptimizedAudioSearcher(AudioSearcher):
             top_k: 返回结果数量
             min_similarity: 最小相似度阈值
             filters: 过滤条件
-            keyword_weight: 关键词匹配的权重 (0.0-1.0)，默认50%
+            keyword_weight: 关键词匹配的权重 (0.0-1.0)，默认70%
 
         Returns:
             搜索结果列表
         """
         # 获取更多结果用于混合排序
-        search_k = min(top_k * 4, 300)
+        search_k = min(top_k * 5, 500)
 
         where_clause = filters if filters else None
 
@@ -268,19 +271,23 @@ class OptimizedAudioSearcher(AudioSearcher):
                 # 计算关键词匹配分数（0-1）
                 keyword_sim = self._keyword_match_score(query, filename, metadata)
 
-                # 混合分数计算（关键词优先）：
-                # - 关键词匹配高的直接置顶
-                # - 关键词匹配中等的，结合语义搜索排序
-                # - 关键词不匹配但语义相关的也显示
-                if keyword_sim >= 0.8:  # 强关键词匹配（文件名完全匹配或标签匹配）
-                    # 给予最高分数，确保排在前面
-                    hybrid_sim = 0.9 + keyword_sim * 0.1  # 0.9-1.0
-                elif keyword_sim >= 0.5:  # 中等关键词匹配
-                    # 结合语义搜索分数，但关键词占主导
-                    hybrid_sim = keyword_sim * 0.7 + semantic_sim * 0.3
-                else:  # 弱关键词匹配
-                    # 主要依靠语义搜索，但给予关键词小幅加分
-                    hybrid_sim = semantic_sim * 0.8 + keyword_sim * 0.2
+                # 混合分数计算（关键词绝对优先）：
+                # 关键词匹配 > 语义相似
+                # 目的是：搜"wood"时，带wood的文件必须排在前面
+                if keyword_sim >= 0.7:  # 强关键词匹配
+                    # 关键词匹配好的，给予最高优先级
+                    # 基础分0.8 + 关键词分数*0.2 = 0.8-1.0
+                    hybrid_sim = 0.8 + keyword_sim * 0.2
+                elif keyword_sim >= 0.4:  # 中等关键词匹配
+                    # 关键词有一定匹配，结合语义但关键词主导
+                    # 0.4-0.7 映射到 0.5-0.8
+                    hybrid_sim = 0.5 + keyword_sim * 0.4 + semantic_sim * 0.1
+                elif keyword_sim > 0:  # 弱关键词匹配
+                    # 关键词略有匹配，语义搜索辅助
+                    hybrid_sim = keyword_sim * 0.5 + semantic_sim * 0.5
+                else:  # 无关键词匹配
+                    # 纯语义搜索，但降低权重
+                    hybrid_sim = semantic_sim * 0.4
 
                 # 确保不超过1.0
                 hybrid_sim = min(hybrid_sim, 1.0)
@@ -406,7 +413,7 @@ class OptimizedAudioSearcher(AudioSearcher):
                     top_k=top_k * 2,  # 获取更多结果用于去重
                     min_similarity=min_similarity,
                     filters=filters,
-                    keyword_weight=0.5  # 关键词匹配权重 50%，文件名和标签优先
+                    keyword_weight=0.7  # 关键词匹配权重 70%，文件名和标签绝对优先
                 )
                 all_results.extend(results)
 
