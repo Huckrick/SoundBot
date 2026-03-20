@@ -4360,7 +4360,7 @@
                     searchTimeout = setTimeout(async () => {
                         try {
                             showNotification('正在搜索...', 'info');
-                            const result = await window.electronAPI.backendAPI.searchAudio(query, 20, 0.1);
+                            const result = await window.electronAPI.backendAPI.searchAudio(query, 1000, 0.1);
                             if (result && result.results) {
                                 // 将后端结果转换为前端格式
                                 const backendSounds = result.results.map((r, index) => ({

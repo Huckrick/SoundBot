@@ -125,7 +125,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
           ipcRenderer.invoke('backend-api', 'import-async', { folderPath, recursive, clientId }),
 
         // 语义搜索音频
-        searchAudio: (query, topK = 20, threshold = 0.15) =>
+        searchAudio: (query, topK = 1000, threshold = 0.15) =>
           ipcRenderer.invoke('backend-api', 'search', { query, topK, threshold }),
 
         // 获取索引状态
