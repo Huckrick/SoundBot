@@ -35,8 +35,11 @@ CORS_ORIGINS = [
 
 # ==================== 模型配置 ====================
 
-# CLAP 音频嵌入模型
-CLAP_MODEL_NAME = "laion/clap-htsat-unfused"
+# HuggingFace 镜像配置（国内加速）
+HF_ENDPOINT = "https://hf-mirror.com"
+
+# CLAP 音频嵌入模型（使用更强的 larger_clap_general）
+CLAP_MODEL_NAME = "laion/larger_clap_general"
 CLAP_DEVICE = "auto"  # auto/cpu/cuda/mps
 
 # ==================== 向量数据库配置 ====================

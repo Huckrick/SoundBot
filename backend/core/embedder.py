@@ -2,7 +2,7 @@
 """
 CLAP 音频-文本嵌入模型封装
 
-使用微软的 CLAP 模型进行音频和文本的特征提取。
+使用 LAION 的 CLAP 模型进行音频和文本的特征提取。
 支持音频-文本对齐搜索功能。
 """
 
@@ -20,6 +20,10 @@ import config
 from utils.audio_utils import load_audio
 
 logger = logging.getLogger(__name__)
+
+# 设置 HuggingFace 镜像（国内加速）
+if hasattr(config, 'HF_ENDPOINT'):
+    os.environ["HF_ENDPOINT"] = config.HF_ENDPOINT
 
 os.environ["HF_HUB_DISABLE_SYMLINKS"] = "1"
 os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "0"
@@ -67,8 +71,7 @@ class CLIPEmbedder:
 
             self.model = ClapModel.from_pretrained(
                 model_path,
-                device_map=self.device,
-                timeout=socket._GLOBAL_DEFAULT_TIMEOUT
+                device_map=self.device
             )
             self.processor = ClapProcessor.from_pretrained(model_path)
 
@@ -143,20 +146,34 @@ class CLIPEmbedder:
         if len(audio) > max_samples:
             audio = audio[:max_samples]
         
-        # 使用 processor 处理
-        inputs = self.processor(
-            audios=[audio], 
-            sampling_rate=48000, 
-            return_tensors="pt"
-        ).to(self.device)
-        
+        # 使用 processor 处理（新版本使用 audio 而不是 audios）
+        try:
+            inputs = self.processor(
+                audio=[audio],
+                sampling_rate=48000,
+                return_tensors="pt"
+            ).to(self.device)
+        except TypeError:
+            # 旧版本使用 audios
+            inputs = self.processor(
+                audios=[audio],
+                sampling_rate=48000,
+                return_tensors="pt"
+            ).to(self.device)
+
         with torch.no_grad():
             outputs = self.model.get_audio_features(**inputs)
-            embedding = outputs.cpu().numpy()[0]
-        
+            # 处理不同版本的输出格式
+            if hasattr(outputs, 'pooler_output'):
+                # 新版本返回 BaseModelOutputWithPooling 对象
+                embedding = outputs.pooler_output.cpu().numpy()[0]
+            else:
+                # 旧版本直接返回张量
+                embedding = outputs.cpu().numpy()[0]
+
         # 归一化
         embedding = embedding / np.linalg.norm(embedding)
-        
+
         return embedding
     
     def _process_long_audio(self, audio: np.ndarray, window_size: int = 30, hop_size: int = 10) -> np.ndarray:
@@ -220,19 +237,25 @@ class CLIPEmbedder:
         """
         try:
             inputs = self.processor(
-                text=[text], 
+                text=[text],
                 return_tensors="pt"
             ).to(self.device)
-            
+
             with torch.no_grad():
                 outputs = self.model.get_text_features(**inputs)
-                embedding = outputs.cpu().numpy()[0]
-            
+                # 处理不同版本的输出格式
+                if hasattr(outputs, 'pooler_output'):
+                    # 新版本返回 BaseModelOutputWithPooling 对象
+                    embedding = outputs.pooler_output.cpu().numpy()[0]
+                else:
+                    # 旧版本直接返回张量
+                    embedding = outputs.cpu().numpy()[0]
+
             # 归一化
             embedding = embedding / np.linalg.norm(embedding)
-            
+
             return embedding
-            
+
         except Exception as e:
             raise RuntimeError(f"[Embedder] 文本嵌入失败: {e}")
     
