@@ -82,9 +82,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 快捷键管理
   shortcuts: {
     register: (accelerator, callback) => {
-      const id = ipcRenderer.invoke('shortcuts-register', accelerator);
-      ipcRenderer.on(`shortcut-${id}`, callback);
-      return id;
+      // 使用 accelerator 作为稳定 ID，先注册监听器再调用 API
+      ipcRenderer.on(`shortcut-${accelerator}`, callback);
+      ipcRenderer.invoke('shortcuts-register', accelerator);
+      return accelerator;
     },
     unregister: (id) => ipcRenderer.invoke('shortcuts-unregister', id)
   },

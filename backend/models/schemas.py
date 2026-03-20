@@ -5,7 +5,7 @@ Pydantic 数据模型
 定义 API 请求/响应的数据结构和验证规则。
 """
 
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 
 
@@ -55,6 +55,7 @@ class SearchResult(BaseModel):
     audio_file: AudioFile
     score: float = Field(..., description="相似度分数")
     distance: float = Field(..., description="距离（越低越相似）")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="混合搜索详情")
 
 
 class ScanResponse(BaseModel):

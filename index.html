@@ -535,8 +535,7 @@
                 return;
             }
 
-            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//127.0.0.1:8000/ws/playback/${clientId}`;
+            const wsUrl = `ws://127.0.0.1:8000/ws/playback/${clientId}`;
             console.log('[Playback WS] 正在连接:', wsUrl);
 
             try {
@@ -3894,8 +3893,7 @@
 
         // 连接到 WebSocket 获取扫描进度
         function connectScanWebSocket(clientId) {
-            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//127.0.0.1:8000/ws/scan/${clientId}`;
+            const wsUrl = `ws://127.0.0.1:8000/ws/scan/${clientId}`;
             console.log('[DEBUG] 正在连接 WebSocket:', wsUrl);
 
             try {
@@ -4550,7 +4548,7 @@
                             id: Date.now() + index + (page - 1) * 50,
                             name: r.audio_file.filename,
                             category: '搜索结果',
-                            duration: r.audio_file.duration,
+                            duration: (r.audio_file.duration || 0) * 1000,
                             tags: ['AI搜索'],
                             filePath: r.audio_file.path,
                             size: r.audio_file.size || 0,

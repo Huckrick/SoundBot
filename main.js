@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog, protocol, net, session, Notification } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, protocol, net, session, Notification, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -696,21 +696,27 @@ function setupIpcHandlers() {
           console.log('[IPC] theme-manager:', data);
           switch (data.action) {
             case 'get': {
-              const isDark = document.documentElement.classList.contains('dark');
-              return { success: true, theme: isDark ? 'dark' : 'light' };
+              const theme = await mainWindow.webContents.executeJavaScript(
+                `document.documentElement.classList.contains('dark') ? 'dark' : 'light'`
+              );
+              return { success: true, theme };
             }
             case 'set': {
-              if (data.theme === 'dark') {
-                document.documentElement.classList.add('dark');
-              } else {
-                document.documentElement.classList.remove('dark');
-              }
+              await mainWindow.webContents.executeJavaScript(
+                data.theme === 'dark'
+                  ? `document.documentElement.classList.add('dark')`
+                  : `document.documentElement.classList.remove('dark')`
+              );
               return { success: true };
             }
             case 'toggle': {
-              document.documentElement.classList.toggle('dark');
-              const isDark = document.documentElement.classList.contains('dark');
-              return { success: true, theme: isDark ? 'dark' : 'light' };
+              const theme = await mainWindow.webContents.executeJavaScript(
+                `(() => {
+                  document.documentElement.classList.toggle('dark');
+                  return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+                })()`
+              );
+              return { success: true, theme };
             }
             default:
               return { success: false, error: '未知的 theme-manager 操作' };
@@ -718,11 +724,25 @@ function setupIpcHandlers() {
         }
 
         case 'shortcuts-register': {
-          return { success: true, id: Date.now().toString(), message: '快捷键注册功能待实现' };
+          try {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              globalShortcut.register(data, () => {
+                mainWindow.webContents.send(`shortcut-${data}`);
+              });
+            }
+            return { success: true, id: data };
+          } catch (e) {
+            return { success: false, error: e.message };
+          }
         }
 
         case 'shortcuts-unregister': {
-          return { success: true, message: '快捷键注销功能待实现' };
+          try {
+            globalShortcut.unregister(data);
+            return { success: true };
+          } catch (e) {
+            return { success: false, error: e.message };
+          }
         }
 
         case 'dialog-message': {

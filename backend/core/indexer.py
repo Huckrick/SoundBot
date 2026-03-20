@@ -491,10 +491,12 @@ def delete_project_index(project_id: str) -> bool:
         if db_path.exists():
             shutil.rmtree(db_path)
             logger.info(f"已删除工程 {project_id} 的向量数据库: {db_path}")
-            return True
-        else:
-            logger.warning(f"工程 {project_id} 的向量数据库不存在")
-            return True
+
+        # 清理 ChromaDB 客户端缓存
+        reset_chroma_client(str(db_path))
+        logger.info(f"已清理工程 {project_id} 的 ChromaDB 客户端缓存")
+
+        return True
     except Exception as e:
         logger.error(f"删除工程 {project_id} 的向量数据库失败: {e}")
         return False

@@ -239,7 +239,10 @@ def validate_audio_path(file_path: str, allowed_base: Path = None) -> Path:
             try:
                 path.relative_to(allowed_base)
             except ValueError:
-                pass
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"路径 '{file_path}' 不在允许的目录 '{allowed_base}' 内"
+                )
 
         return path
 

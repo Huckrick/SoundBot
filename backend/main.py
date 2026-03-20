@@ -1112,7 +1112,12 @@ async def search_audio(request: schemas.SearchRequest):
             search_results.append(schemas.SearchResult(
                 audio_file=audio_file,
                 score=r.similarity,
-                distance=1.0 - r.similarity
+                distance=1.0 - r.similarity,
+                metadata={
+                    "semantic_score": r.metadata.get("semantic_score", r.similarity),
+                    "keyword_score": r.metadata.get("keyword_score", 0.0),
+                    "keyword_only": r.metadata.get("keyword_score", 0.0) > r.metadata.get("semantic_score", r.similarity)
+                }
             ))
 
         # 分页处理
@@ -2416,6 +2421,11 @@ async def switch_project(project_id: str):
             from core.indexer import reset_chroma_client
             reset_chroma_client()
             logger.info("ChromaDB 客户端已重置")
+
+            # 重置 Searcher（强制使用新工程的 ChromaDB）
+            from core.search_engine import reset_optimized_searcher
+            reset_optimized_searcher()
+            logger.info("Searcher 已重置")
 
         # 获取数据库管理器（可能是新的连接）
         db_manager = get_db_manager()

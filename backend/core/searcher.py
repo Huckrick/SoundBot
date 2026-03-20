@@ -117,7 +117,7 @@ class AudioSearcher:
             
             for i, file_id in enumerate(ids):
                 distance = distances[i]
-                similarity = max(0.0, 1.0 - (distance ** 2) / 2.0)
+                similarity = np.exp(-(distance ** 2) / 2.0)
 
                 if similarity < min_similarity:
                     continue
@@ -181,7 +181,7 @@ class AudioSearcher:
             
             for i, file_id in enumerate(ids):
                 distance = distances[i]
-                similarity = max(0.0, 1.0 - (distance ** 2) / 2.0)
+                similarity = np.exp(-(distance ** 2) / 2.0)
 
                 if similarity < min_similarity:
                     continue
