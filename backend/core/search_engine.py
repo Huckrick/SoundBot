@@ -145,6 +145,17 @@ class ChineseTextProcessor:
         "游戏": ["game", "gaming", "arcade"],
         "恐怖": ["horror", "scary", "creepy"],
         "搞笑": ["funny", "comedy", "cartoon"],
+        "石头": ["stone", "rock", "pebble", "gravel", "debris"],
+        "石": ["stone", "rock", "pebble"],
+        "岩": ["rock", "stone", "boulder"],
+        "土": ["dirt", "soil", "earth", "mud"],
+        "泥": ["mud", "dirt", "clay"],
+        "沙": ["sand", "gravel", "grit"],
+        "金属": ["metal", "iron", "steel", "aluminum"],
+        "木": ["wood", "wooden", "timber"],
+        "玻璃": ["glass", "crystal", "window"],
+        "纸": ["paper", "cardboard", "parchment"],
+        "布": ["cloth", "fabric", "textile", "cotton"],
     }
     
     @classmethod
