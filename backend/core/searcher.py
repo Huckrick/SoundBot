@@ -50,11 +50,14 @@ class AudioSearcher:
         # 使用全局 ChromaDB 客户端（与 Indexer 共用）
         self.client = get_chroma_client(persist_directory)
         
-        # 获取 collection
+        # 获取或创建 collection（确保 collection 存在）
         try:
-            self.collection = self.client.get_collection(name=collection_name)
+            self.collection = self.client.get_or_create_collection(
+                name=collection_name,
+                metadata={"description": "Audio file embeddings for semantic search"}
+            )
         except Exception as e:
-            raise RuntimeError(f"无法获取 collection '{collection_name}': {e}")
+            raise RuntimeError(f"无法获取或创建 collection '{collection_name}': {e}")
         
         logger.info(f"Searcher 初始化完成，Collection: {collection_name}")
 
