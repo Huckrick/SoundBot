@@ -8,7 +8,7 @@ import time
 import asyncio
 import json
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
 from concurrent.futures import ThreadPoolExecutor
 
@@ -72,6 +72,10 @@ async def lifespan(app: FastAPI):
     # 初始化 LRU 音频缓存
     cache = get_audio_cache()
     logger.info(f"LRU 音频缓存已初始化，最大容量: {cache._max_size} 个文件")
+
+    # 启动模型预加载（后台异步）
+    from core.model_preloader import preload_models_on_startup
+    await preload_models_on_startup()
 
     yield
 
@@ -261,6 +265,23 @@ async def health_check():
         version=config.APP_VERSION,
         device=config.get_device()
     )
+
+
+@app.get("/api/v1/model/status")
+async def get_model_status():
+    """
+    获取 AI 模型加载状态
+
+    返回模型是否已预加载到内存，以及加载进度
+    """
+    from core.model_preloader import get_preloader
+    preloader = get_preloader()
+
+    return {
+        "status": "success",
+        "model_status": preloader.get_status(),
+        "embedder_available": preloader.get_embedder() is not None
+    }
 
 
 # ==================== LRU 音频缓存管理 ====================
@@ -859,6 +880,20 @@ async def _scan_and_import_task(
                 if added % 10 == 0:  # 每10个文件记录一次
                     write_log('info', '已添加文件', {'added': added, 'current': current_file})
 
+                try:
+                    if is_embedder_available():
+                        indexer = get_indexer()
+                        indexer.add_single_audio(audio_file.path, metadata={
+                            "filename": audio_file.filename,
+                            "duration": audio_file.duration,
+                            "sample_rate": audio_file.sample_rate,
+                            "channels": audio_file.channels,
+                            "format": audio_file.format,
+                            "size": audio_file.size
+                        })
+                except Exception as e:
+                    logger.warning(f"生成语义索引失败 {audio_file.path}: {e}")
+
         write_log('info', '导入完成', {'total': total, 'added': added, 'skipped': skipped})
         # 完成
         await ws_manager.send_scan_complete(
@@ -1062,23 +1097,43 @@ async def get_db_stats():
 @app.post("/api/v1/search", response_model=schemas.SearchResponse)
 async def search_audio(request: schemas.SearchRequest):
     """
-    语义搜索音频
-    
+    语义搜索音频（同步版本，保持向后兼容）
+
     - **query**: 自然语言查询（如"清脆的铃铛声"）
     - **top_k**: 返回结果数量（默认 20）
     - **threshold**: 相似度阈值（默认 0.15）
     """
     try:
-        # 获取或创建搜索器
-        searcher = get_searcher()
-        
-        # 执行搜索
-        results = searcher.search(
+        from core.search_engine import get_optimized_searcher
+
+        searcher = get_optimized_searcher()
+
+        filters = {}
+        if request.min_duration is not None:
+            filters["duration"] = {"$gte": request.min_duration}
+        if request.max_duration is not None:
+            if "duration" in filters:
+                filters["duration"]["$lte"] = request.max_duration
+            else:
+                filters["duration"] = {"$lte": request.max_duration}
+        if request.sample_rate is not None:
+            filters["sample_rate"] = request.sample_rate
+        if request.channels is not None:
+            filters["channels"] = request.channels
+        if request.format is not None:
+            filters["format"] = request.format
+
+        # 使用异步搜索但不推送进度
+        results, stats = await searcher.search_async(
             query=request.query,
             top_k=request.top_k,
-            min_similarity=request.threshold
+            min_similarity=request.threshold,
+            filters=filters if filters else None,
+            use_cache=True
         )
-        
+
+        logger.info(f"搜索 '{request.query}': 找到 {len(results)} 个结果, 耗时 {stats.get('duration', 0):.3f}s, 缓存命中: {stats.get('cache_hit', False)}")
+
         # 转换为响应格式
         search_results = []
         for r in results:
@@ -1096,15 +1151,192 @@ async def search_audio(request: schemas.SearchRequest):
                 score=r.similarity,
                 distance=1.0 - r.similarity
             ))
-        
+
         return schemas.SearchResponse(
             query=request.query,
             total=len(search_results),
             results=search_results
         )
-        
+
     except Exception as e:
         logger.error(f"搜索失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/search/async")
+async def search_audio_async(
+    request: schemas.SearchRequest,
+    background_tasks: BackgroundTasks,
+    client_id: str = Query(default="default")
+):
+    """
+    异步语义搜索（带 WebSocket 进度推送）
+
+    - **query**: 自然语言查询
+    - **top_k**: 返回结果数量
+    - **threshold**: 相似度阈值
+    - **client_id**: WebSocket 客户端标识
+
+    返回搜索任务ID，通过 WebSocket 接收进度和结果
+    """
+    try:
+        search_id = f"search_{int(time.time() * 1000)}"
+
+        # 后台执行搜索
+        background_tasks.add_task(
+            _search_task,
+            search_id=search_id,
+            query=request.query,
+            top_k=request.top_k,
+            min_similarity=request.threshold,
+            filters={
+                k: v for k, v in {
+                    "min_duration": request.min_duration,
+                    "max_duration": request.max_duration,
+                    "sample_rate": request.sample_rate,
+                    "channels": request.channels,
+                    "format": request.format
+                }.items() if v is not None
+            },
+            client_id=client_id
+        )
+
+        return {"search_id": search_id, "message": "搜索任务已启动"}
+
+    except Exception as e:
+        logger.error(f"启动搜索任务失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def _search_task(
+    search_id: str,
+    query: str,
+    top_k: Optional[int],
+    min_similarity: Optional[float],
+    filters: Dict[str, Any],
+    client_id: str
+):
+    """
+    后台搜索任务（带 WebSocket 进度推送）
+    """
+    from core.search_engine import get_optimized_searcher
+
+    ws_manager = get_ws_manager()
+    searcher = get_optimized_searcher()
+
+    # 构建过滤条件
+    where_clause = {}
+    if filters.get("min_duration") is not None:
+        where_clause["duration"] = {"$gte": filters["min_duration"]}
+    if filters.get("max_duration") is not None:
+        if "duration" in where_clause:
+            where_clause["duration"]["$lte"] = filters["max_duration"]
+        else:
+            where_clause["duration"] = {"$lte": filters["max_duration"]}
+    if filters.get("sample_rate") is not None:
+        where_clause["sample_rate"] = filters["sample_rate"]
+    if filters.get("channels") is not None:
+        where_clause["channels"] = filters["channels"]
+    if filters.get("format") is not None:
+        where_clause["format"] = filters["format"]
+
+    try:
+        # 定义进度回调
+        async def progress_callback(stage: str, progress: float):
+            await ws_manager.send_search_progress(
+                client_id=client_id,
+                search_id=search_id,
+                stage=stage,
+                progress=progress,
+                message=f"搜索阶段: {stage}"
+            )
+
+        # 执行搜索
+        results, stats = await searcher.search_async(
+            query=query,
+            top_k=top_k,
+            min_similarity=min_similarity,
+            filters=where_clause if where_clause else None,
+            use_cache=True,
+            progress_callback=progress_callback
+        )
+
+        # 发送完成消息
+        await ws_manager.send_search_complete(
+            client_id=client_id,
+            search_id=search_id,
+            results_count=len(results),
+            duration=stats.get("duration", 0),
+            cache_hit=stats.get("cache_hit", False)
+        )
+
+        # 发送搜索结果
+        search_results_data = []
+        for r in results:
+            search_results_data.append({
+                "path": r.file_path,
+                "filename": r.filename,
+                "duration": r.duration,
+                "format": r.format,
+                "similarity": r.similarity,
+                "metadata": r.metadata
+            })
+
+        await ws_manager.broadcast({
+            "type": "search_results",
+            "search_id": search_id,
+            "data": {
+                "query": query,
+                "total": len(results),
+                "results": search_results_data,
+                "stats": stats
+            }
+        }, client_id)
+
+        logger.info(f"异步搜索 '{query}' 完成: 找到 {len(results)} 个结果, 耗时 {stats.get('duration', 0):.3f}s")
+
+    except Exception as e:
+        logger.error(f"异步搜索失败: {e}")
+        await ws_manager.send_search_error(
+            client_id=client_id,
+            search_id=search_id,
+            error=str(e)
+        )
+
+
+@app.get("/api/v1/search/cache/stats")
+async def get_search_cache_stats():
+    """
+    获取搜索缓存统计信息
+    """
+    try:
+        from core.search_engine import get_optimized_searcher
+        searcher = get_optimized_searcher()
+        stats = searcher.get_cache_stats()
+        return {
+            "status": "success",
+            "cache_stats": stats
+        }
+    except Exception as e:
+        logger.error(f"获取缓存统计失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/search/cache/clear")
+async def clear_search_cache():
+    """
+    清空搜索缓存
+    """
+    try:
+        from core.search_engine import get_optimized_searcher
+        searcher = get_optimized_searcher()
+        await searcher.clear_cache()
+        return {
+            "status": "success",
+            "message": "搜索缓存已清空"
+        }
+    except Exception as e:
+        logger.error(f"清空缓存失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1477,9 +1709,10 @@ async def stream_audio_from_cache(file_path: str):
 async def get_index_status():
     """获取当前索引状态"""
     try:
-        searcher = get_searcher()
+        from core.search_engine import get_optimized_searcher
+        searcher = get_optimized_searcher()
         stats = searcher.get_collection_stats()
-        
+
         return schemas.IndexStatus(
             total_files=stats.get("total_count", 0),
             indexed_files=stats.get("total_count", 0)
@@ -1495,9 +1728,10 @@ async def get_index_status():
 async def get_indexed_files():
     """获取所有已索引的文件列表"""
     try:
-        searcher = get_searcher()
+        from core.search_engine import get_optimized_searcher
+        searcher = get_optimized_searcher()
         files = searcher.get_all_indexed_files()
-        
+
         audio_files = []
         for f in files:
             audio_files.append(schemas.AudioFile(
@@ -1509,7 +1743,7 @@ async def get_indexed_files():
                 format=f.get("format", ""),
                 size=f.get("size", 0)
             ))
-        
+
         return schemas.ScanResponse(
             total=len(audio_files),
             files=audio_files

@@ -188,6 +188,89 @@ class ConnectionManager:
         }
         await self.broadcast(message, client_id)
 
+    async def send_search_progress(
+        self,
+        client_id: str,
+        search_id: str,
+        stage: str,
+        progress: float,
+        message: str = ""
+    ):
+        """
+        发送搜索进度
+
+        Args:
+            client_id: 客户端标识
+            search_id: 搜索任务ID
+            stage: 当前阶段 (checking_cache/loading_model/generating_embedding/searching_database/ranking_results/caching/complete)
+            progress: 进度 (0.0 - 1.0)
+            message: 状态消息
+        """
+        msg = {
+            "type": "search_progress",
+            "search_id": search_id,
+            "data": {
+                "stage": stage,
+                "progress": round(progress * 100, 1),
+                "message": message
+            }
+        }
+        await self.broadcast(msg, client_id)
+
+    async def send_search_complete(
+        self,
+        client_id: str,
+        search_id: str,
+        results_count: int,
+        duration: float,
+        cache_hit: bool = False
+    ):
+        """
+        发送搜索完成消息
+
+        Args:
+            client_id: 客户端标识
+            search_id: 搜索任务ID
+            results_count: 结果数量
+            duration: 搜索耗时（秒）
+            cache_hit: 是否命中缓存
+        """
+        msg = {
+            "type": "search_complete",
+            "search_id": search_id,
+            "data": {
+                "results_count": results_count,
+                "duration": round(duration, 3),
+                "cache_hit": cache_hit,
+                "status": "complete"
+            }
+        }
+        await self.broadcast(msg, client_id)
+
+    async def send_search_error(
+        self,
+        client_id: str,
+        search_id: str,
+        error: str
+    ):
+        """
+        发送搜索错误消息
+
+        Args:
+            client_id: 客户端标识
+            search_id: 搜索任务ID
+            error: 错误信息
+        """
+        msg = {
+            "type": "search_error",
+            "search_id": search_id,
+            "data": {
+                "error": error,
+                "status": "error"
+            }
+        }
+        await self.broadcast(msg, client_id)
+
     async def send_scan_status(
         self,
         client_id: str,

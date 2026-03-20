@@ -189,6 +189,14 @@
         
         <!-- Right: Search & Disk Space -->
         <div class="flex items-center gap-3">
+            <!-- 模型加载状态 -->
+            <div id="modelStatusDisplay" class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs border opacity-80 hover:opacity-100 transition-opacity cursor-help hidden"
+                 style="background-color: var(--bg-tertiary); border-color: var(--border-color);"
+                 title="AI搜索模型加载状态">
+                <div class="w-3.5 h-3.5 rounded-full border-2 border-t-transparent animate-spin" style="border-color: var(--text-secondary); border-top-color: transparent;"></div>
+                <span id="modelStatusText">模型加载中...</span>
+            </div>
+
             <!-- 磁盘空间显示 -->
             <div id="diskSpaceDisplay" class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs border opacity-80 hover:opacity-100 transition-opacity cursor-help"
                  style="background-color: var(--bg-tertiary); border-color: var(--border-color);"
@@ -602,12 +610,12 @@
                     const response = await fetch('http://127.0.0.1:8000/api/v1/disk-space');
                     result = await response.json();
                 }
-                
+
                 if (result && result.success) {
                     const freeSpace = formatFileSize(result.free_bytes);
                     const totalSpace = formatFileSize(result.total_bytes);
                     const percentUsed = ((result.total_bytes - result.free_bytes) / result.total_bytes * 100).toFixed(1);
-                    
+
                     const diskSpaceText = document.getElementById('diskSpaceText');
                     if (diskSpaceText) {
                         diskSpaceText.textContent = `${freeSpace} 可用`;
@@ -622,7 +630,45 @@
                 }
             }
         }
-        
+
+        // 检查模型加载状态
+        async function checkModelStatus() {
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/v1/model/status');
+                const result = await response.json();
+
+                const modelDisplay = document.getElementById('modelStatusDisplay');
+                const modelText = document.getElementById('modelStatusText');
+
+                if (result && result.model_status) {
+                    if (result.model_status.loading) {
+                        // 模型加载中
+                        modelDisplay.classList.remove('hidden');
+                        modelText.textContent = '模型加载中...';
+                    } else if (result.model_status.loaded) {
+                        // 模型已加载
+                        modelDisplay.classList.add('hidden');
+                    } else if (result.model_status.error) {
+                        // 模型加载失败
+                        modelDisplay.classList.remove('hidden');
+                        modelText.textContent = '模型加载失败';
+                        modelDisplay.style.borderColor = '#ef4444';
+                    } else {
+                        // 模型未加载
+                        modelDisplay.classList.remove('hidden');
+                        modelText.textContent = '模型未加载';
+                    }
+                }
+            } catch (error) {
+                console.error('获取模型状态失败:', error);
+                // 后端不可用时不显示模型状态
+                const modelDisplay = document.getElementById('modelStatusDisplay');
+                if (modelDisplay) {
+                    modelDisplay.classList.add('hidden');
+                }
+            }
+        }
+
         // ==================== NOTIFICATIONS ====================
         function showNotification(message, type = 'info') {
             // 创建通知元素
@@ -4143,6 +4189,11 @@
             updateDiskSpaceDisplay();
             // 定期更新磁盘空间（每30秒）
             setInterval(updateDiskSpaceDisplay, 30000);
+
+            // 初始化模型状态检查
+            checkModelStatus();
+            // 定期更新模型状态（每5秒）
+            setInterval(checkModelStatus, 5000);
 
             // 窗口调整大小时重新绘制波形和更新拖拽按钮位置
             let resizeTimeout;

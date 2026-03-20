@@ -293,8 +293,20 @@ _embedder_loading_failed: bool = False
 
 
 def get_embedder() -> Optional[CLIPEmbedder]:
-    """获取 Embedder 单例（延迟加载），如果加载失败返回 None"""
+    """获取 Embedder 单例（优先使用预加载的模型）"""
     global _embedder, _embedder_loading_failed
+
+    # 首先检查是否有预加载的模型
+    try:
+        from core.model_preloader import get_preloader
+        preloader = get_preloader()
+        preloaded_embedder = preloader.get_embedder()
+        if preloaded_embedder is not None:
+            return preloaded_embedder
+    except ImportError:
+        pass
+
+    # 如果没有预加载，使用延迟加载
     if _embedder is None and not _embedder_loading_failed:
         try:
             _embedder = CLIPEmbedder()

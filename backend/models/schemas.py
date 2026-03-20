@@ -22,6 +22,11 @@ class SearchRequest(BaseModel):
     query: str = Field(..., description="搜索查询文本")
     top_k: int = Field(default=20, ge=1, le=100, description="返回结果数量")
     threshold: float = Field(default=0.15, ge=0.0, le=1.0, description="相似度阈值")
+    min_duration: Optional[float] = Field(default=None, description="最短时长（秒）")
+    max_duration: Optional[float] = Field(default=None, description="最长时长（秒）")
+    sample_rate: Optional[int] = Field(default=None, description="采样率（如 44100, 48000）")
+    channels: Optional[int] = Field(default=None, description="声道数（1=单声道, 2=立体声）")
+    format: Optional[str] = Field(default=None, description="音频格式（如 wav, mp3, flac）")
 
 
 class IndexRequest(BaseModel):

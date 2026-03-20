@@ -38,14 +38,26 @@ CORS_ORIGINS = [
 # HuggingFace 镜像配置（国内加速）
 HF_ENDPOINT = "https://hf-mirror.com"
 
-# CLAP 音频嵌入模型（使用更强的 larger_clap_general）
+# CLAP 模型选择（可配置）
+# 可选值:
+#   - "laion/larger_clap_general": 大型模型，精度高，加载慢 (~25s)，推荐用于生产环境
+#   - "laion/clap-htsat-unfused": 中型模型，平衡精度和速度 (~10s)，推荐用于开发环境
+#   - "laion/clap-htsat-fused": 轻量级模型，速度快 (~5s)，精度略低，推荐用于测试环境
+#
 # 模型引用 / Model Citation:
 #   Wu, Y., Chen, K., Zhang, T., Hui, Y., Berg-Kirkpatrick, T., & Dubnov, S. (2022).
 #   Large-scale Contrastive Language-Audio Pretraining with Feature Fusion and Keyword-to-Caption Augmentation.
 #   arXiv preprint arXiv:2211.06687.
 #   https://huggingface.co/laion/larger_clap_general
-CLAP_MODEL_NAME = "laion/larger_clap_general"
+#
+CLAP_MODEL_NAME = os.getenv("CLAP_MODEL", "laion/larger_clap_general")
 CLAP_DEVICE = "auto"  # auto/cpu/cuda/mps
+
+# 模型加载超时（秒）
+MODEL_LOAD_TIMEOUT = int(os.getenv("MODEL_LOAD_TIMEOUT", "60"))
+
+# 是否启用模型预加载（启动时后台加载）
+ENABLE_MODEL_PRELOAD = os.getenv("ENABLE_MODEL_PRELOAD", "true").lower() == "true"
 
 # ==================== 向量数据库配置 ====================
 

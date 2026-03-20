@@ -1,0 +1,5022 @@
+{
+  "d74577383f85e103": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/Dentist Drill A,Revs,Med 2.wav",
+    "filename": "Dentist Drill A,Revs,Med 2.wav",
+    "duration": 8.192,
+    "sample_rate": 96000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 2441786,
+    "hash": "bb655245df53f36c6848c071128ec24f"
+  },
+  "39d09caee08443e8": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/6.mp3",
+    "filename": "6.mp3",
+    "duration": 4.139614512471655,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "MP3",
+    "size": 66082,
+    "hash": "f1d5101d1fef77a38c7f2f4fbe464cb8"
+  },
+  "799c11c8f4d9dbdb": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/Impact 027-glued.wav",
+    "filename": "Impact 027-glued.wav",
+    "duration": 4.583333333333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2640736,
+    "hash": "cd803340e2b8a034c971cccded46c4f5"
+  },
+  "147504dbe91282d1": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/BRS_Latch_Metal_Guitar_Case_Close_1.wav",
+    "filename": "BRS_Latch_Metal_Guitar_Case_Close_1.wav",
+    "duration": 1.5789569160997732,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 220770,
+    "hash": "759a777392e986dab24117796a91bb85"
+  },
+  "bf50d05d862a68c2": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/BRS_Data_Beep_Window_Open_GUI-glued-01.wav",
+    "filename": "BRS_Data_Beep_Window_Open_GUI-glued-01.wav",
+    "duration": 1.8784580498866212,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 252984,
+    "hash": "2fc26b407bb87456d730c6851af36f43"
+  },
+  "6473e78656d86836": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/ANMLMisc_ANIMAL SMALL-Asian Palm Civet Growl Moan_B00M_ALCK_ST.wav",
+    "filename": "ANMLMisc_ANIMAL SMALL-Asian Palm Civet Growl Moan_B00M_ALCK_ST.wav",
+    "duration": 17.354,
+    "sample_rate": 192000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 20493650,
+    "hash": "a4adc3aa633da40994504f6a48919726"
+  },
+  "8c8f641f36682100": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/RUSTLE Outdoor grass herbs wind brush 02 LOOP.LR.wav",
+    "filename": "RUSTLE Outdoor grass herbs wind brush 02 LOOP.LR.wav",
+    "duration": 29.654947916666668,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 17154866,
+    "hash": "1cbb6ba4bb3fc074ab671db6d532fbf4"
+  },
+  "21d68cbd9ee28836": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/BRS_Data_Beep_Synth_Tap.wav",
+    "filename": "BRS_Data_Beep_Synth_Tap.wav",
+    "duration": 0.2438095238095238,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 44068,
+    "hash": "bc5fbddda0971bcb305b8a673ec48587"
+  },
+  "70bc316677e2ab9e": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/5-glued.wav",
+    "filename": "5-glued.wav",
+    "duration": 7.371836734693877,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 650932,
+    "hash": "d85493cdd63f98ca4431e70a294e41d3"
+  },
+  "a2edf60491179e30": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/4.mp3",
+    "filename": "4.mp3",
+    "duration": 3.5636054421768706,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "MP3",
+    "size": 56887,
+    "hash": "dc3bc217a9a43bc789033ec0a7f6874c"
+  },
+  "a29900075f215947": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/5.mp3",
+    "filename": "5.mp3",
+    "duration": 2.7781179138321996,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "MP3",
+    "size": 44348,
+    "hash": "999214cfe7a3bb65ade870cb17225446"
+  },
+  "c32a932a65f5aa3f": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/BRS_Data_Beep_Notifier_Round_Sweet_Delay.wav",
+    "filename": "BRS_Data_Beep_Notifier_Round_Sweet_Delay.wav",
+    "duration": 1.2770975056689342,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 181308,
+    "hash": "ebe4ac2bf7384a2f15e5f4a8d32af57b"
+  },
+  "daa7841c367afb1d": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/DoorMetal 6105_34_5.wav",
+    "filename": "DoorMetal 6105_34_5.wav",
+    "duration": 7.053061224489796,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1244254,
+    "hash": "169fa3b1001e9c4fdfe57d6c9b2c68fd"
+  },
+  "eb4682b7c037e322": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/ElevenLabs_2025-08-15T17_18_20_Hope - upbeat and clear_pvc_sp96_s50_sb75_se0_b_m2.mp3",
+    "filename": "ElevenLabs_2025-08-15T17_18_20_Hope - upbeat and clear_pvc_sp96_s50_sb75_se0_b_m2.mp3",
+    "duration": 1.2857596371882085,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "MP3",
+    "size": 20525,
+    "hash": "192b6f0b597ef0a328761c14a79fcb0d"
+  },
+  "c9f88647ad953956": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/UIMisc_MATCH-Pair Ping_B00M_CUDS.wav",
+    "filename": "UIMisc_MATCH-Pair Ping_B00M_CUDS.wav",
+    "duration": 5.902770833333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 4061600,
+    "hash": "fe54e6c53da81b9fb95f2e976b36061a"
+  },
+  "4d09adff3a9ce676": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/1.mp3",
+    "filename": "1.mp3",
+    "duration": 2.359206349206349,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "MP3",
+    "size": 37661,
+    "hash": "93d37dcc175fe2cfc86238a49ed22123"
+  },
+  "3521dde4359b4d85": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/ElevenLabs_2025-08-15T16_39_50_Liam_pre_sp110_s100_sb100_v3.mp3",
+    "filename": "ElevenLabs_2025-08-15T16_39_50_Liam_pre_sp110_s100_sb100_v3.mp3",
+    "duration": 2.2806575963718823,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "MP3",
+    "size": 36407,
+    "hash": "03f2cb075621152549aab412467ce411"
+  },
+  "d8c198d71efe4ae5": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/METLMvmt_  Antique Gate Screws_344 Audio_Antique Small Metals-glued-01.wav",
+    "filename": "METLMvmt_  Antique Gate Screws_344 Audio_Antique Small Metals-glued-01.wav",
+    "duration": 1.48765625,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 857626,
+    "hash": "8ca045e7bb34b9e932c28641f0122781"
+  },
+  "1afee51bd69e873e": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/Armour Full Plate Foley 05.wav",
+    "filename": "Armour Full Plate Foley 05.wav",
+    "duration": 9.615041666666666,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 5610380,
+    "hash": "0e30f1dced79bde322b1853759137db0"
+  },
+  "cdf1302ade0a0a09": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/DSGNMisc_Glitch 2_344 Audio_Geophonic Design Vol 2.wav",
+    "filename": "DSGNMisc_Glitch 2_344 Audio_Geophonic Design Vol 2.wav",
+    "duration": 2.345625,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1360562,
+    "hash": "648eddd5771b0715ee14ea5d40a78a7d"
+  },
+  "bf29c5957b65f2d3": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/2.mp3",
+    "filename": "2.mp3",
+    "duration": 1.4166213151927438,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "MP3",
+    "size": 22614,
+    "hash": "40307c67fc377fe146442108b7604b10"
+  },
+  "8dbf360a594b2d7a": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/6+.mp3",
+    "filename": "6+.mp3",
+    "duration": 5.815260770975057,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "MP3",
+    "size": 92831,
+    "hash": "262decc624e8d144dac7e8ae14061ab5"
+  },
+  "d2424dad01579ee2": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/Metal,Mvs,Stove,Shrt,Whoosh.wav",
+    "filename": "Metal,Mvs,Stove,Shrt,Whoosh.wav",
+    "duration": 2.24,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 663118,
+    "hash": "701877427a20344d7a562880f6a6c8e1"
+  },
+  "c25a765134e76105": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/3.mp3",
+    "filename": "3.mp3",
+    "duration": 2.8566666666666665,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "MP3",
+    "size": 45602,
+    "hash": "07bb8c40faaef8c5bcb3904ac27a8ab7"
+  },
+  "80d7c651db137ec5": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/QP02 0169 Wind plants consistent some leaves.wav",
+    "filename": "QP02 0169 Wind plants consistent some leaves.wav",
+    "duration": 49.90347916666666,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 14532342,
+    "hash": "5457821ed47c70710dc28aa4b601f19a"
+  },
+  "20b11ed7ab5d156a": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/METLMvmt_  Antique Gate Screws_344 Audio_Antique Small Metals-glued-02.wav",
+    "filename": "METLMvmt_  Antique Gate Screws_344 Audio_Antique Small Metals-glued-02.wav",
+    "duration": 1.4876666666666667,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 431984,
+    "hash": "b31029b0c0e827afc643797e4444c909"
+  },
+  "0dd4120f3901f5f8": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/QP02 0169 Wind plants consistent some leaves 5.0.wav",
+    "filename": "QP02 0169 Wind plants consistent some leaves 5.0.wav",
+    "duration": 49.92454166666667,
+    "sample_rate": 48000,
+    "channels": 5,
+    "format": "WAVEX",
+    "size": 36109196,
+    "hash": "8aa93300367cdda4a1d4b6cd12323465"
+  },
+  "0ed3799315359cb1": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/【金属垃圾厂容器慢挪03】Mechanical Source - Metal Junk Factory Container Slow Shuffle 03.wav",
+    "filename": "【金属垃圾厂容器慢挪03】Mechanical Source - Metal Junk Factory Container Slow Shuffle 03.wav",
+    "duration": 3.2083541666666666,
+    "sample_rate": 192000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 3763270,
+    "hash": "faafbfa3e4d2b092ef0bd3b3d72139a0"
+  },
+  "fd1f4d29d9a0afdc": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/Door,Metal,Donation Bin,Open 1.wav",
+    "filename": "Door,Metal,Donation Bin,Open 1.wav",
+    "duration": 3.7546666666666666,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2176202,
+    "hash": "a82d63229e29655efb5ffb90f10a326a"
+  },
+  "f88fc096c41d0903": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/BRS_Data_Beep_Short_Chirp.wav",
+    "filename": "BRS_Data_Beep_Short_Chirp.wav",
+    "duration": 0.11609977324263039,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 27196,
+    "hash": "13c66643f9067b6aebbabda190d16202"
+  },
+  "389646ab43c63696": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/UIMisc_User Interface Vocalisation, Robotic, Futuristic,_344 Audio_Organic User Interface_02.wav",
+    "filename": "UIMisc_User Interface Vocalisation, Robotic, Futuristic,_344 Audio_Organic User Interface_02.wav",
+    "duration": 0.70365625,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 409830,
+    "hash": "905ca04ad2a1aa776f25e6d0725ad732"
+  },
+  "afcac7eaaf1df5b0": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/MAGIC ENERGY Spell, Electricity, Medium, Zap, Impact, Heavy, Buzzy Ramp, Short 02.wav",
+    "filename": "MAGIC ENERGY Spell, Electricity, Medium, Zap, Impact, Heavy, Buzzy Ramp, Short 02.wav",
+    "duration": 1.3315416666666666,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1256672,
+    "hash": "24605246866ece6c12e27faede867714"
+  },
+  "49ac69ab37a3420a": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/BRS_Data_Reveal_Metal_Phase_2.wav",
+    "filename": "BRS_Data_Reveal_Metal_Phase_2.wav",
+    "duration": 2.3568253968253967,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 635652,
+    "hash": "03ec8f98ca6f084804a76f35f0eb705a"
+  },
+  "0d737bd970788d7a": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/ELECSprk_Welding Machine Slide On Metal Sparkles Medium Long_B00M_ONE.wav",
+    "filename": "ELECSprk_Welding Machine Slide On Metal Sparkles Medium Long_B00M_ONE.wav",
+    "duration": 14.625020833333334,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 8826206,
+    "hash": "25a0fb9dc2d11a8fb269268e5af43c9a"
+  },
+  "09834b6de6981798": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/BRS_Data_Beep_Window_Open_GUI-glued.wav",
+    "filename": "BRS_Data_Beep_Window_Open_GUI-glued.wav",
+    "duration": 1.8784580498866212,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 252984,
+    "hash": "e36ab764141fd90a0f7567cfc5058ea4"
+  },
+  "29047c0922b9edb2": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/【汽车宝马车内开启声06】Mechanical Source - Car BMW Interior opening 06.wav",
+    "filename": "【汽车宝马车内开启声06】Mechanical Source - Car BMW Interior opening 06.wav",
+    "duration": 0.8178541666666667,
+    "sample_rate": 192000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1009310,
+    "hash": "604f206b10361ff1c1dac9ab4d4ddcd8"
+  },
+  "75315020d10db7f5": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/METLMvmt_  Antique Gate Screws_344 Audio_Antique Small Metals.wav",
+    "filename": "METLMvmt_  Antique Gate Screws_344 Audio_Antique Small Metals.wav",
+    "duration": 1.48765625,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 863728,
+    "hash": "e92a3f771aeac1fcf29ad1efa94eca24"
+  },
+  "361e4b0d54db5dd8": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/ElevenLabs_2025-08-15T16_42_08_Liam_pre_sp110_s100_sb100_v3.mp3",
+    "filename": "ElevenLabs_2025-08-15T16_42_08_Liam_pre_sp110_s100_sb100_v3.mp3",
+    "duration": 3.1708843537414966,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "MP3",
+    "size": 50618,
+    "hash": "0c7c37f87eb99d600c2ddb942991021b"
+  },
+  "bf721f02a96271ad": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/CatHissAngryShort_SFXB.202.wav",
+    "filename": "CatHissAngryShort_SFXB.202.wav",
+    "duration": 0.5493333333333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 329020,
+    "hash": "b50c52f7bef47b2f5e663b2774d9b23d"
+  },
+  "81be79dc0fcde635": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/UIMisc_User Interface Vocalisation, Robotic, Futuristic,_344 Audio_Organic User Interface_06.wav",
+    "filename": "UIMisc_User Interface Vocalisation, Robotic, Futuristic,_344 Audio_Organic User Interface_06.wav",
+    "duration": 0.3203020833333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 187850,
+    "hash": "5f198e78b3a3e6dd51635ad19dd7e446"
+  },
+  "d7cd18afdd3c328d": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/Builder_Game_Item_Pickaxe_Hit_Stone_Metal_Full_1.wav",
+    "filename": "Builder_Game_Item_Pickaxe_Hit_Stone_Metal_Full_1.wav",
+    "duration": 0.7345,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 546076,
+    "hash": "76173748bedae49154b6ef606a246b16"
+  },
+  "5fe073f38a400ef5": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/【汽车门开00】Mechanical Source - Car Renault Espace Door Opening 00.wav",
+    "filename": "【汽车门开00】Mechanical Source - Car Renault Espace Door Opening 00.wav",
+    "duration": 0.5566145833333334,
+    "sample_rate": 192000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 708410,
+    "hash": "919d7c81f5870e938492f615bba2b602"
+  },
+  "f37fcf36fb31fdf9": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/FIRECrkl_Fire Crackle At Clay Bakery Long_B00M_ONE.wav",
+    "filename": "FIRECrkl_Fire Crackle At Clay Bakery Long_B00M_ONE.wav",
+    "duration": 9.749604166666666,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 6016186,
+    "hash": "20032d7555422aa56e7d2a88187adbfd"
+  },
+  "96140332e412edef": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/Axe Drop Small 03.wav",
+    "filename": "Axe Drop Small 03.wav",
+    "duration": 10.683010416666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 6225298,
+    "hash": "8ff1b021f1c2de6da7c580ceebf8f668"
+  },
+  "e6cf0cae8ea772b8": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/Throwing Axe Whoosh Impact Metal Metallic-002.wav",
+    "filename": "Throwing Axe Whoosh Impact Metal Metallic-002.wav",
+    "duration": 0.90271875,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 535440,
+    "hash": "648118802a7c8f25a34cdcba732e1699"
+  },
+  "0a018d86ae7dc379": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/tba03_calderafreed_electricity_05_aratak_m.mp3",
+    "filename": "tba03_calderafreed_electricity_05_aratak_m.mp3",
+    "duration": 1.319875,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "MP3",
+    "size": 31677,
+    "hash": "e04aa459a1f2519b9dca252b2be58472"
+  },
+  "bf906a87c2cd5b4b": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/SF-CK Synthesized Servo 03.wav",
+    "filename": "SF-CK Synthesized Servo 03.wav",
+    "duration": 13.461333333333334,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 7966620,
+    "hash": "40cf4917d646265fca9ed2fdf3b24451"
+  },
+  "fa6b533f46cff481": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/BRS_Data_Beep_Chirp_2.wav",
+    "filename": "BRS_Data_Beep_Chirp_2.wav",
+    "duration": 0.16253968253968254,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 33276,
+    "hash": "104f5886c4b41da6495b9469d01985d5"
+  },
+  "72725757000b82f8": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/OBJZipr_Open Fast 02_B00M_ONE.wav",
+    "filename": "OBJZipr_Open Fast 02_B00M_ONE.wav",
+    "duration": 3.7584583333333335,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 4168562,
+    "hash": "ae5841960456d5f41951a18395ed70c3"
+  },
+  "ad2ef01099e1e58a": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/BRS_Data_Beep_Window_Open_GUI.wav",
+    "filename": "BRS_Data_Beep_Window_Open_GUI.wav",
+    "duration": 0.7314285714285714,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 108908,
+    "hash": "a669d1b6144b39555992bc83b12382a1"
+  },
+  "c80e8a6cbf5a4641": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/MOVECrea_Yeti Footsteps, Walking Pace_344 Audio_Monster Movement.wav",
+    "filename": "MOVECrea_Yeti Footsteps, Walking Pace_344 Audio_Monster Movement.wav",
+    "duration": 7.136921875,
+    "sample_rate": 192000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 8267496,
+    "hash": "b809d4240c30a6a51e7f99f34b76754b"
+  },
+  "d2f29df8a409fb13": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/COSMOS_ACTION#569 (FT_DIRT_RUN_L; FT_DIRT_RUN_R; FT_GRASS_RUN_L; FT_GRASS_RUN_R; FT_GRAVEL_RUN_L; FT_GRAVEL_RUN_R; FT_HVY_DIRT_RUN_L; FT_HVY_DIRT_RUN_R; FT_HVY_GRASS_RUN_L; FT_HVY_GRASS_RUN_R; FT_HVY_GRAVEL_RUN_L; FT_HVY_GRAVEL_RUN_R; FT_HVY_METAL_RU.mp3",
+    "filename": "COSMOS_ACTION#569 (FT_DIRT_RUN_L; FT_DIRT_RUN_R; FT_GRASS_RUN_L; FT_GRASS_RUN_R; FT_GRAVEL_RUN_L; FT_GRAVEL_RUN_R; FT_HVY_DIRT_RUN_L; FT_HVY_DIRT_RUN_R; FT_HVY_GRASS_RUN_L; FT_HVY_GRASS_RUN_R; FT_HVY_GRAVEL_RUN_L; FT_HVY_GRAVEL_RUN_R; FT_HVY_METAL_RU.mp3",
+    "duration": 0.3726041666666667,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "MP3",
+    "size": 10212,
+    "hash": "7ceebba0b5362f533eecc8c745e7ffac"
+  },
+  "3d30ee3b256e6d9e": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/【金属夹子点击序列02】Mechanical Source - Metal Clamp Click Sequence 02-glued.wav",
+    "filename": "【金属夹子点击序列02】Mechanical Source - Metal Clamp Click Sequence 02-glued.wav",
+    "duration": 1.100828125,
+    "sample_rate": 192000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1270534,
+    "hash": "e223fcb01d7622d153e2f4ba077cef17"
+  },
+  "f071912e0423c594": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/BRS_Data_Beep_Chirp_1.wav",
+    "filename": "BRS_Data_Beep_Chirp_1.wav",
+    "duration": 0.16253968253968254,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 33608,
+    "hash": "0bd82389d3d23c97e0596db469cdac41"
+  },
+  "43f5c8059c5f5601": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/BRS_Data_Beep_Round_Sweet_2.wav",
+    "filename": "BRS_Data_Beep_Round_Sweet_2.wav",
+    "duration": 0.23219954648526078,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 42928,
+    "hash": "39b6f422dfe5b8a82f9587d52fe8271a"
+  },
+  "c3be2ff6ed36f19d": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/BRS_Latch_Metal_Guitar_Case_O-C.wav",
+    "filename": "BRS_Latch_Metal_Guitar_Case_O-C.wav",
+    "duration": 2.147845804988662,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 296022,
+    "hash": "431a97602c50d835edaba0a910e2f63f"
+  },
+  "015508a54d9447a0": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/ELECTRIC SPARK Electricity Pylon, Taser Gun, Short 06.wav",
+    "filename": "ELECTRIC SPARK Electricity Pylon, Taser Gun, Short 06.wav",
+    "duration": 0.33275,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 678548,
+    "hash": "3f4d53a3108e2749d496bc0ad0264b26"
+  },
+  "2f47ea0b04f8c5cc": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/MAGIC ENERGY Beam Spell, Electricity, Zap, Start, Run, Stop 02.wav",
+    "filename": "MAGIC ENERGY Beam Spell, Electricity, Zap, Start, Run, Stop 02.wav",
+    "duration": 14.605104166666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 8899756,
+    "hash": "81075ab12a319812b5e376154f6a2f2b"
+  },
+  "bed81b27218e3175": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/BRS_Data_Beep_Chirp_5.wav",
+    "filename": "BRS_Data_Beep_Chirp_5.wav",
+    "duration": 0.17414965986394557,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 34812,
+    "hash": "8879e5066732d409d14af95799fa47cb"
+  },
+  "7c21a9c5ce0f33d7": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/ElevenLabs_2025-08-15T16_34_29_Liam_pre_sp110_s100_sb100_v3.mp3",
+    "filename": "ElevenLabs_2025-08-15T16_34_29_Liam_pre_sp110_s100_sb100_v3.mp3",
+    "duration": 2.359206349206349,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "MP3",
+    "size": 37661,
+    "hash": "3c9badfda3c6d439fe55e3d2127b4eff"
+  },
+  "11627c87dfbd7540": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/Throwing Axe Whoosh Impact Metal Metallic-004.wav",
+    "filename": "Throwing Axe Whoosh Impact Metal Metallic-004.wav",
+    "duration": 1.0093020833333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 596832,
+    "hash": "e3ca1e48b2ed8d03e9a304bf0f05a5f5"
+  },
+  "1550334568c8d03d": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/Impact 027.wav",
+    "filename": "Impact 027.wav",
+    "duration": 4.233333333333333,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1228162,
+    "hash": "83c2252768587e02ed775dca85233a57"
+  },
+  "c951816923b5a75e": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/BRS_Data_Beep_Round_Musical_2.wav",
+    "filename": "BRS_Data_Beep_Round_Musical_2.wav",
+    "duration": 0.603718820861678,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 91780,
+    "hash": "8508df4494f4670257ff07b334471991"
+  },
+  "f112d108c9d096bb": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/SpObj_ElectricBoxGenerator_ElectricityStart.wav",
+    "filename": "SpObj_ElectricBoxGenerator_ElectricityStart.wav",
+    "duration": 1.1717708333333334,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 112534,
+    "hash": "be0be1e88470b1215c9e6020bc083aa4"
+  },
+  "44d88112ee71815f": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/Impact 032.wav",
+    "filename": "Impact 032.wav",
+    "duration": 3.566104166666667,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1034996,
+    "hash": "e8f6af4de2b3d741754631b3aa4eaf03"
+  },
+  "645bb8d4f238fb27": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/ESM_Sword_Impact_Bloody_Pull_Out16_Wet_Smash_Liquid_Bash_Knife_Organic_Splat_Gore_Horror.wav",
+    "filename": "ESM_Sword_Impact_Bloody_Pull_Out16_Wet_Smash_Liquid_Bash_Knife_Organic_Splat_Gore_Horror.wav",
+    "duration": 0.9608616780045351,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 316172,
+    "hash": "6f49315d30b70ae4b933ff154c820453"
+  },
+  "70b61aa3ea496b1d": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/QP02 0191 Wind deciduous forest breeze debris insects 5.0.wav",
+    "filename": "QP02 0191 Wind deciduous forest breeze debris insects 5.0.wav",
+    "duration": 221.3223125,
+    "sample_rate": 48000,
+    "channels": 5,
+    "format": "WAVEX",
+    "size": 159515840,
+    "hash": "cf0166f1e429a2f5bda1d9afa49e4005"
+  },
+  "9d9436491c66d1c8": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/BRS_Door_Bathroom_Stall_Handling_Roomy_Rough_Short_1.wav",
+    "filename": "BRS_Door_Bathroom_Stall_Handling_Roomy_Rough_Short_1.wav",
+    "duration": 2.1942857142857144,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 593402,
+    "hash": "9c48ae84468a54ac82eff5eb43027f0d"
+  },
+  "f80a23429472927d": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/UIMisc_User Interface Vocalisation, Robotic, Futuristic,_344 Audio_Organic User Interface_33.wav",
+    "filename": "UIMisc_User Interface Vocalisation, Robotic, Futuristic,_344 Audio_Organic User Interface_33.wav",
+    "duration": 0.7124166666666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 414908,
+    "hash": "def9e892895d3f164074f527a206e309"
+  },
+  "bf4d835b888386d4": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/【金属碎片箱轻搜04】Movement Source - Metal Debris Box Soft Searching 04.wav",
+    "filename": "【金属碎片箱轻搜04】Movement Source - Metal Debris Box Soft Searching 04.wav",
+    "duration": 1.8869739583333334,
+    "sample_rate": 192000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2241040,
+    "hash": "9a949bbdc9ee1cbd60fb6376cd215ad9"
+  },
+  "c214d0dbf022d011": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/PLASTIC TAPE Duct Tape, Wrap Platic, Pell, Remove, Rip, Hard, Electricity 10.wav",
+    "filename": "PLASTIC TAPE Duct Tape, Wrap Platic, Pell, Remove, Rip, Hard, Electricity 10.wav",
+    "duration": 1.2180729166666666,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1187980,
+    "hash": "69b82dd46780ebdf70994b52cddaea7b"
+  },
+  "fefcbdc9201091d5": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/BRS_Data_Beep_Round_Musical_1.wav",
+    "filename": "BRS_Data_Beep_Round_Musical_1.wav",
+    "duration": 0.7894784580498866,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 116356,
+    "hash": "bb559dfc11554a5477f2537e74c75a31"
+  },
+  "795953a198905b94": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/METLMvmt_  Antique Gate Screws_344 Audio_Antique Small Metals-glued.wav",
+    "filename": "METLMvmt_  Antique Gate Screws_344 Audio_Antique Small Metals-glued.wav",
+    "duration": 1.48765625,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 857626,
+    "hash": "e9608bb4ce5afb3145b82897784f5407"
+  },
+  "c36c24013bd14446": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/FootstepsMetal_BW.7995.wav",
+    "filename": "FootstepsMetal_BW.7995.wav",
+    "duration": 0.7626666666666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 525724,
+    "hash": "ae494c7d1baaa0a5d711ab3baaa50bc2"
+  },
+  "70f348fd07ee2f39": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/Button,Metal,Sml,Loose,Push 2.wav",
+    "filename": "Button,Metal,Sml,Loose,Push 2.wav",
+    "duration": 0.512,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 63210,
+    "hash": "d8bf14f74044528689a1c92174039e80"
+  },
+  "c410e1396cda0a3c": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/ElevenLabs_2025-08-15T16_41_40_Liam_pre_sp110_s100_sb100_v3.mp3",
+    "filename": "ElevenLabs_2025-08-15T16_41_40_Liam_pre_sp110_s100_sb100_v3.mp3",
+    "duration": 3.4850566893424038,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "MP3",
+    "size": 55633,
+    "hash": "0448344d137cbf13d37a2886cfaf77f9"
+  },
+  "4399a76d9b35669e": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/BRS_Data_Beep_Modern_13.wav",
+    "filename": "BRS_Data_Beep_Modern_13.wav",
+    "duration": 0.11609977324263039,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 27164,
+    "hash": "f537e37e3db9e865db62088f08704078"
+  },
+  "3a94d39ea9b5703c": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/DSGNMisc_Glitch 2_344 Audio_Geophonic Design Vol 2-glued.wav",
+    "filename": "DSGNMisc_Glitch 2_344 Audio_Geophonic Design Vol 2-glued.wav",
+    "duration": 4.565625,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2634636,
+    "hash": "841d098b6dff5d47d71939ab70b16f7d"
+  },
+  "da1fa9766143ee3e": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/【金属手铐点击序列07】Mechanical Source - Metal Handcufs Click Sequence 07.wav",
+    "filename": "【金属手铐点击序列07】Mechanical Source - Metal Handcufs Click Sequence 07.wav",
+    "duration": 0.8699010416666667,
+    "sample_rate": 192000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1069300,
+    "hash": "8f3d5eec6292fe837a04f6d9ff139b55"
+  },
+  "d072a68d8adcae05": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/Armour Full Plate Drop 03.wav",
+    "filename": "Armour Full Plate Drop 03.wav",
+    "duration": 14.704572916666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 8541910,
+    "hash": "d1f0ceabc85c575a7c18a70a4a371441"
+  },
+  "3e62da9c0d9e4924": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/SF-CK Servo Small Plastic 20 High.wav",
+    "filename": "SF-CK Servo Small Plastic 20 High.wav",
+    "duration": 5.616,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 3442172,
+    "hash": "bd8c7523984a2c9bc043ea8a7017ed28"
+  },
+  "b3b5241df3511987": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/【金属夹子点击序列02】Mechanical Source - Metal Clamp Click Sequence 02.wav",
+    "filename": "【金属夹子点击序列02】Mechanical Source - Metal Clamp Click Sequence 02.wav",
+    "duration": 1.5207447916666668,
+    "sample_rate": 192000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1819056,
+    "hash": "0dd474366340d340436b8b9580c472d0"
+  },
+  "f1642edba933214d": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/Fire Burning - Bonfire 01.wav",
+    "filename": "Fire Burning - Bonfire 01.wav",
+    "duration": 60.16266666666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 34939822,
+    "hash": "00b085a088a5a9a37f89aa1848d16598"
+  },
+  "0a46e32d5408c26b": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/ElevenLabs_2025-08-15T16_38_48_Liam_pre_sp110_s100_sb100_v3.mp3",
+    "filename": "ElevenLabs_2025-08-15T16_38_48_Liam_pre_sp110_s100_sb100_v3.mp3",
+    "duration": 7.490997732426304,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "MP3",
+    "size": 119581,
+    "hash": "cf496f696851cc62882fe408a89b77b4"
+  },
+  "e72a8db9ed6f0cb7": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/344 Audio - Pitch Looper Processing, Sci-Fi.wav",
+    "filename": "344 Audio - Pitch Looper Processing, Sci-Fi.wav",
+    "duration": 14.049552083333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 8137280,
+    "hash": "4d1cd319e84d2191c1a826cc9fbd380d"
+  },
+  "51136a1319b72c60": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/CatMeow_S08AN.44.wav",
+    "filename": "CatMeow_S08AN.44.wav",
+    "duration": 0.7413333333333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 438764,
+    "hash": "cc9b84b0b98d081c88745c22a6ae14c3"
+  },
+  "9a37aa8aa467e004": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/BRS_Door_Wood_Stove_Open_Slow_1.wav",
+    "filename": "BRS_Door_Wood_Stove_Open_Slow_1.wav",
+    "duration": 7.035646258503402,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 942954,
+    "hash": "bea208490f536d7210330b1f3dcc36c4"
+  },
+  "0d3b765d7b0d73a5": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/Whoosh Sword Medium.wav",
+    "filename": "Whoosh Sword Medium.wav",
+    "duration": 4.9390625,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 3008242,
+    "hash": "0d3ec0fa3e5fbb73d54dd733db14c38c"
+  },
+  "00eebf7ad90d74cc": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/DoorWoodshed_S011FO.366.wav",
+    "filename": "DoorWoodshed_S011FO.366.wav",
+    "duration": 0.8373333333333334,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 494668,
+    "hash": "d9ae01a1ec5a5ab04a775f248ff8f846"
+  },
+  "e4b6b42ff4aa0261": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/GamePieces_S011SP.228.wav",
+    "filename": "GamePieces_S011SP.228.wav",
+    "duration": 2.4426666666666668,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1420860,
+    "hash": "3b9541f4bb6212aad6edcd7f0ad62646"
+  },
+  "1c47cd6738ec1811": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/FIRESizz_Torch Sizzle Hard 01_B00M_ONE.wav",
+    "filename": "FIRESizz_Torch Sizzle Hard 01_B00M_ONE.wav",
+    "duration": 15.392270833333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 10871342,
+    "hash": "6ef0ca9cff33b6a4126b604a4567925f"
+  },
+  "93a247114dab4c3d": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/CatMeow_S08AN.45.wav",
+    "filename": "CatMeow_S08AN.45.wav",
+    "duration": 0.512,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 306492,
+    "hash": "cf6b257efa40c5e0773ba6fc30b982b4"
+  },
+  "63ef717a3c253595": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/Blood Stab Medium 04.wav",
+    "filename": "Blood Stab Medium 04.wav",
+    "duration": 17.081333333333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 9911290,
+    "hash": "3ab517a57becdcb7efa261f99d446445"
+  },
+  "747c99e9da3a5652": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/BRS_Foley_Belt_Buckle_Metal_Clinks.wav",
+    "filename": "BRS_Foley_Belt_Buckle_Metal_Clinks.wav",
+    "duration": 54.57850340136054,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 7232502,
+    "hash": "f88ebbdfbc9db9c8f85307531aadd04e"
+  },
+  "d36a0bd318b9251f": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/METLMvmt_  Antique Lock_344 Audio_Antique Small Metals.wav",
+    "filename": "METLMvmt_  Antique Lock_344 Audio_Antique Small Metals.wav",
+    "duration": 0.6721875,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 391538,
+    "hash": "b77a434e2e9adabbc4740e0347c8d9cc"
+  },
+  "fdb5cc49554b89c7": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/【汽车宝马车内开启声05】Mechanical Source - Car BMW Interior opening 05.wav",
+    "filename": "【汽车宝马车内开启声05】Mechanical Source - Car BMW Interior opening 05.wav",
+    "duration": 0.7024791666666667,
+    "sample_rate": 192000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 876398,
+    "hash": "826b46e51418d5e577f9263ac5d73d07"
+  },
+  "32baa94c8d262fba": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/CatMeow_S08AN.47.wav",
+    "filename": "CatMeow_S08AN.47.wav",
+    "duration": 0.3253333333333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 198972,
+    "hash": "832f115e24a8167e41dc6e724b77308f"
+  },
+  "961d1fa2bc727f2b": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/TOOLPowr_SERVO Hammer Drill Harsh Constant Hammer_B00M_CWCK.wav",
+    "filename": "TOOLPowr_SERVO Hammer Drill Harsh Constant Hammer_B00M_CWCK.wav",
+    "duration": 62.67340625,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 36529304,
+    "hash": "4685b90e1a1d3484f4d0a48f80fe71b2"
+  },
+  "cc43b1294f30375a": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/【电钻 基础电锤 06】Driller Source - Makita Hammer Driller Basic Servo  06.wav",
+    "filename": "【电钻 基础电锤 06】Driller Source - Makita Hammer Driller Basic Servo  06.wav",
+    "duration": 2.402625,
+    "sample_rate": 192000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2834990,
+    "hash": "360f1232a5bf56346bfdc0793647bdfa"
+  },
+  "b7978edeb74b9017": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/QP02 0181 Wind deciduous forest gentle leafy detail.wav",
+    "filename": "QP02 0181 Wind deciduous forest gentle leafy detail.wav",
+    "duration": 98.22152083333333,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 28447602,
+    "hash": "d0fd31f9c0ccdacb76ee6d56f8a1720c"
+  },
+  "f924e0f2434d3004": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/【金属夹点击01】Mechanical Source - Metal Clamp Click 01.wav",
+    "filename": "【金属夹点击01】Mechanical Source - Metal Clamp Click 01.wav",
+    "duration": 0.5639791666666667,
+    "sample_rate": 192000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 716806,
+    "hash": "a3d5c00be9a038c121ca164495007688"
+  },
+  "a88260a197a05e49": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/DSGNMisc_Glitch 1_344 Audio_Geophonic Design Vol 2.wav",
+    "filename": "DSGNMisc_Glitch 1_344 Audio_Geophonic Design Vol 2.wav",
+    "duration": 2.2725,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1318226,
+    "hash": "4e56c3d705ba859ef3dad9e1218a90b7"
+  },
+  "daa40a0a5bb244a0": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/ELECTRIC SPARK Electricity Pylon, Taser Gun, Short x6.wav",
+    "filename": "ELECTRIC SPARK Electricity Pylon, Taser Gun, Short x6.wav",
+    "duration": 7.9814375,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 5090698,
+    "hash": "384d15d3bf75eb7c07d5d383e31d06cf"
+  },
+  "4b589ca41ccf5869": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加/Media/ElevenLabs_2025-08-15T16_35_34_Liam_pre_sp110_s100_sb100_v3.mp3",
+    "filename": "ElevenLabs_2025-08-15T16_35_34_Liam_pre_sp110_s100_sb100_v3.mp3",
+    "duration": 2.516326530612245,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "MP3",
+    "size": 40169,
+    "hash": "8cd9394e3cf9e5f42d8f87eb39c33cfc"
+  },
+  "0d140c0a0fad354d": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【破裂 金属 A04】Rupture - Metal_A04.wav",
+    "filename": "【破裂 金属 A04】Rupture - Metal_A04.wav",
+    "duration": 1.9717291666666668,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1300560,
+    "hash": "26ca458be3ab444039b506d5530c3018"
+  },
+  "261e236d3c1b676d": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 撤退飞行A01】Wasp - Retreat_Fly_A01.wav",
+    "filename": "【怪兽 黄蜂 撤退飞行A01】Wasp - Retreat_Fly_A01.wav",
+    "duration": 1.2980208333333334,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 811750,
+    "hash": "4d948d7e4c4c1325e42141361d8e8e6c"
+  },
+  "2746184232547360": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_Bloody_Bug_Squish_2_Wet_Smash_Goo_Liquid_Bash_Sword_Knife_Organic_Splat_Gore_Horror.wav",
+    "filename": "ESM_Bloody_Bug_Squish_2_Wet_Smash_Goo_Liquid_Bash_Sword_Knife_Organic_Splat_Gore_Horror.wav",
+    "duration": 0.16160997732426305,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 175096,
+    "hash": "ad49eeff2f6aa55e1629d2596136c549"
+  },
+  "12d78a5be8a3307f": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/InsectDigFoliage_BU01.215.wav",
+    "filename": "InsectDigFoliage_BU01.215.wav",
+    "duration": 0.7306666666666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 433420,
+    "hash": "b2d0e570f5da0305ac7f7071fad33971"
+  },
+  "51c70ad7a985c06f": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_One_Shot_Vocal_Spider_Queen_Monster_Attack_4_Insect_Bug_Screech_Squeal_Angry_Combat.wav",
+    "filename": "ESM_One_Shot_Vocal_Spider_Queen_Monster_Attack_4_Insect_Bug_Screech_Squeal_Angry_Combat.wav",
+    "duration": 1.1967395833333334,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 876648,
+    "hash": "9c8f706d6ece3d5d12a2d45db7a57577"
+  },
+  "1fb80ee6884e79e8": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ Card_Game_UI_Notification_Shaker_01.wav",
+    "filename": " Card_Game_UI_Notification_Shaker_01.wav",
+    "duration": 0.49615625,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 433200,
+    "hash": "c13f137e8c04691e5d1d2286dd580d56"
+  },
+  "6f595beb71c41c7e": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ArtSupplyBag_S08FO.41.wav",
+    "filename": "ArtSupplyBag_S08FO.41.wav",
+    "duration": 0.39466666666666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 239244,
+    "hash": "46caeccb05f87c119354bdcf8bfe2b2c"
+  },
+  "618101f97a03571f": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ArmChair_Sliding_on_WoodenFloor_01_04.wav",
+    "filename": "ArmChair_Sliding_on_WoodenFloor_01_04.wav",
+    "duration": 1.9504375,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1136046,
+    "hash": "e355c2ca153384fbf13d32b736f8aa3c"
+  },
+  "5cc6364ca4d38cbe": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Dentist Drill A,Revs,Med 2.wav",
+    "filename": "Dentist Drill A,Revs,Med 2.wav",
+    "duration": 8.192,
+    "sample_rate": 96000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 2441786,
+    "hash": "617a8e8ff6fc25a8b1928217995428f9"
+  },
+  "76586c046b25e570": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/6.mp3",
+    "filename": "6.mp3",
+    "duration": 4.139614512471655,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "MP3",
+    "size": 66082,
+    "hash": "7f12b7750c351b86b11b6c068248749c"
+  },
+  "aa718ada39b1acd1": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Impact 027-glued.wav",
+    "filename": "Impact 027-glued.wav",
+    "duration": 4.583333333333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2640736,
+    "hash": "857af331fe743ae8460eddd15217fa27"
+  },
+  "ac1e74c95921d252": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/CFCK STEP GRASS Short Dry.M-glued.wav",
+    "filename": "CFCK STEP GRASS Short Dry.M-glued.wav",
+    "duration": 1.6133333333333333,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 206370,
+    "hash": "5d1ed10c6542a9daa190c39588ce4247"
+  },
+  "5208bca1ffdb8d4c": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_EMDP1_fx_foley_loop_m.M.wav",
+    "filename": "ESM_EMDP1_fx_foley_loop_m.M.wav",
+    "duration": 8.373333333333333,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 994594,
+    "hash": "bad91293f4d2dd4515813711306df878"
+  },
+  "ebabebab28fe89ff": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/00008-imported-001.wav",
+    "filename": "00008-imported-001.wav",
+    "duration": 1.8986666666666667,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 182316,
+    "hash": "bea508119a94c01767e557e580304d78"
+  },
+  "56391a84f02661df": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/bug_hurt-6.M.wav",
+    "filename": "bug_hurt-6.M.wav",
+    "duration": 0.768,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 225804,
+    "hash": "bce4ead6874e3a3a299bae576c513edd"
+  },
+  "4b3d2309ba04202c": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 翅膀拍动03】Wasp - WingFlap03.wav",
+    "filename": "【怪兽 黄蜂 翅膀拍动03】Wasp - WingFlap03.wav",
+    "duration": 3.9996666666666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2367302,
+    "hash": "b6a330e4f8787d950eb3fc341db36623"
+  },
+  "42b2408504feb8a7": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Calculations and Text-0-2.M.wav",
+    "filename": "Calculations and Text-0-2.M.wav",
+    "duration": 4.618666666666667,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1432078,
+    "hash": "fa36e27f068825268b43f503230c3eaa"
+  },
+  "3cb2017032caea48": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 右拳挥动2】Expector2 - fol_movement_punch_r_02.wav",
+    "filename": "【怪兽 右拳挥动2】Expector2 - fol_movement_punch_r_02.wav",
+    "duration": 1.2314166666666666,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "AIFF",
+    "size": 262328,
+    "hash": "322a356c0b62f44d4e0cbeed36b5e17d"
+  },
+  "9a7d11c77520a1f2": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Bluezone-BC0223-noise-cracke-033.wav",
+    "filename": "Bluezone-BC0223-noise-cracke-033.wav",
+    "duration": 0.780045351473923,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 208034,
+    "hash": "0682b90002a7b0a7375bab919d63e673"
+  },
+  "6aaa7d082ca3827d": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Armour Chain Mail Drop 02.M.wav",
+    "filename": "Armour Chain Mail Drop 02.M.wav",
+    "duration": 0.4622291666666667,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 157864,
+    "hash": "907e9f7a58e72312a05f578b594619d0"
+  },
+  "c68cc7488e39126a": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Ambient_Game_Movement_Climb_Vine_2.wav",
+    "filename": "Ambient_Game_Movement_Climb_Vine_2.wav",
+    "duration": 2.644083333333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1525036,
+    "hash": "303e1e044ca58fea31b4ebd56af0f66a"
+  },
+  "4bf4cc5185fc2407": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 翅膀拍动05】Wasp - Wing.M.wav",
+    "filename": "【怪兽 黄蜂 翅膀拍动05】Wasp - Wing.M.wav",
+    "duration": 0.6506666666666666,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 164692,
+    "hash": "4c17472f0b9b4ef7f8dc025d74e61fc1"
+  },
+  "80a54cef10cd3774": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BRS_Data_Beep_Window_Open_GUI-glued-01.wav",
+    "filename": "BRS_Data_Beep_Window_Open_GUI-glued-01.wav",
+    "duration": 1.8784580498866212,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 252984,
+    "hash": "89cbbd4dde28fd578314294937b1e6d6"
+  },
+  "abd47a51bbf1809a": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【破裂 木块碎片3】Rupture - Wood_Debris_03.wav",
+    "filename": "【破裂 木块碎片3】Rupture - Wood_Debris_03.wav",
+    "duration": 2.202958333333333,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1346014,
+    "hash": "43a5ef7b24c309195204d383e5981558"
+  },
+  "5bfaf047561a71c7": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ANMLMisc_ANIMAL SMALL-Asian Palm Civet Growl Moan_B00M_ALCK_ST.wav",
+    "filename": "ANMLMisc_ANIMAL SMALL-Asian Palm Civet Growl Moan_B00M_ALCK_ST.wav",
+    "duration": 17.354,
+    "sample_rate": 192000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 20493650,
+    "hash": "aa1daa287966bec800735d4ce1ce0a64"
+  },
+  "3d467982012689b1": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/AMBDsrt_Bursts Of Wind-1.M.wav",
+    "filename": "AMBDsrt_Bursts Of Wind-1.M.wav",
+    "duration": 2.1379791666666668,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 2212192,
+    "hash": "7dd5d919b73319b99b0a93ef6edb3881"
+  },
+  "fe71ae63caa55d3f": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/InsectVoiceAnger_BU01.375.wav",
+    "filename": "InsectVoiceAnger_BU01.375.wav",
+    "duration": 0.2773333333333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 171868,
+    "hash": "65e0fa3b5988033116ddfeec43654db0"
+  },
+  "4c19efa7ccae5677": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Ancient_Game_Metal_Gear_Socket_Slide_5_Into_Place_1.wav",
+    "filename": "Ancient_Game_Metal_Gear_Socket_Slide_5_Into_Place_1.wav",
+    "duration": 0.8307291666666666,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 612286,
+    "hash": "32a5a54ccd667f410e028c7f7fe26f71"
+  },
+  "711cf1d0880647ed": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/CFCK WINGS SWEETENER Whoo.M.wav",
+    "filename": "CFCK WINGS SWEETENER Whoo.M.wav",
+    "duration": 2.4875833333333333,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 422040,
+    "hash": "ff8ec42ae0bf2d1738fa05fa3652af18"
+  },
+  "b177d5946a0c7856": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 翅膀拍动05】Wasp - Wi-4.M.wav",
+    "filename": "【怪兽 黄蜂 翅膀拍动05】Wasp - Wi-4.M.wav",
+    "duration": 0.672,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 166732,
+    "hash": "18594e7dd2f4d8bdcbe7717ca965bb4e"
+  },
+  "9a3ee264c9f5788d": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/InsectDigDirt_BU01.212.M.wav",
+    "filename": "InsectDigDirt_BU01.212.M.wav",
+    "duration": 2.5509375,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 265712,
+    "hash": "fcf1906775d873f6e8f9f4a26342a1d6"
+  },
+  "dcba0984783d3b4c": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 潜行A01】Wasp - Stalk_A01.wav",
+    "filename": "【怪兽 黄蜂 潜行A01】Wasp - Stalk_A01.wav",
+    "duration": 4.034447916666666,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2387336,
+    "hash": "e4d768f148cbd453b58ed44632fb58a7"
+  },
+  "811780ed0de0dd71": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【机器人 中等厚脚步撞击01】footstep_impact_medium_thick_01.wav",
+    "filename": "【机器人 中等厚脚步撞击01】footstep_impact_medium_thick_01.wav",
+    "duration": 0.5005895691609977,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1056176,
+    "hash": "5844b6e878584265f8794b9c153c9c57"
+  },
+  "d5bc273ab2ddfb09": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Armour Chain Mail Drop-1.M.wav",
+    "filename": "Armour Chain Mail Drop-1.M.wav",
+    "duration": 0.576,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 168778,
+    "hash": "ed59c12d42d3fb10c782feb7465eb574"
+  },
+  "4b41196393221879": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【破裂 大木杆簇02】Rupture - Wood_Pole_Large_Cluster_02.wav",
+    "filename": "【破裂 大木杆簇02】Rupture - Wood_Pole_Large_Cluster_02.wav",
+    "duration": 2.471041666666667,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1398878,
+    "hash": "0b09a37bdcfa3cbeae13151ae2eac306"
+  },
+  "ef01a61e15e2f8cf": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【未来武器2 BFG 长单发射击喷溅变体3】Future Weapons 2 - BFG - shot_single_long_sputter variation_3.wav",
+    "filename": "【未来武器2 BFG 长单发射击喷溅变体3】Future Weapons 2 - BFG - shot_single_long_sputter variation_3.wav",
+    "duration": 3.9705208333333335,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2407186,
+    "hash": "f497cb6a5c6fbd777dfa6f3cfa5b242d"
+  },
+  "777c8f0d96f708c8": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/bug_hurt-4.M.wav",
+    "filename": "bug_hurt-4.M.wav",
+    "duration": 0.9066666666666666,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 239116,
+    "hash": "2408f049a3f66bec8b7a10c90d6bc9b4"
+  },
+  "e96d4ed12fa36a13": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Bluezone-BC0223-noise-cracke-025.wav",
+    "filename": "Bluezone-BC0223-noise-cracke-025.wav",
+    "duration": 0.8562358276643991,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 228270,
+    "hash": "35023055c372202cfd6e52a8a627caf8"
+  },
+  "1240dc8b59c38511": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ADG_Action_Fire_4_ST.wav",
+    "filename": "ADG_Action_Fire_4_ST.wav",
+    "duration": 2.9729375,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1712456,
+    "hash": "237a7d114ec2a198a9c651023276663a"
+  },
+  "222302592095220e": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/SE_BT_HIT_SAND_1.mp3",
+    "filename": "SE_BT_HIT_SAND_1.mp3",
+    "duration": 0.6975833333333333,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "MP3",
+    "size": 32953,
+    "hash": "5e1d8cba7502df8c2cbf29db9e08fc87"
+  },
+  "54178d024b967890": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 小生物 雪地脚步07】Small Creature - Footstep_Snow_07.wav",
+    "filename": "【怪兽 小生物 雪地脚步07】Small Creature - Footstep_Snow_07.wav",
+    "duration": 0.5400833333333334,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 374630,
+    "hash": "800241f5e9f2b6563ff3f0856fea3572"
+  },
+  "71f6fd31de4e9b45": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【未来武器2 螺栓泵枪 单发射击变化3】Future Weapons 2 - Bolt Pomp Gun - shot_single_variation_3.wav",
+    "filename": "【未来武器2 螺栓泵枪 单发射击变化3】Future Weapons 2 - Bolt Pomp Gun - shot_single_variation_3.wav",
+    "duration": 1.1796666666666666,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 799742,
+    "hash": "248f23e4f2426644e6d3bfeb3c3b3333"
+  },
+  "435ec55036524f62": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【机械故障声02】mechanism_malfunction_mech_02.wav",
+    "filename": "【机械故障声02】mechanism_malfunction_mech_02.wav",
+    "duration": 2.61375,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2575262,
+    "hash": "ec4f6dca798b0281f297b1401b2040d2"
+  },
+  "01d6639ccf3ea478": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Confirm ToneFM-011【模块化UI 确认音调1】.wav",
+    "filename": "Confirm ToneFM-011【模块化UI 确认音调1】.wav",
+    "duration": 0.9816145833333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1277126,
+    "hash": "45303e1d5566b4b4f7166b75a8e0ab7d"
+  },
+  "cdfbe4dc8af1f3bf": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 吸虫 着陆失误03】Leech - Land_Miss_03.wav",
+    "filename": "【怪兽 吸虫 着陆失误03】Leech - Land_Miss_03.wav",
+    "duration": 0.51275,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 358814,
+    "hash": "a86793844cafd38f3b046e5a61fc1494"
+  },
+  "e43f32b4694d665b": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Confirm ToneFM-050【模块化UI.M.wav",
+    "filename": "Confirm ToneFM-050【模块化UI.M.wav",
+    "duration": 0.6293333333333333,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1048976,
+    "hash": "9b34a8956e71ec036fb9cdbbcaa7ff57"
+  },
+  "c554ad89bfd30f68": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Bluezone-BC0223-noise-cracke-030.wav",
+    "filename": "Bluezone-BC0223-noise-cracke-030.wav",
+    "duration": 1.0466213151927437,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 278646,
+    "hash": "b5924a1b2478370b390630788325f1c5"
+  },
+  "9d57a454065820bb": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Bluezone-BC0223-noise-cracke-024.wav",
+    "filename": "Bluezone-BC0223-noise-cracke-024.wav",
+    "duration": 0.7893424036281179,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 210570,
+    "hash": "68a30ec5dd7de4ddc55565ddc7695da2"
+  },
+  "a8164661e91a19a9": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【破裂 陶瓷撞击B03】Rupture - Ceramic_Impact_B03.wav",
+    "filename": "【破裂 陶瓷撞击B03】Rupture - Ceramic_Impact_B03.wav",
+    "duration": 2.5144583333333332,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1394180,
+    "hash": "f70df581dd1c1e9e765a8c2f4a0f4338"
+  },
+  "be4fa39bc56dfad4": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BRS_Data_Beep_Notifier_Round_Sweet_Delay.wav",
+    "filename": "BRS_Data_Beep_Notifier_Round_Sweet_Delay.wav",
+    "duration": 1.2770975056689342,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 181308,
+    "hash": "a6afb658ebd40ce38ee8c31ea488b56e"
+  },
+  "9cb9318b4c8c2437": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 喷吐者受伤叫声1】Expector - Vocal_TakeDamage01.wav",
+    "filename": "【怪兽 喷吐者受伤叫声1】Expector - Vocal_TakeDamage01.wav",
+    "duration": 0.7932916666666666,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 520438,
+    "hash": "1cb629c04c2f3e3fe0e8276aac780261"
+  },
+  "1c3a69fedb7dfe86": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Ancient_Game_Iron_Metal_Lid_Close.wav",
+    "filename": "Ancient_Game_Iron_Metal_Lid_Close.wav",
+    "duration": 0.875,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 637750,
+    "hash": "2fb43629cbf7af26c32e26d96f7b4096"
+  },
+  "800585dbf7b09077": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BeeFlyBy_BU01.23.M.wav",
+    "filename": "BeeFlyBy_BU01.23.M.wav",
+    "duration": 0.6613333333333333,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 84338,
+    "hash": "1249894fa8119c010d1d9b3b911b8cf3"
+  },
+  "8f523ee713bb7a54": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ROCKImpt_IMPACT-Rock Sand.M-glued.wav",
+    "filename": "ROCKImpt_IMPACT-Rock Sand.M-glued.wav",
+    "duration": 1.1946666666666668,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 344800,
+    "hash": "f152cd2278cc9eee0e8aea15f7e96de2"
+  },
+  "83585e3c92b805b2": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/DBDS Metal Large 02.M.wav",
+    "filename": "DBDS Metal Large 02.M.wav",
+    "duration": 6.176,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 856178,
+    "hash": "57d3762d470b2a89526549abb9613ca2"
+  },
+  "6989f16d43c8444a": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【机器人 脚步声 有机电子人 00】Footsteps - Organic Cyborg 00.wav",
+    "filename": "【机器人 脚步声 有机电子人 00】Footsteps - Organic Cyborg 00.wav",
+    "duration": 1.25,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 786990,
+    "hash": "c4c14bc16e71059038af78838958fb44"
+  },
+  "54f38d5607a86b16": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ARTILLERY Shot Rough 02.wav",
+    "filename": "ARTILLERY Shot Rough 02.wav",
+    "duration": 2.5549791666666666,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 900210,
+    "hash": "102d6e1a5c237adb44c70a5512786d8f"
+  },
+  "0cdc93ec64da341f": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/croak_tiny_06_04_short_ha.M-glued.wav",
+    "filename": "croak_tiny_06_04_short_ha.M-glued.wav",
+    "duration": 1.5931041666666668,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 153674,
+    "hash": "fd23591eb7e1f3f3b2e542bd15670620"
+  },
+  "5625f7c0ab40a080": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【断裂 树干撞击】Rupture - Tree_Trunk_Impact_05.wav",
+    "filename": "【断裂 树干撞击】Rupture - Tree_Trunk_Impact_05.wav",
+    "duration": 2.9506875,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1480908,
+    "hash": "77ecfbfb8144bf96cd453a9db09bb0e2"
+  },
+  "2f7a71d336daf148": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【能量 电椅火花开启】Energy - elect.M.wav",
+    "filename": "【能量 电椅火花开启】Energy - elect.M.wav",
+    "duration": 1.7386666666666666,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 319862,
+    "hash": "df18bf85ea54f494d9dbef297ea20b6d"
+  },
+  "e927b25c023a6b49": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【机器人 中等厚脚步撞击02】footstep_impact_medium_thick_02.wav",
+    "filename": "【机器人 中等厚脚步撞击02】footstep_impact_medium_thick_02.wav",
+    "duration": 0.3999092970521542,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1047368,
+    "hash": "4ddb4684b8b1347216ffe90379a211a4"
+  },
+  "c6676dc476124e1b": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ElevenLabs_2025-08-15T17_18_20_Hope - upbeat and clear_pvc_sp96_s50_sb75_se0_b_m2.mp3",
+    "filename": "ElevenLabs_2025-08-15T17_18_20_Hope - upbeat and clear_pvc_sp96_s50_sb75_se0_b_m2.mp3",
+    "duration": 1.2857596371882085,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "MP3",
+    "size": 20525,
+    "hash": "f8119bd23922c0b2516c751490fd1106"
+  },
+  "d19f3584d63e78b1": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ADG_Action_Fire_6_ST.wav",
+    "filename": "ADG_Action_Fire_6_ST.wav",
+    "duration": 3.620927083333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2085698,
+    "hash": "16cd6558635c726b854af3d7edd3aa35"
+  },
+  "61edfd91ea4746c3": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/CFCK WINGS SWEETENER Wh-3.M.wav",
+    "filename": "CFCK WINGS SWEETENER Wh-3.M.wav",
+    "duration": 1.5181041666666666,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 328962,
+    "hash": "b34785fe541f5710e62c4a319bad2d6d"
+  },
+  "7ba0bae062da6365": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ROCKMvmt_Large Sandstones.M.wav",
+    "filename": "ROCKMvmt_Large Sandstones.M.wav",
+    "duration": 1.859,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 2185580,
+    "hash": "4641274164d7e26029ccd4517fd48769"
+  },
+  "d210843c091f7631": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【破裂 金属 B06】Rupture - Metal_B06.wav",
+    "filename": "【破裂 金属 B06】Rupture - Metal_B06.wav",
+    "duration": 1.9990625,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1113508,
+    "hash": "bb31974f66aec55dec7efd952a96f674"
+  },
+  "0f100b2d88987f3c": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【干爽脚步撞击01】footstep_dryer_impact_01.wav",
+    "filename": "【干爽脚步撞击01】footstep_dryer_impact_01.wav",
+    "duration": 1.34721875,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1784830,
+    "hash": "a398cdc6e10ea6aa70e304c6619a2725"
+  },
+  "e70ac2eeb442d852": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【电力 装甲武器杂音3】Energy - armor weapon power supply foley 3.wav",
+    "filename": "【电力 装甲武器杂音3】Energy - armor weapon power supply foley 3.wav",
+    "duration": 1.1733333333333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 775438,
+    "hash": "a5a7b5610e18559c98051acb3a38e2db"
+  },
+  "417010c7823e2403": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/00007-imported-001.wav",
+    "filename": "00007-imported-001.wav",
+    "duration": 0.9386666666666666,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 90156,
+    "hash": "0d951c94e5aeed84d6063a34874ee3e0"
+  },
+  "1fa17b832cff88d6": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 潜行者 脚趾17】Prowler - fs_toe_17.wav",
+    "filename": "【怪兽 潜行者 脚趾17】Prowler - fs_toe_17.wav",
+    "duration": 0.32133333333333336,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 248550,
+    "hash": "7a2bd06d226ba6789fbb1ba48cceb99c"
+  },
+  "f0194bb2de14d55e": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 潜行 B03】Wasp - Stalk_B03.wav",
+    "filename": "【怪兽 黄蜂 潜行 B03】Wasp - Stalk_B03.wav",
+    "duration": 4.93984375,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2908844,
+    "hash": "9488342de57d6bb5ec552b3b139e437d"
+  },
+  "36ab6591718d61c0": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【树冠 撞击03】Rupture - Tree_Crown_Impact_03.wav",
+    "filename": "【树冠 撞击03】Rupture - Tree_Crown_Impact_03.wav",
+    "duration": 1.9264791666666667,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1281302,
+    "hash": "988bf3b59b980a657c40f4a86688ac12"
+  },
+  "752dd48501cb1c15": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/00006-glued.wav",
+    "filename": "00006-glued.wav",
+    "duration": 1.088,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 105184,
+    "hash": "1a56d704641a288800190d0c2a730bb1"
+  },
+  "240ff677d097c894": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BRS_Data_Beep_Modern_13-glued-01.wav",
+    "filename": "BRS_Data_Beep_Modern_13-glued-01.wav",
+    "duration": 0.1551700680272109,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 24624,
+    "hash": "460e5c9e139305b44debd1be8cd97501"
+  },
+  "4c55649c6ca7d80e": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 咳出者 咯咯尖叫03】Expector - Vocal_ChitterScream03.wav",
+    "filename": "【怪兽 咳出者 咯咯尖叫03】Expector - Vocal_ChitterScream03.wav",
+    "duration": 1.6716875,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1026466,
+    "hash": "9adacd1dceed8ec26159b443480940d3"
+  },
+  "74a458f896284aca": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【破裂 泥土撞击04】Rupture - Dirt_Impact_04.wav",
+    "filename": "【破裂 泥土撞击04】Rupture - Dirt_Impact_04.wav",
+    "duration": 2.5075,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1392724,
+    "hash": "2292221936700122602a17c93d779a30"
+  },
+  "d08d6677c9829464": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BeeFlyBy_BU01.28.wav",
+    "filename": "BeeFlyBy_BU01.28.wav",
+    "duration": 2.6506666666666665,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1540508,
+    "hash": "ae52564ffee94d941ae49a1503209703"
+  },
+  "474f076c2986502c": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Bluezone-BC0223-noise-cracke-021.wav",
+    "filename": "Bluezone-BC0223-noise-cracke-021.wav",
+    "duration": 0.8344671201814059,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 222434,
+    "hash": "c31baade9d72aafc68e9b6efae496a8f"
+  },
+  "d25c1f0524d0c5a6": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Bluezone-BC0200-grenade-l.M.wav",
+    "filename": "Bluezone-BC0200-grenade-l.M.wav",
+    "duration": 0.608,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 77138,
+    "hash": "4ab4070004d1c055632797e1d92e8d08"
+  },
+  "248b5e4286a73b4c": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ElevenLabs_2025-08-15T16_39_50_Liam_pre_sp110_s100_sb100_v3.mp3",
+    "filename": "ElevenLabs_2025-08-15T16_39_50_Liam_pre_sp110_s100_sb100_v3.mp3",
+    "duration": 2.2806575963718823,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "MP3",
+    "size": 36407,
+    "hash": "1a0967f97dc1d53e3fc75e91d35553b0"
+  },
+  "049258572728d0f6": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/07 Jetset.wav",
+    "filename": "07 Jetset.wav",
+    "duration": 2.5946666666666665,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1510300,
+    "hash": "a998857d50fb1efa70a29a72d3f17489"
+  },
+  "faac4562ed9e7e47": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/METLImpt_Grenade Drop 05_.M.wav",
+    "filename": "METLImpt_Grenade Drop 05_.M.wav",
+    "duration": 0.5226666666666666,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 587958,
+    "hash": "e1643e037444a2a46ff9c78ab2e942b3"
+  },
+  "51f94bb81a5a2df1": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/DSGNDist_SYNTH-Rocket Agg.M.wav",
+    "filename": "DSGNDist_SYNTH-Rocket Agg.M.wav",
+    "duration": 0.8793541666666667,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 554074,
+    "hash": "350b7b57df8e161d89d611800927d733"
+  },
+  "3a6c437d18888d0f": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Micro Gestures-003【模块化UI 微动作】.wav",
+    "filename": "Micro Gestures-003【模块化UI 微动作】.wav",
+    "duration": 23.333333333333332,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 14151460,
+    "hash": "b955a38468677fb23b11b19da44f128c"
+  },
+  "3c38131d44fff127": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/croak_tiny_04_01_long_s-1.M.wav",
+    "filename": "croak_tiny_04_01_long_s-1.M.wav",
+    "duration": 1.312,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 263524,
+    "hash": "203e8c28afb8c1d7471a3a39622e2977"
+  },
+  "32a3b40e73eb111a": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【外骨骼脚步声03】footstep_exoskeleton_03.wav",
+    "filename": "【外骨骼脚步声03】footstep_exoskeleton_03.wav",
+    "duration": 1.3299092970521542,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1126154,
+    "hash": "612d517ada753988f71d70dc5fbf219b"
+  },
+  "0415e54f50ccdf9f": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BaseballBatMetal_S08SP.12.wav",
+    "filename": "BaseballBatMetal_S08SP.12.wav",
+    "duration": 0.8,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 473564,
+    "hash": "25a22a6e78e0e2c3765701588cfbf7ca"
+  },
+  "55eff3ff6cbca8e5": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Bluezone-Autobots-transformingelement-064.wav",
+    "filename": "Bluezone-Autobots-transformingelement-064.wav",
+    "duration": 3.7899773242630386,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1004472,
+    "hash": "f815957cf1a18cd44f3284a0f80c81d2"
+  },
+  "5e80713895e16a8e": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/CFCK BODY FALL CONCRETE P.M.wav",
+    "filename": "CFCK BODY FALL CONCRETE P.M.wav",
+    "duration": 1.0773333333333333,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 286406,
+    "hash": "cb895a2df939861da114b4e653263069"
+  },
+  "58c906aa91d909d4": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 远处嗡嗡声循环】Wasp - BuzzFar_Loop.wav",
+    "filename": "【怪兽 黄蜂 远处嗡嗡声循环】Wasp - BuzzFar_Loop.wav",
+    "duration": 3.226354166666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1921898,
+    "hash": "05e28dae82e63634a283c7a02cd0428b"
+  },
+  "fb491746582949f5": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/bug_hurt-2.M.wav",
+    "filename": "bug_hurt-2.M.wav",
+    "duration": 1.5056875,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 296630,
+    "hash": "14362b207975fefc265dfbd01442b5f6"
+  },
+  "9b66882d207ee70b": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/InsectEatAttack_BU01.219.wav",
+    "filename": "InsectEatAttack_BU01.219.wav",
+    "duration": 0.6186666666666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 368812,
+    "hash": "13ab1daf6fc518bff1b02997ffbc80dd"
+  },
+  "7a6e8fcfe0e2d4ba": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_One_Shot_Vocal_Spider_Queen_Monster_Idle_Insect_Bug_Select_Chirp.wav",
+    "filename": "ESM_One_Shot_Vocal_Spider_Queen_Monster_Idle_Insect_Bug_Select_Chirp.wav",
+    "duration": 2.545,
+    "sample_rate": 96000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 921866,
+    "hash": "ac50252a37a3e2046e68914560cbc113"
+  },
+  "652ab284c07f7f61": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BELLMisc_Mech Bell 07_DDUMAIS_NONE.wav",
+    "filename": "BELLMisc_Mech Bell 07_DDUMAIS_NONE.wav",
+    "duration": 4.065958333333334,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 7402802,
+    "hash": "7439410324327b09b7b073975b73658b"
+  },
+  "291888e7f55a4065": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【金属钳子点击06】metal_vice_grips_click_06.wav",
+    "filename": "【金属钳子点击06】metal_vice_grips_click_06.wav",
+    "duration": 0.384,
+    "sample_rate": 96000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 394788,
+    "hash": "74dd8dbe932803d5d98d99e1b08f2059"
+  },
+  "00be3b4d08e1c197": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Scrapes-and-Scratches_064.M.wav",
+    "filename": "Scrapes-and-Scratches_064.M.wav",
+    "duration": 0.5471875,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 73282,
+    "hash": "19fa01d47dbd78758ad26fcd21b93979"
+  },
+  "6907ca5a98479aa2": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/14 Fast Whoosh B.M.wav",
+    "filename": "14 Fast Whoosh B.M.wav",
+    "duration": 0.7573333333333333,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 93124,
+    "hash": "db5abf6e28834aee708a91f740a2c879"
+  },
+  "bceb7a54d58af99d": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Animation Whoosh9-glued-01.wav",
+    "filename": "Animation Whoosh9-glued-01.wav",
+    "duration": 1.1840362811791383,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 212160,
+    "hash": "b2ae1b4ceb2b4d4f8ee4c6394c2386e4"
+  },
+  "902e56a911338358": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/2.mp3",
+    "filename": "2.mp3",
+    "duration": 1.4166213151927438,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "MP3",
+    "size": 22614,
+    "hash": "f3dcac442e8a278538d96a103bb31403"
+  },
+  "1e9c79c0f1b67a8a": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/InsectHissAngry_BU01.258.wav",
+    "filename": "InsectHissAngry_BU01.258.wav",
+    "duration": 0.6826666666666666,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 405324,
+    "hash": "121f9bf9a2d25b2ff443d9752c3836e3"
+  },
+  "53065a2d6de6e485": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 翅膀拍动05】Wasp - Wi-2.M.wav",
+    "filename": "【怪兽 黄蜂 翅膀拍动05】Wasp - Wi-2.M.wav",
+    "duration": 0.288,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 129868,
+    "hash": "6a3bcd7c2cbfb7ba7ebd9fd9e3ca3821"
+  },
+  "367230088b03a906": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/SF-CK Data Telemetry Sing.M.wav",
+    "filename": "SF-CK Data Telemetry Sing.M.wav",
+    "duration": 2.24,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 367576,
+    "hash": "d60bee4cf5771f0c5ea335846d32a084"
+  },
+  "84b072feeec58b0f": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Bluezone-BC0197-falling-metal-debris-001.wav",
+    "filename": "Bluezone-BC0197-falling-metal-debris-001.wav",
+    "duration": 3.253968253968254,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 862666,
+    "hash": "fc16fba7b29fc238c6b02e7e40d87b21"
+  },
+  "9a388053d485f8d6": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/3.mp3",
+    "filename": "3.mp3",
+    "duration": 2.8566666666666665,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "MP3",
+    "size": 45602,
+    "hash": "1b6116027f983463f3f7f808e924e395"
+  },
+  "0ab84c490de7a887": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/DRWRMetl_Heavy Metal Drawer 06_DDUMAIS_NONE-glued-01.wav",
+    "filename": "DRWRMetl_Heavy Metal Drawer 06_DDUMAIS_NONE-glued-01.wav",
+    "duration": 0.41794791666666664,
+    "sample_rate": 96000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1502558,
+    "hash": "c996f41546338cccefea7915258c2156"
+  },
+  "13ff3dde4cb99a1e": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Ancient_Game_Mechanism_Button_Tap_2.wav",
+    "filename": "Ancient_Game_Mechanism_Button_Tap_2.wav",
+    "duration": 1.25,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 853658,
+    "hash": "ffd3c0dd028c879cdcaec29851683514"
+  },
+  "88d45c62b65ff5fa": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_One_Shot_Vocal_Spider_Queen_Monster_Pain_1_Insect_Bug_Screech_Chirp_Death_Hit_Squish.wav",
+    "filename": "ESM_One_Shot_Vocal_Spider_Queen_Monster_Pain_1_Insect_Bug_Screech_Chirp_Death_Hit_Squish.wav",
+    "duration": 0.81421875,
+    "sample_rate": 96000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 422256,
+    "hash": "d44797b2ea57379ccff5143c28f6bff7"
+  },
+  "8cde5000b2d3f16c": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 群飞循环】Wasp - Swarm_Loop.wav",
+    "filename": "【怪兽 黄蜂 群飞循环】Wasp - Swarm_Loop.wav",
+    "duration": 12.312770833333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 7155698,
+    "hash": "559ab9aadf1af5934d71ded3e082a8a6"
+  },
+  "e8222f144c5c5f5e": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 陷阱者 走路05】Trapper - fs.M.wav",
+    "filename": "【怪兽 陷阱者 走路05】Trapper - fs.M.wav",
+    "duration": 0.278625,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 128740,
+    "hash": "6b7ff27895dfeb260caaf83c67d56d75"
+  },
+  "7cb3f9a876937c77": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/CFCK WINGS SWEETENER Wh-1.M.wav",
+    "filename": "CFCK WINGS SWEETENER Wh-1.M.wav",
+    "duration": 2.026666666666667,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 377784,
+    "hash": "de8c740fc1984ec10f942df54626ec2c"
+  },
+  "d22107c43c8259c3": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 翅膀拍动01】Wasp - WingFlap01.wav",
+    "filename": "【怪兽 黄蜂 翅膀拍动01】Wasp - WingFlap01.wav",
+    "duration": 3.8893020833333334,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2303740,
+    "hash": "52c7d0c5b024ea83fdbfd2ff56a9124e"
+  },
+  "92f5cf8521af9cb3": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂飞舞C06】Wasp - Fly_C06.wav",
+    "filename": "【怪兽 黄蜂飞舞C06】Wasp - Fly_C06.wav",
+    "duration": 1.6395416666666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1008416,
+    "hash": "1c009422beeb95dd6ea29af2cc7976c7"
+  },
+  "8b90c46388a17790": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/CLOCKMech_Large Clockwork.M.wav",
+    "filename": "CLOCKMech_Large Clockwork.M.wav",
+    "duration": 2.1380416666666666,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 228894,
+    "hash": "5dc611e2f7893f184782e1a8590bab64"
+  },
+  "0d0146746da27fef": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【破裂 金属 B05】Rupture - Metal_B05.wav",
+    "filename": "【破裂 金属 B05】Rupture - Metal_B05.wav",
+    "duration": 2.224625,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1136190,
+    "hash": "27a73d9a3a398a792841b2149774576e"
+  },
+  "521b418103f9e628": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/00001-imported.wav",
+    "filename": "00001-imported.wav",
+    "duration": 1.4506666666666668,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 139308,
+    "hash": "0f85dc394039642eb317d7c36def467a"
+  },
+  "c283ea2f1d5596c9": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Calculations and Text-030.M.wav",
+    "filename": "Calculations and Text-030.M.wav",
+    "duration": 2.2126875,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1201072,
+    "hash": "09a8e7c54ca08fd5f124408616d1235c"
+  },
+  "72b846dc96f52d70": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Calculations and Text-0-1.M.wav",
+    "filename": "Calculations and Text-0-1.M.wav",
+    "duration": 2.5405416666666665,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1232578,
+    "hash": "965eaa89ec3c5f059a80a23b44438ef8"
+  },
+  "96b227cdebfbf6c5": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【破裂 沙地撞击B03】Rupture - San.M.wav",
+    "filename": "【破裂 沙地撞击B03】Rupture - San.M.wav",
+    "duration": 4.277333333333333,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1680684,
+    "hash": "e57df51583099a47d68902aeebebab31"
+  },
+  "331be913bf078423": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/bug_hurt-5.M.wav",
+    "filename": "bug_hurt-5.M.wav",
+    "duration": 0.6933333333333334,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 218636,
+    "hash": "59c3dda2756485fbc199424b8d0e89f4"
+  },
+  "e5e0182e2e5a3c00": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【金属垃圾厂容器慢挪03】Mechanical Source - Metal Junk Factory Container Slow Shuffle 03.wav",
+    "filename": "【金属垃圾厂容器慢挪03】Mechanical Source - Metal Junk Factory Container Slow Shuffle 03.wav",
+    "duration": 3.2083541666666666,
+    "sample_rate": 192000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 3763270,
+    "hash": "80c0d180c74903d5ed87aeeeb3e9bb4d"
+  },
+  "1c11b8fad40b8ff7": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_MMO_Game_Magic_Designed_Air_Whoosh_05.wav",
+    "filename": "ESM_MMO_Game_Magic_Designed_Air_Whoosh_05.wav",
+    "duration": 2.254,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1465858,
+    "hash": "c9b45108cf0ce086456981da2dead811"
+  },
+  "4c5dbb64c39c1bb0": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BeeFlyBy_BU01.28-glued.wav",
+    "filename": "BeeFlyBy_BU01.28-glued.wav",
+    "duration": 3.1418333333333335,
+    "sample_rate": 96000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 908536,
+    "hash": "973bfbcc0ebae417c192b4fe11107a86"
+  },
+  "f7af79abb1806558": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/SE_EN0001_GrenadeSoldier_015.wav",
+    "filename": "SE_EN0001_GrenadeSoldier_015.wav",
+    "duration": 3.6703333333333332,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 704748,
+    "hash": "4c10fb8b128cbecc3c5e27b8c1200fe8"
+  },
+  "76b11b3850f864bb": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 翅膀拍动05】Wasp - Wi-5.M.wav",
+    "filename": "【怪兽 黄蜂 翅膀拍动05】Wasp - Wi-5.M.wav",
+    "duration": 2.8408125,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 374946,
+    "hash": "d9cf0c55b811f96efd831f91a805ab89"
+  },
+  "02246aa7b7d3088f": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/11 Overwhelm.wav",
+    "filename": "11 Overwhelm.wav",
+    "duration": 5.8453333333333335,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 3386650,
+    "hash": "8b21a9d0428baddb9fdf3be80001e681"
+  },
+  "ef857ded3db63f9d": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_SFSG_cinematic_fx_science_fiction_footstep_mech_futuristic_movement_run_04.wav",
+    "filename": "ESM_SFSG_cinematic_fx_science_fiction_footstep_mech_futuristic_movement_run_04.wav",
+    "duration": 0.9437414965986395,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1287282,
+    "hash": "e151e74420b4053f944666bc8a41beec"
+  },
+  "3ad409826e3fa1bc": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/00014-imported.wav",
+    "filename": "00014-imported.wav",
+    "duration": 1.216,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 116780,
+    "hash": "7f7d1bed0091760b429e36deac3f7f05"
+  },
+  "9f92c06ac8c611c1": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_SFSG_cinematic_fx_s-2.M.wav",
+    "filename": "ESM_SFSG_cinematic_fx_s-2.M.wav",
+    "duration": 0.5653333333333334,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 3872016,
+    "hash": "fba90567e71c65b03d7fa75ce658ee04"
+  },
+  "d94866fcdf461c55": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ADG_Crafting_Metal_ST.wav",
+    "filename": "ADG_Crafting_Metal_ST.wav",
+    "duration": 1.50746875,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 868346,
+    "hash": "9f44c07f9920efb693301bdf50ba2fa7"
+  },
+  "3517cb25759e857e": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/GrenadeLauncher_S08WA.238.wav",
+    "filename": "GrenadeLauncher_S08WA.238.wav",
+    "duration": 6.549333333333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 3789848,
+    "hash": "0256c21443eee6ab529f1d9addafb5dc"
+  },
+  "aeb012fbb372d056": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BRS_Data_Beep_Short_Chirp.wav",
+    "filename": "BRS_Data_Beep_Short_Chirp.wav",
+    "duration": 0.11609977324263039,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 27196,
+    "hash": "f3956fdbb2cc54aa9f6767cdcd0dee4e"
+  },
+  "c321eafc3d09b9c0": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/SJ_Plasma_Cannon_02_CT.wav",
+    "filename": "SJ_Plasma_Cannon_02_CT.wav",
+    "duration": 5.409770833333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 3116072,
+    "hash": "aa30560c99fd784a389052fc18831f1e"
+  },
+  "266d7e97a37d83f5": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/MEDS Large Drawbridge Sho.M.wav",
+    "filename": "MEDS Large Drawbridge Sho.M.wav",
+    "duration": 3.4133333333333336,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 621404,
+    "hash": "5bfb4f1a2770db51c6aa42da04f45f4f"
+  },
+  "56acb48e2da47ad6": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 吸血虫 人声片段 01】Leech - Vox_Stab_01.wav",
+    "filename": "【怪兽 吸血虫 人声片段 01】Leech - Vox_Stab_01.wav",
+    "duration": 1.45984375,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 904220,
+    "hash": "c17f051753d0a006713e7b6b2897032c"
+  },
+  "86f7d7e8f910b4b7": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ Card_Game_UI_Notification_Gong_03.wav",
+    "filename": " Card_Game_UI_Notification_Gong_03.wav",
+    "duration": 0.994875,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 720454,
+    "hash": "b20bdf446e04ab840f905ac71c225861"
+  },
+  "ccbbc8c2127ea977": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【科幻武器 火箭发射12】Rocket_Launcher_12.wav",
+    "filename": "【科幻武器 火箭发射12】Rocket_Launcher_12.wav",
+    "duration": 3.4926145833333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2152420,
+    "hash": "405094bc625fdb4719801b44e9b2cfb0"
+  },
+  "845e04566de88ebc": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 翅膀拍动05】Wasp - WingFlap05.wav",
+    "filename": "【怪兽 黄蜂 翅膀拍动05】Wasp - WingFlap05.wav",
+    "duration": 7.20396875,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 4212988,
+    "hash": "45e66647f53198a5e9d8041465936dec"
+  },
+  "d43b18f540fc55cb": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BRS_Data_Reveal_Metal_Phase_2.wav",
+    "filename": "BRS_Data_Reveal_Metal_Phase_2.wav",
+    "duration": 2.3568253968253967,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 635652,
+    "hash": "12cdd77feea284ff75573c929545d0a5"
+  },
+  "d285bb4500fd3582": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_One_Shot_Vocal_Spider_Queen_Monster_Pain_2_Insect_Bug_Screech_Chirp_Death_Hit_Squish.wav",
+    "filename": "ESM_One_Shot_Vocal_Spider_Queen_Monster_Pain_2_Insect_Bug_Screech_Chirp_Death_Hit_Squish.wav",
+    "duration": 1.0825208333333334,
+    "sample_rate": 96000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 499734,
+    "hash": "1bef55abcdc808c4a38fa717fc4536c8"
+  },
+  "4cb010a0243d222e": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【树干 撞击02】Rupture - Tree_T.M.wav",
+    "filename": "【树干 撞击02】Rupture - Tree_T.M.wav",
+    "duration": 1.44,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1408216,
+    "hash": "ddb9c5433263b319209a57a0d307f3e3"
+  },
+  "850867a9546df3c3": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 死亡02】Wasp - Death02.wav",
+    "filename": "【怪兽 黄蜂 死亡02】Wasp - Death02.wav",
+    "duration": 1.4975520833333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 925964,
+    "hash": "8f3201f30cf6f3bdd7caf8f3d87dc568"
+  },
+  "de8a8348ae503da6": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 狼人 咆哮07】Werewolf - Growl_07.wav",
+    "filename": "【怪兽 狼人 咆哮07】Werewolf - Growl_07.wav",
+    "duration": 0.9135625,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 590724,
+    "hash": "b25c37c4cea0cf8b223bd59b027b9d18"
+  },
+  "7d01973f412199d8": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/AWDS Grenade Launcher Mod.M.wav",
+    "filename": "AWDS Grenade Launcher Mod.M.wav",
+    "duration": 0.6556458333333334,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 280970,
+    "hash": "8a7cb26381ad74fe3675868748e24dd5"
+  },
+  "e9c086a695ca9fb8": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/AIRSuck_ORGANIC-Hoover Po.M.wav",
+    "filename": "AIRSuck_ORGANIC-Hoover Po.M.wav",
+    "duration": 7.2,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1161084,
+    "hash": "7dc006c32bb3137a185cc852fa0a5bf5"
+  },
+  "eb3d36c8894f2d82": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 小生物 跳跃01】Small Creature - Jump_01.wav",
+    "filename": "【怪兽 小生物 跳跃01】Small Creature - Jump_01.wav",
+    "duration": 0.7575208333333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 500368,
+    "hash": "8f65d05e46b85cbce5d1c6663ebbf567"
+  },
+  "6c8da0efb7ecc12b": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/WATRPlmb_Sink Pull Plug N.M.wav",
+    "filename": "WATRPlmb_Sink Pull Plug N.M.wav",
+    "duration": 0.4053333333333333,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 2044892,
+    "hash": "564fed59fd7b20a8a779e607a90fcd3b"
+  },
+  "91446f61b2733992": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂投掷呼啸01】Wasp - Lob_Whoosh01.wav",
+    "filename": "【怪兽 黄蜂投掷呼啸01】Wasp - Lob_Whoosh01.wav",
+    "duration": 1.3927291666666666,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 865754,
+    "hash": "94acb336d95e1ff5a559cdb5e2854dda"
+  },
+  "8364a3810d2e61b4": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/CockroachRun_BU01.67.wav",
+    "filename": "CockroachRun_BU01.67.wav",
+    "duration": 5.082666666666666,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2943500,
+    "hash": "ffa11db027c951823baf6c5cf0315a97"
+  },
+  "c2b5fe28d5d6966a": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/bug_hurt-7.M.wav",
+    "filename": "bug_hurt-7.M.wav",
+    "duration": 1.0133958333333333,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 249362,
+    "hash": "9d36bb47c297ad52cfbabf3824743081"
+  },
+  "68d542267a5a0747": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_SFSG_cinematic_fx_science_fiction_footstep_augment_mech_metal_clank_walk_05.wav",
+    "filename": "ESM_SFSG_cinematic_fx_science_fiction_footstep_augment_mech_metal_clank_walk_05.wav",
+    "duration": 0.9298866213151927,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1283612,
+    "hash": "dde2732c24a2a2bb167d193f3a1ab8f6"
+  },
+  "de4cae0f08e5c2bf": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【汽车宝马车内开启声06】Mechanical Source - Car BMW Interior opening 06.wav",
+    "filename": "【汽车宝马车内开启声06】Mechanical Source - Car BMW Interior opening 06.wav",
+    "duration": 0.8178541666666667,
+    "sample_rate": 192000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1009310,
+    "hash": "c47f68b120f82f9629611d7c704c8f7b"
+  },
+  "dd3473f7eaacf9b2": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【电源按钮 03】Energy - power button_03.wav",
+    "filename": "【电源按钮 03】Energy - power button_03.wav",
+    "duration": 1.6125625,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1027922,
+    "hash": "9248eab3c3c0b0e0bfddba8fdff3a0f4"
+  },
+  "c77bbab131c7b523": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【撞击舱门】impact_hatch_28.wav",
+    "filename": "【撞击舱门】impact_hatch_28.wav",
+    "duration": 3.55159375,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 3131060,
+    "hash": "32d5e5b1f5450d93414c96922d8b96fd"
+  },
+  "5dcf36ed3f4e6457": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/lizard_man_hurt.M.wav",
+    "filename": "lizard_man_hurt.M.wav",
+    "duration": 1.9626666666666666,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 340224,
+    "hash": "d76bc5b404682350f6e5915aab003a8a"
+  },
+  "499a50a774cc846a": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Subtle Hi Tech-029【模块化UI.M.wav",
+    "filename": "Subtle Hi Tech-029【模块化UI.M.wav",
+    "duration": 3.7653333333333334,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1350200,
+    "hash": "9ab0e9c348bf099a8500f70ffb3f6aee"
+  },
+  "5bb9d4c8e75f06c4": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【未来武器2 爆裂泵枪 轻松单发射击1】Future Weapons 2 - Bolt Pomp Gun - lite_shot_single_variation_1.wav",
+    "filename": "【未来武器2 爆裂泵枪 轻松单发射击1】Future Weapons 2 - Bolt Pomp Gun - lite_shot_single_variation_1.wav",
+    "duration": 0.92325,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 652078,
+    "hash": "9731cf38d63f1d40bafb2f57b2f12607"
+  },
+  "e41edb489d4dfead": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【树枝 撞击01】Rupture - Tree_Branch_Impact_01.wav",
+    "filename": "【树枝 撞击01】Rupture - Tree_Branch_Impact_01.wav",
+    "duration": 1.655375,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1070354,
+    "hash": "a5dbe7d87bf11083a9a824dc9d820c65"
+  },
+  "3b44e80054193d03": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/bug_hurt-3.M.wav",
+    "filename": "bug_hurt-3.M.wav",
+    "duration": 0.9176875,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 240174,
+    "hash": "4db9272e24032851550c8a5b5f40cece"
+  },
+  "2a95201d7f1c8310": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 翅膀拍动07】Wasp - WingFlap07.wav",
+    "filename": "【怪兽 黄蜂 翅膀拍动07】Wasp - WingFlap07.wav",
+    "duration": 3.6280729166666665,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2153272,
+    "hash": "8a9bb44a79dab1e396d6fc54e95e90c2"
+  },
+  "0af726d63d535c15": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BeetleWalkFast_BU01.53-1.M.wav",
+    "filename": "BeetleWalkFast_BU01.53-1.M.wav",
+    "duration": 0.494,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 68454,
+    "hash": "71129b15cfaf785e178f30ef2cc1080c"
+  },
+  "027b4a04299fc4b3": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_SFSG_cinematic_fx_science_fiction_footstep_mech_futuristic_movement_run_02.wav",
+    "filename": "ESM_SFSG_cinematic_fx_science_fiction_footstep_mech_futuristic_movement_run_02.wav",
+    "duration": 0.9437414965986395,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1287282,
+    "hash": "e151e74420b4053f944666bc8a41beec"
+  },
+  "7ce6f062ef3808e3": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/AshTraySetDown_SFXB.701.wav",
+    "filename": "AshTraySetDown_SFXB.701.wav",
+    "duration": 0.9653333333333334,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 568940,
+    "hash": "48ab47dc89eb5e8e2b044ca96e928024"
+  },
+  "5e3216562b677cb9": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【金属门猛关】Door - Metal - Doo.M.wav",
+    "filename": "【金属门猛关】Door - Metal - Doo.M.wav",
+    "duration": 0.7253333333333334,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 297032,
+    "hash": "731e45deeee2809d92c5f859f813c899"
+  },
+  "5b114ed0840928f9": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/CockroachWalk_BU01.74-glued-01.wav",
+    "filename": "CockroachWalk_BU01.74-glued-01.wav",
+    "duration": 4.430552083333334,
+    "sample_rate": 96000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1276736,
+    "hash": "5768bc6d3963e921a42f7ecd4442ad1d"
+  },
+  "06722423f98c3f31": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 飞行06】Wasp - Fly_06-glued.wav",
+    "filename": "【怪兽 黄蜂 飞行06】Wasp - Fly_06-glued.wav",
+    "duration": 1.65775,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 956792,
+    "hash": "a923872a7fc2d5c51865d78e8804c72b"
+  },
+  "af4d22446385a0b1": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【未来武器2 爆裂泵枪 轻松单发射击3】Future Weapons 2 - Bolt Pomp Gun - lite_shot_single_variation_3.wav",
+    "filename": "【未来武器2 爆裂泵枪 轻松单发射击3】Future Weapons 2 - Bolt Pomp Gun - lite_shot_single_variation_3.wav",
+    "duration": 1.1457916666666668,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 780262,
+    "hash": "f51b6ea3478f740600fe06aef1d6929c"
+  },
+  "679863d459936388": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 无情 盔甲滑肉01】Heartless -.M.wav",
+    "filename": "【怪兽 无情 盔甲滑肉01】Heartless -.M.wav",
+    "duration": 0.384,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 138904,
+    "hash": "a2dd02963b2bcbf73e1a8814c37c25ca"
+  },
+  "0c0f61ab95920103": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 狼人 脚步 砾石 08】Werewolf - Footstep_Gravel_08.wav",
+    "filename": "【怪兽 狼人 脚步 砾石 08】Werewolf - Footstep_Gravel_08.wav",
+    "duration": 0.38744791666666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 287742,
+    "hash": "a999605f03c9cd195b8153330fd7d7e5"
+  },
+  "395ab49ac577c069": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【蒸汽朋克 科幻武器 撕裂者 重装1】Evisce.M.wav",
+    "filename": "【蒸汽朋克 科幻武器 撕裂者 重装1】Evisce.M.wav",
+    "duration": 1.6579166666666667,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 314870,
+    "hash": "121d6b6c84cabfb7edc2822d984629a1"
+  },
+  "c6c9886863ae526b": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ElevenLabs_2025-08-15T16_42_08_Liam_pre_sp110_s100_sb100_v3.mp3",
+    "filename": "ElevenLabs_2025-08-15T16_42_08_Liam_pre_sp110_s100_sb100_v3.mp3",
+    "duration": 3.1708843537414966,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "MP3",
+    "size": 50618,
+    "hash": "8047361e1a9a90448e67dfb3f7e874fd"
+  },
+  "2db7f6290536b334": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BELLMisc_Mech Bell 08_D-1.M.wav",
+    "filename": "BELLMisc_Mech Bell 08_D-1.M.wav",
+    "duration": 0.7684375,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 5137532,
+    "hash": "619cdd17ba3b87b88e9aa29466fe5361"
+  },
+  "47c81d108fa98815": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/SJ_Power_On_01_CT.wav",
+    "filename": "SJ_Power_On_01_CT.wav",
+    "duration": 1.0,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 576044,
+    "hash": "ecfba8da8bdd22d2a20f0141a43b7f0b"
+  },
+  "d94a903c14dd7bc1": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【外骨骼脚步声02】footstep_exoskeleton_02.wav",
+    "filename": "【外骨骼脚步声02】footstep_exoskeleton_02.wav",
+    "duration": 1.5203854875283447,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1142954,
+    "hash": "879005d29b5d4393707f3bbc6b2577ef"
+  },
+  "414e2448ef312e32": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/MEDS Large Enigma Short.M.wav",
+    "filename": "MEDS Large Enigma Short.M.wav",
+    "duration": 0.8553541666666666,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 375650,
+    "hash": "cbdce8abc13f57fb1862c81d53dc0770"
+  },
+  "19bf4ab2cad03e1f": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/CatHissAngryShort_SFXB.202.wav",
+    "filename": "CatHissAngryShort_SFXB.202.wav",
+    "duration": 0.5493333333333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 329020,
+    "hash": "7b52c976f3bbc3845b7d6ac684727eed"
+  },
+  "6f96d2377e344f73": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 潜行B01】Wasp - Stalk_B01.wav",
+    "filename": "【怪兽 黄蜂 潜行B01】Wasp - Stalk_B01.wav",
+    "duration": 2.7573541666666666,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1651730,
+    "hash": "d73dba6f64809d7f7146c9d2aef4b0e5"
+  },
+  "12c1da11ac885038": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_Oneshot_Alien_Game_UI_16_Glitchy_SciFi_Bleep_Digital_Short_Laser_Synthesized.wav",
+    "filename": "ESM_Oneshot_Alien_Game_UI_16_Glitchy_SciFi_Bleep_Digital_Short_Laser_Synthesized.wav",
+    "duration": 0.49971875,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 398096,
+    "hash": "d25854e207166fd74a751c4eff7a84d4"
+  },
+  "423c1bdc605ac69a": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/InsectVocalization_SFXB.286.wav",
+    "filename": "InsectVocalization_SFXB.286.wav",
+    "duration": 0.44266666666666665,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 267660,
+    "hash": "1e5c22d4760860733dcc1c4414a58bf9"
+  },
+  "92b381e62e83d6e8": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/shut_down_SpaceShip_10.M.wav",
+    "filename": "shut_down_SpaceShip_10.M.wav",
+    "duration": 3.541333333333333,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 800534,
+    "hash": "21332ca2066d12710114af7d1eeb6e18"
+  },
+  "88eb31fbde962a7a": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/alarm_loops_05【UI触摸屏 警报循环5】-glued.wav",
+    "filename": "alarm_loops_05【UI触摸屏 警报循环5】-glued.wav",
+    "duration": 6.390145833333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 3684106,
+    "hash": "4af0380f98063b2bfe7c31221e1f9d80"
+  },
+  "c57aea69e9aca325": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/SW-Vibrating Ventilator.M.wav",
+    "filename": "SW-Vibrating Ventilator.M.wav",
+    "duration": 2.208,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 488766,
+    "hash": "84768852e6f0ed7f155226828989e51d"
+  },
+  "617157e0fac6516f": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/UIMisc_User Interface Vocalisation, Robotic, Futuristic,_344 Audio_Organic User Interface_06.wav",
+    "filename": "UIMisc_User Interface Vocalisation, Robotic, Futuristic,_344 Audio_Organic User Interface_06.wav",
+    "duration": 0.3203020833333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 187850,
+    "hash": "10beef528f95b76fa3551a1bff41ed0f"
+  },
+  "ad59f79349c1f322": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 扑击呼啸02】Wasp - Swoop_Whoosh02.wav",
+    "filename": "【怪兽 黄蜂 扑击呼啸02】Wasp - Swoop_Whoosh02.wav",
+    "duration": 1.3528125,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 842746,
+    "hash": "21ebbc317009d06ba8dbcbac09c45901"
+  },
+  "a37c01111e6066b9": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Bluezone_BC0239_metal_element_009.wav",
+    "filename": "Bluezone_BC0239_metal_element_009.wav",
+    "duration": 3.067981859410431,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 813928,
+    "hash": "d6f6455cadbb3c1a3104ab1ec21e0041"
+  },
+  "cecb8bc33561d311": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【机械装置 慢射自动大炮 003】 Process.M.wav",
+    "filename": "【机械装置 慢射自动大炮 003】 Process.M.wav",
+    "duration": 0.20266666666666666,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 315620,
+    "hash": "fe27f6462c90ea227a893e76b5a2d525"
+  },
+  "7f8b0c5b010fa292": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_SPG_fx_pole_whoosh_ro.M.wav",
+    "filename": "ESM_SPG_fx_pole_whoosh_ro.M.wav",
+    "duration": 0.64,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 256442,
+    "hash": "6c8b29f1446255e5107d49eb41a90baa"
+  },
+  "44f168b7c3c117a5": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【破裂 木头大块固体碎片短03】Rupture - Wood_Large_Solid_Debris_Short_03.wav",
+    "filename": "【破裂 木头大块固体碎片短03】Rupture - Wood_Large_Solid_Debris_Short_03.wav",
+    "duration": 0.8131875,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1073042,
+    "hash": "f7ec07580a853fa7f381cd50e5f78a4c"
+  },
+  "41cd188447e8537a": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【破裂 金属 A03】Rupture - Metal_A03.wav",
+    "filename": "【破裂 金属 A03】Rupture - Metal_A03.wav",
+    "duration": 1.7373125,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1254480,
+    "hash": "b9515bdd4ffa3820061ee542898845b7"
+  },
+  "519f8c8004196517": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/SE_EN0001_GrenadeSoldier_004.wav",
+    "filename": "SE_EN0001_GrenadeSoldier_004.wav",
+    "duration": 0.3081041666666667,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 29622,
+    "hash": "63e78d6f0dfcf8c17ccb9f55c224401b"
+  },
+  "7badaa94c32a52f0": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【汽车门开00】Mechanical Source - Car Renault Espace Door Opening 00.wav",
+    "filename": "【汽车门开00】Mechanical Source - Car Renault Espace Door Opening 00.wav",
+    "duration": 0.5566145833333334,
+    "sample_rate": 192000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 708410,
+    "hash": "840c22974063c52e2c7dd309a07c0a40"
+  },
+  "92ff1777302173c1": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/CFCK WINGS SWEETENER Wh-2.M.wav",
+    "filename": "CFCK WINGS SWEETENER Wh-2.M.wav",
+    "duration": 1.8666666666666667,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 362424,
+    "hash": "26715ad65ff35b7495f5039eca738d80"
+  },
+  "35fcbc116f829a70": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【机器人 撞击舱门06】impact_hatch_.M.wav",
+    "filename": "【机器人 撞击舱门06】impact_hatch_.M.wav",
+    "duration": 1.498,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1026988,
+    "hash": "c1b51b29e3dd57e5c29502bdc28cce5c"
+  },
+  "797bfb0260aa1bd5": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/FIRECrkl_Fire Crackle At Clay Bakery Long_B00M_ONE.wav",
+    "filename": "FIRECrkl_Fire Crackle At Clay Bakery Long_B00M_ONE.wav",
+    "duration": 9.749604166666666,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 6016186,
+    "hash": "5b4d565a53abf0d364146e9363e592ff"
+  },
+  "31028f8471a94b9f": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Bluezone_BC0236_metal_debris_100.wav",
+    "filename": "Bluezone_BC0236_metal_debris_100.wav",
+    "duration": 1.8765532879818594,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 498396,
+    "hash": "89079cc81b0fb9b5681415d6cad73b8e"
+  },
+  "b5956d229c807cc0": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 远处嗡嗡声循环】Wasp - BuzzFar_Loop-glued.wav",
+    "filename": "【怪兽 黄蜂 远处嗡嗡声循环】Wasp - BuzzFar_Loop-glued.wav",
+    "duration": 5.6455520833333335,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 3253766,
+    "hash": "6e221126f5f57bb51f3b232f983c233c"
+  },
+  "da9fc1e62877bff0": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 挣扎开始】Wasp - Strugg.M.wav",
+    "filename": "【怪兽 黄蜂 挣扎开始】Wasp - Strugg.M.wav",
+    "duration": 0.45866666666666667,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 146232,
+    "hash": "cdcd4f27b8bad2bf0e038be7f43e529b"
+  },
+  "f8ac3d34cc3d1f63": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【电击投掷】Elemental - Electricity Throw_5.wav",
+    "filename": "【电击投掷】Elemental - Electricity Throw_5.wav",
+    "duration": 4.52952380952381,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 905462,
+    "hash": "0e5340c6a6dfe24885563dd2004f9d5c"
+  },
+  "65f63fe808b85857": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Subtle Hi Tech-012【模块化UI.M.wav",
+    "filename": "Subtle Hi Tech-012【模块化UI.M.wav",
+    "duration": 3.5571875,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1330218,
+    "hash": "b9bceeb9e148393677a232dcd74dda85"
+  },
+  "48908263d50c6415": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 翅膀拍动05】Wasp - Wi-1.M.wav",
+    "filename": "【怪兽 黄蜂 翅膀拍动05】Wasp - Wi-1.M.wav",
+    "duration": 0.13866666666666666,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 115532,
+    "hash": "abb3a153d7b0e57ae04c431fccbedd36"
+  },
+  "4b17171729d4540b": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 翅膀拍动08】Wasp - WingFlap08.wav",
+    "filename": "【怪兽 黄蜂 翅膀拍动08】Wasp - WingFlap08.wav",
+    "duration": 3.41909375,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2032900,
+    "hash": "7b46f7955da4bf9d69ab12230e196972"
+  },
+  "66a8545aae11a987": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/FOLIAGE MOTION-SHORT Magn.M.wav",
+    "filename": "FOLIAGE MOTION-SHORT Magn.M.wav",
+    "duration": 6.282666666666667,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1097716,
+    "hash": "1c5c0f2c8fef4c555ffd2184aacbdc2d"
+  },
+  "c42c4ac20813f29b": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Footstep Robot 2_06.M.wav",
+    "filename": "Footstep Robot 2_06.M.wav",
+    "duration": 0.3413333333333333,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 52154,
+    "hash": "7cc10dabe988eb0a9bf6c92d22e0febc"
+  },
+  "c960bd628025500b": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【机器人 机械脚步03】Footsteps - M.M.wav",
+    "filename": "【机器人 机械脚步03】Footsteps - M.M.wav",
+    "duration": 0.92075,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 197402,
+    "hash": "1f35e04ed67912f54ad6864bf01f2de3"
+  },
+  "2aadcd3657712bf6": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/bug_tense.M.wav",
+    "filename": "bug_tense.M.wav",
+    "duration": 2.0623125,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 350148,
+    "hash": "8a8968ea4544567e2e4bc33adaecc03d"
+  },
+  "5d681808394aa93a": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/DRWRMetl_Heavy Metal Drawer 06_DDUMAIS_NONE-glued.wav",
+    "filename": "DRWRMetl_Heavy Metal Drawer 06_DDUMAIS_NONE-glued.wav",
+    "duration": 3.815375,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 3579844,
+    "hash": "eaa2bff6b9576e1753235c07ab2f8802"
+  },
+  "af6ab9963f25664b": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 吸血虫 人声片段 03】Leech - Vox_Stab_03.wav",
+    "filename": "【怪兽 吸血虫 人声片段 03】Leech - Vox_Stab_03.wav",
+    "duration": 1.2025416666666666,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 756014,
+    "hash": "5bc3dd89ba7d7fad89b4b2de949ac0e7"
+  },
+  "2e32e9c9d77533d6": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【机器人 伺服器 小机器人长音05】Servos - Kyma nano Bot Long 05.wav",
+    "filename": "【机器人 伺服器 小机器人长音05】Servos - Kyma nano Bot Long 05.wav",
+    "duration": 1.162125,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 736206,
+    "hash": "b4acb78b17f9d471147c00b3f3039b49"
+  },
+  "78413f12a65bcf80": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Data Transmissions-002【模块化UI 数据传输 002】.wav",
+    "filename": "Data Transmissions-002【模块化UI 数据传输 002】.wav",
+    "duration": 24.0,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 14535718,
+    "hash": "524a6e98a336d11be4466232c0b6456a"
+  },
+  "4d62e0b9448da93f": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Throwing Axe Whoosh Impact Metal Metallic-002.wav",
+    "filename": "Throwing Axe Whoosh Impact Metal Metallic-002.wav",
+    "duration": 0.90271875,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 535440,
+    "hash": "d4bc27bae8e779ff9c37890b5274970d"
+  },
+  "bde52487a857f259": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 扑击呼啸03】Wasp - Swoop_Whoosh03.wav",
+    "filename": "【怪兽 黄蜂 扑击呼啸03】Wasp - Swoop_Whoosh03.wav",
+    "duration": 1.36490625,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 849712,
+    "hash": "a968225675fb413700ee32d0a88d3ee1"
+  },
+  "1f73ae75b4483bfd": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/bug_tense-1.M.wav",
+    "filename": "bug_tense-1.M.wav",
+    "duration": 1.9733333333333334,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 341614,
+    "hash": "e63c960dd167325f3c3740af9487fbda"
+  },
+  "f011131f8728e48f": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 飞行03】Wasp - Fly_03.wav",
+    "filename": "【怪兽 黄蜂 飞行03】Wasp - Fly_03.wav",
+    "duration": 1.7530625,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1073368,
+    "hash": "b9404354c0641515bbdfd1b6e5a9ed88"
+  },
+  "3a28d6dc33ec5df8": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 潜行B02】Wasp - Stalk_B02.wav",
+    "filename": "【怪兽 黄蜂 潜行B02】Wasp - Stalk_B02.wav",
+    "duration": 2.7155104166666666,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1627628,
+    "hash": "967ee38786ae687ad90aaee6b724c83f"
+  },
+  "1f6ce082a404dea7": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/DRWRMetl_Heavy Metal Draw.M.wav",
+    "filename": "DRWRMetl_Heavy Metal Draw.M.wav",
+    "duration": 0.3318541666666667,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 5095940,
+    "hash": "12f4b616c8fad2ba39de3e1b691adeb0"
+  },
+  "52470072b4f7b4f0": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/tba03_calderafreed_electricity_05_aratak_m.mp3",
+    "filename": "tba03_calderafreed_electricity_05_aratak_m.mp3",
+    "duration": 1.319875,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "MP3",
+    "size": 31677,
+    "hash": "ced5e8a112999f4f1dfebc3921999ba3"
+  },
+  "df502a4e5fe36434": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/MAGIC FOLIAGE Emerge, V-1.M.wav",
+    "filename": "MAGIC FOLIAGE Emerge, V-1.M.wav",
+    "duration": 0.9409791666666667,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 584576,
+    "hash": "9d80468da65e3573f9ef49581c5f83fe"
+  },
+  "3cbbd32e33476f11": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【破裂 混凝土尾音02】Rupture - Con.M.wav",
+    "filename": "【破裂 混凝土尾音02】Rupture - Con.M.wav",
+    "duration": 1.888,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1451344,
+    "hash": "2a21fcb6b28e9e761ef23771b7903a2f"
+  },
+  "f0afcfbe965ca7e3": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Subtle Hi Tech-017【模块化UI 微妙的科技感 017】.wav",
+    "filename": "Subtle Hi Tech-017【模块化UI 微妙的科技感 017】.wav",
+    "duration": 8.366072916666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 5530414,
+    "hash": "d3a55d623bb4f8c77ee94aeb1f23d385"
+  },
+  "f490ebdfbdb18407": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/start_up_SpaceShip_24.wav",
+    "filename": "start_up_SpaceShip_24.wav",
+    "duration": 23.61021875,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 13923482,
+    "hash": "ee219e1fe96216798d1058aeb1ef489a"
+  },
+  "7dc317ac1b29b954": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 猎人 拟音 受伤评估02】Hunter -.M.wav",
+    "filename": "【怪兽 猎人 拟音 受伤评估02】Hunter -.M.wav",
+    "duration": 0.32379166666666664,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 133410,
+    "hash": "a3dddb6a69f5439346a435a73b36ca32"
+  },
+  "36bb8983c56c82b9": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 后跳】Leech - Jump_Back_01.wav",
+    "filename": "【怪兽 后跳】Leech - Jump_Back_01.wav",
+    "duration": 0.9466041666666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 608610,
+    "hash": "7c9b19d8ee3511650d4dcedb0b12066f"
+  },
+  "69c359a41ba15b47": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【电击投掷】Elemental - Electri.M.wav",
+    "filename": "【电击投掷】Elemental - Electri.M.wav",
+    "duration": 4.192,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 563692,
+    "hash": "8b2a757cc0396ce1cf12b8b32e0ca613"
+  },
+  "5026c3bece135fa2": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Builder_Game_Footstep_Run_Grass_2-glued.wav",
+    "filename": "Builder_Game_Footstep_Run_Grass_2-glued.wav",
+    "duration": 3.386625,
+    "sample_rate": 96000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 976084,
+    "hash": "6c982d0901e70a17f86f59675809d735"
+  },
+  "b7801094de89b099": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Calculations and Text-021.M.wav",
+    "filename": "Calculations and Text-021.M.wav",
+    "duration": 1.5893333333333333,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1141230,
+    "hash": "d2516b553f32fd5e2d5bd22e4d106afa"
+  },
+  "4a66d3eca9c33491": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【外骨骼脚步声01】footstep_exoskeleton_01.wav",
+    "filename": "【外骨骼脚步声01】footstep_exoskeleton_01.wav",
+    "duration": 1.1332879818594104,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1108796,
+    "hash": "d8d72717a74572f804281d805f2a8c26"
+  },
+  "0fb44e5e07949cf2": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【未来武器2 爆裂泵枪 猛烈单发射击1】Future Weapons 2 - Bolt Pomp Gun - hard_shot_single_variation_1.wav",
+    "filename": "【未来武器2 爆裂泵枪 猛烈单发射击1】Future Weapons 2 - Bolt Pomp Gun - hard_shot_single_variation_1.wav",
+    "duration": 1.5197708333333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 995674,
+    "hash": "e5effa9b423e83a2005ab9d1dbfd0009"
+  },
+  "6a8a6a70027ef7cd": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ADG_Action_Fire_5_ST.wav",
+    "filename": "ADG_Action_Fire_5_ST.wav",
+    "duration": 3.49771875,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2014730,
+    "hash": "c7d7491f4bc03be1162285ce86658a62"
+  },
+  "df9a67d6f3fb89e1": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【树叶 撞击01】Rupture - Tree_Leaves_Impact_01.wav",
+    "filename": "【树叶 撞击01】Rupture - Tree_Leaves_Impact_01.wav",
+    "duration": 1.6076875,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1220114,
+    "hash": "4ad5981282ec6412cbcd7ae8b786f7c2"
+  },
+  "2642dc3fd1885cee": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/00002-imported.wav",
+    "filename": "00002-imported.wav",
+    "duration": 1.4506666666666668,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 139308,
+    "hash": "0f85dc394039642eb317d7c36def467a"
+  },
+  "7381978acb597e06": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/SF-CK Synthesized Servo 03.wav",
+    "filename": "SF-CK Synthesized Servo 03.wav",
+    "duration": 13.461333333333334,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 7966620,
+    "hash": "4e3586b39aadfc3cd90abeed4a0bc2a8"
+  },
+  "43a700accd983f23": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Ancient_Game_Gear_Bag_Throw_Down_1.wav",
+    "filename": "Ancient_Game_Gear_Bag_Throw_Down_1.wav",
+    "duration": 1.3333333333333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 901758,
+    "hash": "c77a282daadf7546c681f36bc36f54b2"
+  },
+  "81da12286d59685a": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BRS_Data_Beep_Chirp_2.wav",
+    "filename": "BRS_Data_Beep_Chirp_2.wav",
+    "duration": 0.16253968253968254,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 33276,
+    "hash": "ba007df19550b74f2f260eb7360e00c0"
+  },
+  "736e34a4ac281cb6": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【砖块撞击05】Rupture - Brick_I.M.wav",
+    "filename": "【砖块撞击05】Rupture - Brick_I.M.wav",
+    "duration": 2.485333333333333,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1508474,
+    "hash": "4b6a8d870aa300725ef67635b4a6c8ba"
+  },
+  "883c5c8eb9bd65ea": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂飞舞B04】Wasp - Fly_B04.wav",
+    "filename": "【怪兽 黄蜂飞舞B04】Wasp - Fly_B04.wav",
+    "duration": 1.316625,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 822424,
+    "hash": "20cdf59909fe77f64afe735a5de52647"
+  },
+  "5280bdfb0fad15ef": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/AC_Unit_Metal_Debris_Hit_2.wav",
+    "filename": "AC_Unit_Metal_Debris_Hit_2.wav",
+    "duration": 1.6923958333333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1062164,
+    "hash": "0a4d1f22c5ba909eab1926bb6a7bf2b6"
+  },
+  "2aa6c3a5e8cad944": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 狼人 脚步 砾石 05】Werewolf - Footstep_Gravel_05.wav",
+    "filename": "【怪兽 狼人 脚步 砾石 05】Werewolf - Footstep_Gravel_05.wav",
+    "duration": 0.5572395833333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 385542,
+    "hash": "74fc571eb64923a74118d465961aaeb6"
+  },
+  "e21dfb9b6ded71cc": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/SF-CK Electronics Power 1.M.wav",
+    "filename": "SF-CK Electronics Power 1.M.wav",
+    "duration": 2.3811875,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 380996,
+    "hash": "8e88d069c5044a3fb2da5641d764ab92"
+  },
+  "b6f531c26c2c0527": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【机器人 脚步声 安卓TT 06】Footstep.M.wav",
+    "filename": "【机器人 脚步声 安卓TT 06】Footstep.M.wav",
+    "duration": 0.43733333333333335,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 151036,
+    "hash": "8fc8bfe0a1625158dd28b665e85c7113"
+  },
+  "9663fc650d12354f": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_GF_fx_metal_one_shots.M.wav",
+    "filename": "ESM_GF_fx_metal_one_shots.M.wav",
+    "duration": 0.15091666666666667,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 160090,
+    "hash": "92af57f24aac018427c618316de0f8c4"
+  },
+  "631df21608a1f477": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/MOVECrea_Yeti Footsteps, Walking Pace_344 Audio_Monster Movement.wav",
+    "filename": "MOVECrea_Yeti Footsteps, Walking Pace_344 Audio_Monster Movement.wav",
+    "duration": 7.136921875,
+    "sample_rate": 192000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 8267496,
+    "hash": "46970dbdd8f7d2e04f0e2035793da32a"
+  },
+  "0fcccf6b11698979": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【破裂 金属 B07】Rupture - Metal_B07.wav",
+    "filename": "【破裂 金属 B07】Rupture - Metal_B07.wav",
+    "duration": 1.7911458333333334,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1092628,
+    "hash": "09235b5f075d5b2af6da8bd4447e59f9"
+  },
+  "a8404b25ed1443d2": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 潜行A03】Wasp - Stalk.M.wav",
+    "filename": "【怪兽 黄蜂 潜行A03】Wasp - Stalk.M.wav",
+    "duration": 1.717375,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 266910,
+    "hash": "49058a8b4660341c73ac5e0c37fb1274"
+  },
+  "edf35c4fcce33a65": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_SFSG_cinematic_fx_science_fiction_footstep_leg_augment_metallic_impact_walk_03.wav",
+    "filename": "ESM_SFSG_cinematic_fx_science_fiction_footstep_leg_augment_metallic_impact_walk_03.wav",
+    "duration": 0.5102947845804988,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1172600,
+    "hash": "2f8232864bf18899cb1cd6fc013db3b9"
+  },
+  "2598a2836f1136d7": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 翅膀拍动02】Wasp - WingFlap02.wav",
+    "filename": "【怪兽 黄蜂 翅膀拍动02】Wasp - WingFlap02.wav",
+    "duration": 2.339375,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1410982,
+    "hash": "d956c096592fb1da1ae18fea8dbf8114"
+  },
+  "410c79c100aa82dc": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/croak_tiny_04_01_long_sof.M.wav",
+    "filename": "croak_tiny_04_01_long_sof.M.wav",
+    "duration": 1.78525,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 308956,
+    "hash": "4205f25d76604b2dadd934071fb96cdb"
+  },
+  "24ff89550ec2bcdc": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Ancient_Game_Metal_Tools_Debris_and_Scrap_Slide_Blacksmith.wav",
+    "filename": "Ancient_Game_Metal_Tools_Debris_and_Scrap_Slide_Blacksmith.wav",
+    "duration": 0.721875,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 549750,
+    "hash": "f7ac97a4679c183e0dacd9e8a71b9d91"
+  },
+  "e617176e3fe5de68": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/bug_die.M.wav",
+    "filename": "bug_die.M.wav",
+    "duration": 1.2053333333333334,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 267762,
+    "hash": "f33b057c9e3aef3817a050048e44e917"
+  },
+  "3fb3d58f3542fbde": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/DESTRClpse_Collapsing Con.M.wav",
+    "filename": "DESTRClpse_Collapsing Con.M.wav",
+    "duration": 3.8648125,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 2377006,
+    "hash": "1531604e6c11604457396288fc33102d"
+  },
+  "c39c34d7d1ebdf91": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Assassin_Senior_RangeAttackThrowWhoosh.wav",
+    "filename": "Assassin_Senior_RangeAttackThrowWhoosh.wav",
+    "duration": 0.9079791666666667,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 87210,
+    "hash": "fa78777f0f92bdb4a2cb46757bccc843"
+  },
+  "3e9d4b395cb832ee": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BeetleWalkFast_BU01.53.M.wav",
+    "filename": "BeetleWalkFast_BU01.53.M.wav",
+    "duration": 0.43733333333333335,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 62990,
+    "hash": "76cd325595be34219b51553661c92cf5"
+  },
+  "41c88f8129e744e3": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/bug_tense-3.M.wav",
+    "filename": "bug_tense-3.M.wav",
+    "duration": 1.6553125,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 311084,
+    "hash": "6995d8f3018b49d87ab794c76e77758a"
+  },
+  "83ab0a2f347ec8d8": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 承载者2 尖叫01】Bearer2 - scream_01.wav",
+    "filename": "【怪兽 承载者2 尖叫01】Bearer2 - scream_01.wav",
+    "duration": 2.88825,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "AIFF",
+    "size": 500818,
+    "hash": "182c13a623d5a93a4bb70a095a232ac8"
+  },
+  "bc2d48abb256bf30": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 潜行者 脚趾16】Prowler - fs_toe_16.wav",
+    "filename": "【怪兽 潜行者 脚趾16】Prowler - fs_toe_16.wav",
+    "duration": 0.18739583333333334,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 171402,
+    "hash": "bd25f56f578091365de995cc7bf0a3ea"
+  },
+  "b368f5e9f597bbb9": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_One_Shot_Vocal_Spider_Queen_Monster_Attack_1_Insect_Bug_Screech_Squeal_Angry_Combat.wav",
+    "filename": "ESM_One_Shot_Vocal_Spider_Queen_Monster_Attack_1_Insect_Bug_Screech_Squeal_Angry_Combat.wav",
+    "duration": 0.8926041666666666,
+    "sample_rate": 96000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 444880,
+    "hash": "f0baa99a88b0fdc1cd482cb21d040c15"
+  },
+  "5c473d36581706a0": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【金属夹子点击序列02】Mechanical Source - Metal Clamp Click Sequence 02-glued.wav",
+    "filename": "【金属夹子点击序列02】Mechanical Source - Metal Clamp Click Sequence 02-glued.wav",
+    "duration": 1.100828125,
+    "sample_rate": 192000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1270534,
+    "hash": "950be644b688d4c0628fcce7170eacdc"
+  },
+  "eba5ee4e660833e0": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/EXPLDsgn_Designed Metal Explosion With Debris 07_DDUMAIS_NONE.wav",
+    "filename": "EXPLDsgn_Designed Metal Explosion With Debris 07_DDUMAIS_NONE.wav",
+    "duration": 3.3560416666666666,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2468300,
+    "hash": "bbd1f516b95bf68e08f76fb8eaade20d"
+  },
+  "d310c591f5db9eb2": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/MEDS Tiny Indicator Short.M.wav",
+    "filename": "MEDS Tiny Indicator Short.M.wav",
+    "duration": 1.0773333333333333,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 397064,
+    "hash": "56cb6ec8519c0867e452c2fe86a466b4"
+  },
+  "cba7a1e3934888f8": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【机器人 机械脚步00】Footsteps - M.M.wav",
+    "filename": "【机器人 机械脚步00】Footsteps - M.M.wav",
+    "duration": 1.0146041666666668,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 206412,
+    "hash": "9f437a05ee775d733cccadb5f1fad0f1"
+  },
+  "4f362aaf86836e51": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【塑料冰箱挪动00】Mechanical Source - Plastic Fridge Shuffling  00.wav",
+    "filename": "【塑料冰箱挪动00】Mechanical Source - Plastic Fridge Shuffling  00.wav",
+    "duration": 1.0111770833333333,
+    "sample_rate": 192000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1232026,
+    "hash": "44d67ea3aededda8bbed72a495ce099b"
+  },
+  "bd3a412858ce385b": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【车窗玻璃中碎波03】Rupture - Glass_VehicleWindow_Break_Medium_Wave_03.wav",
+    "filename": "【车窗玻璃中碎波03】Rupture - Glass_VehicleWindow_Break_Medium_Wave_03.wav",
+    "duration": 1.468,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1201780,
+    "hash": "4656ce9e41250dcfb1c1a59c20564d7e"
+  },
+  "7a28bbc17a3593f4": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Footstep Robot 2_04.M.wav",
+    "filename": "Footstep Robot 2_04.M.wav",
+    "duration": 0.37333333333333335,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 55250,
+    "hash": "de3e8cb2f13a99fd145445bf00c0420a"
+  },
+  "e7883130bb0d8e0f": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BRS_Data_Beep_Chirp_1.wav",
+    "filename": "BRS_Data_Beep_Chirp_1.wav",
+    "duration": 0.16253968253968254,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 33608,
+    "hash": "6b2d58cd06e164ed086f02cf2f261d36"
+  },
+  "4f279eceb17f1e48": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Explosion 3【爆炸3】.wav",
+    "filename": "Explosion 3【爆炸3】.wav",
+    "duration": 5.121510416666666,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 3043504,
+    "hash": "a8c0d83a2fd53e65301a4e9852b96a36"
+  },
+  "6ed4b911243b657f": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BRS_Data_Beep_Round_Sweet_2.wav",
+    "filename": "BRS_Data_Beep_Round_Sweet_2.wav",
+    "duration": 0.23219954648526078,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 42928,
+    "hash": "80795f566fb56dee69c02df35003439a"
+  },
+  "ee49fb88ac654d57": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 狼人 砾石脚步01】Werewolf - Footstep_Gravel_01.wav",
+    "filename": "【怪兽 狼人 砾石脚步01】Werewolf - Footstep_Gravel_01.wav",
+    "duration": 0.5833645833333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 400590,
+    "hash": "38d0939c03a443395588fcaf0af0e7d6"
+  },
+  "4f2b0ccb2a0d8263": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ELECTRIC SPARK Electricity Pylon, Taser Gun, Short 06.wav",
+    "filename": "ELECTRIC SPARK Electricity Pylon, Taser Gun, Short 06.wav",
+    "duration": 0.33275,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 678548,
+    "hash": "e80f8427052ab31a13bb332b0984727f"
+  },
+  "972f8cb74753bac6": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【机器人 中等厚脚步撞击03】footstep_impact_medium_thick_03.wav",
+    "filename": "【机器人 中等厚脚步撞击03】footstep_impact_medium_thick_03.wav",
+    "duration": 0.4895238095238095,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1055148,
+    "hash": "c495f1d9c343391e08a20adf331cd626"
+  },
+  "f07c65888f9fe994": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/07 Jetset.mp3",
+    "filename": "07 Jetset.mp3",
+    "duration": 2.8059375,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "MP3",
+    "size": 112366,
+    "hash": "a647743ec59d4bf4c0e01e6dceb420c3"
+  },
+  "313970f81f9c1bf1": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/MAGIC ENERGY Beam Spell, Electricity, Zap, Start, Run, Stop 02.wav",
+    "filename": "MAGIC ENERGY Beam Spell, Electricity, Zap, Start, Run, Stop 02.wav",
+    "duration": 14.605104166666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 8899756,
+    "hash": "0a3133a60e5775bf6387e627d34d684d"
+  },
+  "04ede46af21a1e7d": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【破裂 混凝土尾音01】Rupture - Concrete_Tail_01.wav",
+    "filename": "【破裂 混凝土尾音01】Rupture - Concrete_Tail_01.wav",
+    "duration": 3.8213333333333335,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1645214,
+    "hash": "1ce766d5ac1ac9ac59f112b8e09c3e5c"
+  },
+  "53fa23d4ba90d4dc": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BRS_Data_Beep_Chirp_5.wav",
+    "filename": "BRS_Data_Beep_Chirp_5.wav",
+    "duration": 0.17414965986394557,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 34812,
+    "hash": "e1a6ca93788f470780c8be5f250b27ae"
+  },
+  "a15ab796bcaa0ab5": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ElevenLabs_2025-08-15T16_34_29_Liam_pre_sp110_s100_sb100_v3.mp3",
+    "filename": "ElevenLabs_2025-08-15T16_34_29_Liam_pre_sp110_s100_sb100_v3.mp3",
+    "duration": 2.359206349206349,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "MP3",
+    "size": 37661,
+    "hash": "17b1da0aec48d279afeb68b12bbf9467"
+  },
+  "5e6c349464acf9fb": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 搬运者受伤叫07】Bearer - Voc.M.wav",
+    "filename": "【怪兽 搬运者受伤叫07】Bearer - Voc.M.wav",
+    "duration": 0.7705833333333333,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 176190,
+    "hash": "8aa9eb4c35f3a8911cda4cc69fe62b95"
+  },
+  "652911a266220a77": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/croak_tiny_03_04_long_sof.M.wav",
+    "filename": "croak_tiny_03_04_long_sof.M.wav",
+    "duration": 2.6453333333333333,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 391536,
+    "hash": "56c882a5ace89f9344824e68b4215473"
+  },
+  "dcad3c3e9e34644a": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Subtle Hi Tech-010【模块化UI 微妙高科技 010】.wav",
+    "filename": "Subtle Hi Tech-010【模块化UI 微妙高科技 010】.wav",
+    "duration": 4.416,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 3254852,
+    "hash": "62d452936f25863d9dcdcbf557d2f408"
+  },
+  "c5f30b47986233b3": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【电击撞击】Elemental - Electricity Impact_6.wav",
+    "filename": "【电击撞击】Elemental - Electricity Impact_6.wav",
+    "duration": 3.8390929705215417,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 783718,
+    "hash": "f1a567a9cf80a6ae42a9616575089085"
+  },
+  "ab12806b1ba287d1": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Animation Whoosh5.wav",
+    "filename": "Animation Whoosh5.wav",
+    "duration": 0.7291836734693877,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 129358,
+    "hash": "f445ee46d52ace1ce7abbcc4319fcce9"
+  },
+  "e250375b083ee094": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【机器人 脚步声 攻击小队A 04】Footsteps - Assault Unit A 04.wav",
+    "filename": "【机器人 脚步声 攻击小队A 04】Footsteps - Assault Unit A 04.wav",
+    "duration": 0.8907291666666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 580050,
+    "hash": "6f4735c9e3a2382600d5da138294d4be"
+  },
+  "51e497b4a193eef8": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 翅膀拍动08】Wasp - Wi-3.M.wav",
+    "filename": "【怪兽 黄蜂 翅膀拍动08】Wasp - Wi-3.M.wav",
+    "duration": 0.96,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 194340,
+    "hash": "ca2e3ef16e5cc57405cbe86dcef66bd3"
+  },
+  "09aefa1ff67574a2": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BRS_Data_Beep_Round_Musical_2.wav",
+    "filename": "BRS_Data_Beep_Round_Musical_2.wav",
+    "duration": 0.603718820861678,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 91780,
+    "hash": "f7217b373a0373d22f16f318145da1be"
+  },
+  "801764e057493e68": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 飞行06】Wasp - Fly_06.wav",
+    "filename": "【怪兽 黄蜂 飞行06】Wasp - Fly_06.wav",
+    "duration": 2.356875,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1421164,
+    "hash": "3f1c21790b49302ce3dccb4cae38b1f6"
+  },
+  "3a5b614fa01624d9": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/SpObj_ElectricBoxGenerator_ElectricityStart.wav",
+    "filename": "SpObj_ElectricBoxGenerator_ElectricityStart.wav",
+    "duration": 1.1717708333333334,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 112534,
+    "hash": "7eb1703ad8c76c6e48a2d338948c5f52"
+  },
+  "7e0121c7345b6b09": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_GF_fx_metal_one_shots_footstep_boots_dry_walking_rattle_interior_28.wav",
+    "filename": "ESM_GF_fx_metal_one_shots_footstep_boots_dry_walking_rattle_interior_28.wav",
+    "duration": 0.37864583333333335,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 360900,
+    "hash": "8903a3359597609f063cd607904ccfa9"
+  },
+  "7e49b8dc41b7059e": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【机器人 大力神践踏声02】Footsteps - Herman Juggernaut 02.wav",
+    "filename": "【机器人 大力神践踏声02】Footsteps - Herman Juggernaut 02.wav",
+    "duration": 1.38896875,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 867052,
+    "hash": "ee51a0c61004dbcb5b4186de04128ed1"
+  },
+  "c1d100420e965492": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_One_Shot_Vocal_Spider_Queen_Monster_Hiss_Insect_Bug_Attack_Hit_Impact.wav",
+    "filename": "ESM_One_Shot_Vocal_Spider_Queen_Monster_Hiss_Insect_Bug_Attack_Hit_Impact.wav",
+    "duration": 1.6705625,
+    "sample_rate": 96000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 669412,
+    "hash": "4b51d794cb6a394788f98e2512e291fe"
+  },
+  "b8a2771c7f58dd0f": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【破裂 混凝土撞击06】Rupture - Concrete_Impact_06.wav",
+    "filename": "【破裂 混凝土撞击06】Rupture - Concrete_Impact_06.wav",
+    "duration": 2.806208333333333,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1450356,
+    "hash": "8ea3edb80f87bc95b2b308caed4f6d21"
+  },
+  "9b0bd944e3f1d863": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_Wind_Loop_Rocky_Mountian_Cave_Dark_Steady_Medium_Bass_2_Cold_Winter.wav",
+    "filename": "ESM_Wind_Loop_Rocky_Mountian_Cave_Dark_Steady_Medium_Bass_2_Cold_Winter.wav",
+    "duration": 58.0,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 33558696,
+    "hash": "aae20ec8d291e0a14d2932e9364b89e9"
+  },
+  "2b5b9dfad9536ea6": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_One_Shot_Vocal_Spider_Queen_Monster_Attack_3_Insect_Bug_Screech_Squeal_Angry_Combat.wav",
+    "filename": "ESM_One_Shot_Vocal_Spider_Queen_Monster_Attack_3_Insect_Bug_Screech_Squeal_Angry_Combat.wav",
+    "duration": 0.8240104166666666,
+    "sample_rate": 96000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 425076,
+    "hash": "7ce0ab6201e9f2e16801bdeaa58dc115"
+  },
+  "eb22f6f4436eab21": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 狼人 脚步 砾石 07】Werewolf - Footstep_Gravel_07.wav",
+    "filename": "【怪兽 狼人 脚步 砾石 07】Werewolf - Footstep_Gravel_07.wav",
+    "duration": 0.44259375,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 319506,
+    "hash": "02fc2e2cff39ddbb8943d204abf63f05"
+  },
+  "a7f65c794d6dfd70": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 杂音 大肉撞击07】Fodder - impact_flesh_large_07.wav",
+    "filename": "【怪兽 杂音 大肉撞击07】Fodder - impact_flesh_large_07.wav",
+    "duration": 1.89775,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1156582,
+    "hash": "fd59c7a3f126e455cd27680d88396bdf"
+  },
+  "fe4aa6f7d7c18d58": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/bug_tense-2.M-glued.wav",
+    "filename": "bug_tense-2.M-glued.wav",
+    "duration": 1.4933333333333334,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 144096,
+    "hash": "fdcf52482be7b47e028573f2ed531590"
+  },
+  "af5002b6a97cf115": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/DBCK Metal Mixed Poles Fa.M.wav",
+    "filename": "DBCK Metal Mixed Poles Fa.M.wav",
+    "duration": 1.23875,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 363844,
+    "hash": "684cf4ca0b15fc43065bd64c04c2394c"
+  },
+  "11f9a2f0517b60a9": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【破裂 金属 A05】Rupture - Metal_A05.wav",
+    "filename": "【破裂 金属 A05】Rupture - Metal_A05.wav",
+    "duration": 1.142,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1136986,
+    "hash": "4a470d4e8c83869ab37399518483fa6b"
+  },
+  "1c906da34904eab9": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【金属钻硬敲工具箱01】Impacts Sourc.M.wav",
+    "filename": "【金属钻硬敲工具箱01】Impacts Sourc.M.wav",
+    "duration": 0.23466666666666666,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 131864,
+    "hash": "8ec73120b53cbde472f8cccb229a89b8"
+  },
+  "59993de3a8df6ad3": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_Bloody_Gore_Crush_Wet_Smash_Goo_Liquid_Bash_Sword_Knife_Organic_Splat_Gore_Horror.wav",
+    "filename": "ESM_Bloody_Gore_Crush_Wet_Smash_Goo_Liquid_Bash_Sword_Knife_Organic_Splat_Gore_Horror.wav",
+    "duration": 0.8025170068027211,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 288152,
+    "hash": "c5ad9480748d5e5b70e6c0fec4f475e0"
+  },
+  "2b22d10779a6ff71": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/bug_die-2.M.wav",
+    "filename": "bug_die-2.M.wav",
+    "duration": 0.941875,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 242478,
+    "hash": "5ba974e552e60000efb6ce7387297bf9"
+  },
+  "f40d5dadd706f4a4": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【金属碎片箱轻搜04】Movement Source - Metal Debris Box Soft Searching 04.wav",
+    "filename": "【金属碎片箱轻搜04】Movement Source - Metal Debris Box Soft Searching 04.wav",
+    "duration": 1.8869739583333334,
+    "sample_rate": 192000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2241040,
+    "hash": "374a0803ae10dbc4eaabdbd8543cc111"
+  },
+  "40121e31800cadad": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【树干 撞击01】Rupture - Tree_Trunk_Impact_01.wav",
+    "filename": "【树干 撞击01】Rupture - Tree_Trunk_Impact_01.wav",
+    "duration": 3.3597916666666667,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1556496,
+    "hash": "9bc1632e8bd7f266447a2cea6f60a21a"
+  },
+  "4972eb095f81085d": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_PG_cinematic_fx_weapons_warefare_cannon_ball_whoosh_metal_03.wav",
+    "filename": "ESM_PG_cinematic_fx_weapons_warefare_cannon_ball_whoosh_metal_03.wav",
+    "duration": 3.532,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1019108,
+    "hash": "32f51fd579a87f0f1d670ae75b37823b"
+  },
+  "fc5a962a20e523e0": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BRS_Data_Beep_Round_Musical_1.wav",
+    "filename": "BRS_Data_Beep_Round_Musical_1.wav",
+    "duration": 0.7894784580498866,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 116356,
+    "hash": "5e4f35d24fe7165a308ab22e1cb6a427"
+  },
+  "96afdd8e0ee5b8fb": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Data MicroCalculate-17【模块.M.wav",
+    "filename": "Data MicroCalculate-17【模块.M.wav",
+    "duration": 3.7060625,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1344148,
+    "hash": "a3b892aeefe03781dc72bfee7ce2354b"
+  },
+  "c71f0618e0a45760": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Confirm ToneFM-021【模块化UI 确认音效21】.wav",
+    "filename": "Confirm ToneFM-021【模块化UI 确认音效21】.wav",
+    "duration": 0.43852083333333336,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 964050,
+    "hash": "8f8e84e9942431abfbd70621d7f6c7fb"
+  },
+  "83b37ee721b767cc": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 扑击预告02】Wasp - Swoop_Announce02.wav",
+    "filename": "【怪兽 黄蜂 扑击预告02】Wasp - Swoop_Announce02.wav",
+    "duration": 1.3698958333333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 852594,
+    "hash": "025d122f6a620ea97d53c3e1a959586f"
+  },
+  "c7289b6c0550c3b7": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BulletShellDropMetal_BW._64.wav",
+    "filename": "BulletShellDropMetal_BW._64.wav",
+    "duration": 2.453333333333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1427500,
+    "hash": "a5109169a2c0f3abce5e9da43547d4f7"
+  },
+  "f74cef77a7e672b5": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Footstep Robot 2_02.M.wav",
+    "filename": "Footstep Robot 2_02.M.wav",
+    "duration": 0.33066666666666666,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 51154,
+    "hash": "a353f06898e4885755d5c97bcac9122e"
+  },
+  "6d91af5ae217a887": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Button,Metal,Sml,Loose,Push 2.wav",
+    "filename": "Button,Metal,Sml,Loose,Push 2.wav",
+    "duration": 0.512,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 63210,
+    "hash": "168ff4d43db1354dd0c6681e656a10b9"
+  },
+  "69193c6f9003f049": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【树叶 撞击02】Rupture - Tree_Leaves_Impact_02.wav",
+    "filename": "【树叶 撞击02】Rupture - Tree_Leaves_Impact_02.wav",
+    "duration": 1.8519375,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1267010,
+    "hash": "9a2e52b1a0f607f82c7ed53836f5eff7"
+  },
+  "96be307c95cad9f0": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/CockroachRun_BU01.68.wav",
+    "filename": "CockroachRun_BU01.68.wav",
+    "duration": 0.7893333333333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 467452,
+    "hash": "0a2ad5ca749121430fc6fd5653b33ca3"
+  },
+  "7f9150d95a34de20": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_One_Shot_Vocal_Spider_Queen_Monster_Death_3_Insect_Bug_Screech_Squeal_Pain_Hurt_Moan_Groan.wav",
+    "filename": "ESM_One_Shot_Vocal_Spider_Queen_Monster_Death_3_Insect_Bug_Screech_Squeal_Pain_Hurt_Moan_Groan.wav",
+    "duration": 1.0121979166666666,
+    "sample_rate": 96000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 479470,
+    "hash": "8de6421d6010915a2626e1907627d6bd"
+  },
+  "3573bb3a6474da85": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/DRWRMetl_Heavy Metal Drawer 07_DDUMAIS_NONE-glued-01.wav",
+    "filename": "DRWRMetl_Heavy Metal Drawer 07_DDUMAIS_NONE-glued-01.wav",
+    "duration": 0.5867395833333333,
+    "sample_rate": 96000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 169718,
+    "hash": "ee1d7d06a303dba10af0cd9a7bedc88c"
+  },
+  "fc298b3c6b45b450": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/passby_SpaceShip_Medium_31.wav",
+    "filename": "passby_SpaceShip_Medium_31.wav",
+    "duration": 7.1789375,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 4786204,
+    "hash": "93966d9b93d0e7e3e3c30b8b9a428726"
+  },
+  "3ef6561bb83fe03c": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/AN 14 Fast Whoosh B.M.wav",
+    "filename": "AN 14 Fast Whoosh B.M.wav",
+    "duration": 0.736,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 91152,
+    "hash": "d94396f2fa5226419e4ed83775e51db4"
+  },
+  "f009f8030cfee5c7": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/HRCK Ambient - Heartbea-2.M.wav",
+    "filename": "HRCK Ambient - Heartbea-2.M.wav",
+    "duration": 8.128,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 927138,
+    "hash": "da37fbb36b93aac7747e2c138193aac0"
+  },
+  "628bc3be545b0b84": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BRS_Data_Beep_Modern_13.wav",
+    "filename": "BRS_Data_Beep_Modern_13.wav",
+    "duration": 0.11609977324263039,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 27164,
+    "hash": "89c223a809612eb51e3591918459806a"
+  },
+  "9c0d9fba850f7bb5": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/00006.wav",
+    "filename": "00006.wav",
+    "duration": 1.088,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 104492,
+    "hash": "1baa734438c444c97993b7e272996797"
+  },
+  "750ffa7140bbd901": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/DSGNMisc_Glitch 2_344 Audio_Geophonic Design Vol 2-glued.wav",
+    "filename": "DSGNMisc_Glitch 2_344 Audio_Geophonic Design Vol 2-glued.wav",
+    "duration": 4.565625,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2634636,
+    "hash": "d30818b4c4da37bf29f177cd55ce6c65"
+  },
+  "7183afb5fb9c637b": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 挖掘机跳跃02】Excavator_Jump_02.wav",
+    "filename": "【怪兽 挖掘机跳跃02】Excavator_Jump_02.wav",
+    "duration": 0.9079375,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 586290,
+    "hash": "3fb4024c7698a0fb0c1dae0c4bd61698"
+  },
+  "51718bfb1dec4936": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/UIMisc_User Interface Vocalisation, Robotic, Futuristic,_344 Audio_Organic User Interface_06-glued.wav",
+    "filename": "UIMisc_User Interface Vocalisation, Robotic, Futuristic,_344 Audio_Organic User Interface_06-glued.wav",
+    "duration": 0.3046041666666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 180084,
+    "hash": "fa6beb9bfe41b473ea81b81e4d380799"
+  },
+  "cf865a780cbf898e": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【机器人 脚步声 安卓TT 05】Footstep.M.wav",
+    "filename": "【机器人 脚步声 安卓TT 05】Footstep.M.wav",
+    "duration": 0.47222916666666664,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 154386,
+    "hash": "360099e94afb696191d3d992c993ee28"
+  },
+  "bf00bec1d04542e4": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/GrenadeLauncher_S08WA.238.M-glued.wav",
+    "filename": "GrenadeLauncher_S08WA.238.M-glued.wav",
+    "duration": 0.9945625,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 96214,
+    "hash": "7ab95129de0c8eb4247913deae4b3b8e"
+  },
+  "ba764cf6dc59e978": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【金属手铐点击序列07】Mechanical Source - Metal Handcufs Click Sequence 07.wav",
+    "filename": "【金属手铐点击序列07】Mechanical Source - Metal Handcufs Click Sequence 07.wav",
+    "duration": 0.8699010416666667,
+    "sample_rate": 192000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1069300,
+    "hash": "72077eb01b9d2c653bbddc9aa44d8b23"
+  },
+  "f1d9603cbedc1b05": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【机器人 中等厚实脚步声05】footstep_impact_medium_thick_05.wav",
+    "filename": "【机器人 中等厚实脚步声05】footstep_impact_medium_thick_05.wav",
+    "duration": 0.5036054421768708,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1056486,
+    "hash": "e6db978f53f0d5126b70f5d1b21f0955"
+  },
+  "dabbd9a2c6091a92": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BRS_Data_Beep_Round_Musical_2-glued.wav",
+    "filename": "BRS_Data_Beep_Round_Musical_2-glued.wav",
+    "duration": 0.48385487528344673,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 68182,
+    "hash": "53e50d04a15e52e4d012bafc92341f2f"
+  },
+  "62f9c84e6d797a5a": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【破裂 金属 A02】Rupture - Metal_A02.wav",
+    "filename": "【破裂 金属 A02】Rupture - Metal_A02.wav",
+    "duration": 1.4043541666666666,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1189064,
+    "hash": "a895559695b5f179a716b9ea81bf7ab6"
+  },
+  "36ca9878d7833178": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 翅膀拍动04】Wasp - WingFlap04.wav",
+    "filename": "【怪兽 黄蜂 翅膀拍动04】Wasp - WingFlap04.wav",
+    "duration": 4.794854166666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2825338,
+    "hash": "e8dfb6dc7589dfd915ba2abca860ac7f"
+  },
+  "418d890eaf3babe3": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 翅膀拍动08】Wasp - Wing.M.wav",
+    "filename": "【怪兽 黄蜂 翅膀拍动08】Wasp - Wing.M.wav",
+    "duration": 1.0133333333333334,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 199476,
+    "hash": "5fe04cbacc4690bfca477e80c77b964a"
+  },
+  "dd252886513cde2c": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/MEDS Large Enigma Long.M.wav",
+    "filename": "MEDS Large Enigma Long.M.wav",
+    "duration": 10.805333333333333,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1330890,
+    "hash": "5e79476e85f018930e76527ec9bb4de8"
+  },
+  "1486e3be79cf811e": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【飞船舱门08】door_SpaceShip_ha.M.wav",
+    "filename": "【飞船舱门08】door_SpaceShip_ha.M.wav",
+    "duration": 0.7479166666666667,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 532876,
+    "hash": "4bbd5b45e077a7439ed5dc47cac9a6ac"
+  },
+  "8c49689137ac8563": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Ancient_Game_Metal_Chain_Screw_Loose_Turn_7.wav",
+    "filename": "Ancient_Game_Metal_Chain_Screw_Loose_Turn_7.wav",
+    "duration": 1.5,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 997714,
+    "hash": "a76954675dde2d686b0161f1395d20c9"
+  },
+  "bfe19c88d83f4719": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【机器人 硬金属块变形04】transform_a_hard_metal_chunk_04.wav",
+    "filename": "【机器人 硬金属块变形04】transform_a_hard_metal_chunk_04.wav",
+    "duration": 3.3262604166666665,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 4189442,
+    "hash": "943eeda42827a5f067a55580c1406665"
+  },
+  "5f80bcc09fe23acf": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/00000-imported-001.wav",
+    "filename": "00000-imported-001.wav",
+    "duration": 1.216,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 116780,
+    "hash": "a0c2153048ddc18ffae5c00da6c955a0"
+  },
+  "2ee91476eaf97bfc": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/SF-CK Servo Small Plastic 20 High.wav",
+    "filename": "SF-CK Servo Small Plastic 20 High.wav",
+    "duration": 5.616,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 3442172,
+    "hash": "f3468464ccec63c2710217cef4cb2017"
+  },
+  "cbca4a4ec7d9ea4a": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/DRWRMetl_Heavy Metal Dr-3.M.wav",
+    "filename": "DRWRMetl_Heavy Metal Dr-3.M.wav",
+    "duration": 0.3661875,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 5099244,
+    "hash": "553614041f795b4f7e26eaa058df88cb"
+  },
+  "8f81a59e234c5727": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 承载者2 尖叫01】Bearer2 - scream_01-glued.wav",
+    "filename": "【怪兽 承载者2 尖叫01】Bearer2 - scream_01-glued.wav",
+    "duration": 2.233791666666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1287400,
+    "hash": "72375baf65c8d8af9ff55046e1b10f9e"
+  },
+  "765b775fc321df1d": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【雪地 撞击B05】Rupture - Snow_.M.wav",
+    "filename": "【雪地 撞击B05】Rupture - Snow_.M.wav",
+    "duration": 0.9706666666666667,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1362988,
+    "hash": "346a7525fdf7a6a7420b549b7e6e66ed"
+  },
+  "fe4264f8f8353de9": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_Bloody_Gore_Impact_Juicy_Wet_Squish_Smash_Goo_Liquid_Bash_Sword_Knife_Bug_Insect.wav",
+    "filename": "ESM_Bloody_Gore_Impact_Juicy_Wet_Squish_Smash_Goo_Liquid_Bash_Sword_Knife_Bug_Insect.wav",
+    "duration": 0.5246485260770976,
+    "sample_rate": 44100,
+    "channels": 2,
+    "format": "WAV",
+    "size": 239184,
+    "hash": "9a338910cdae6962749ce6c8de4faa4c"
+  },
+  "5bc7c2e5f601e7aa": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【撞击 机械体跌落 02】impact_mecha_body_drop_02.wav",
+    "filename": "【撞击 机械体跌落 02】impact_mecha_body_drop_02.wav",
+    "duration": 1.9178911564625851,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1177798,
+    "hash": "6c8e42b1fe02bba650fb837e4db2d27d"
+  },
+  "c5b617c259c50071": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/00011.wav",
+    "filename": "00011.wav",
+    "duration": 0.8533333333333334,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 81964,
+    "hash": "e4cd3898d29ec21b4433e07d2a9c43a6"
+  },
+  "c89fafec9d96a89d": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/98-Metal Stairs Descendin.M-glued-01.wav",
+    "filename": "98-Metal Stairs Descendin.M-glued-01.wav",
+    "duration": 0.5432083333333333,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 56068,
+    "hash": "d7983b77d502fff411944c484b21dbeb"
+  },
+  "250347d40378f806": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/00005.wav",
+    "filename": "00005.wav",
+    "duration": 0.6826666666666666,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 65580,
+    "hash": "befd985cc24d18e94bdc3375d4fe3df0"
+  },
+  "0721e2b8c9a75701": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BELLMisc_Mech Bell 08_DDU.M.wav",
+    "filename": "BELLMisc_Mech Bell 08_DDU.M.wav",
+    "duration": 0.9516041666666667,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 5155116,
+    "hash": "3429026ca94fd32187b5b5d7fc97049b"
+  },
+  "18fa2f841da552ff": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Scrapes-and-Scratches_057.M.wav",
+    "filename": "Scrapes-and-Scratches_057.M.wav",
+    "duration": 1.3910208333333334,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 154290,
+    "hash": "6bd981cd6e0194f5293d6dba0789c511"
+  },
+  "61dd44c1ab001bac": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【破裂 金属 A06】Rupture - Metal_A06.wav",
+    "filename": "【破裂 金属 A06】Rupture - Metal_A06.wav",
+    "duration": 0.7813125,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 991100,
+    "hash": "59eba6d40b3b8bc23107b8f2c880e3c4"
+  },
+  "03d903197883fd5b": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/DRWRMetl_Heavy Metal Dr-1.M.wav",
+    "filename": "DRWRMetl_Heavy Metal Dr-1.M.wav",
+    "duration": 0.2456875,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 5087676,
+    "hash": "aed8299db496ab4354b8631ec2300849"
+  },
+  "d7202cb3697c93b1": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/MBJFB Close Whistle 03 MS.M.wav",
+    "filename": "MBJFB Close Whistle 03 MS.M.wav",
+    "duration": 6.0404583333333335,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 738876,
+    "hash": "92ae80ee429b1049375fb0d3a9ec8aea"
+  },
+  "b684b7b171cfd072": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/EXPLDsgn_Designed Metal Explosion With Debris 06_DDUMAIS_NONE.wav",
+    "filename": "EXPLDsgn_Designed Metal Explosion With Debris 06_DDUMAIS_NONE.wav",
+    "duration": 3.7276979166666666,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2682374,
+    "hash": "b26caf90ac8474ad48ccc05cb62063ab"
+  },
+  "d08100cb865d40a8": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/THUN_Isolated-Thunder Close Defined Large Reverberant_B00M_3DS14_2.0.wav",
+    "filename": "THUN_Isolated-Thunder Close Defined Large Reverberant_B00M_3DS14_2.0.wav",
+    "duration": 24.0204375,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 14167636,
+    "hash": "8939885407cd76e55ed325f11df37881"
+  },
+  "93c694767fd372e7": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Calculations and Text-004.M.wav",
+    "filename": "Calculations and Text-004.M.wav",
+    "duration": 7.136,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1673702,
+    "hash": "39599ce653f1b529c988ff59ab13e1d0"
+  },
+  "e83f0e6c5f51fd77": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 扑击呼啸01】Wasp - Swoop_Whoosh01.wav",
+    "filename": "【怪兽 黄蜂 扑击呼啸01】Wasp - Swoop_Whoosh01.wav",
+    "duration": 1.4328854166666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 888868,
+    "hash": "40f5b0b60dd9ae61e0d09a9b8d17e471"
+  },
+  "9eca0670c693d292": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【机械装置 机械臂朋克拳打 001】 Designed Mech Arm Punk Fist Punch-001.wav",
+    "filename": "【机械装置 机械臂朋克拳打 001】 Designed Mech Arm Punk Fist Punch-001.wav",
+    "duration": 1.4360416666666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 754958,
+    "hash": "e8d670b6bdd5066e5445dec4fefe1f5b"
+  },
+  "2d6cc37f8e3d2847": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Asylum_Alone_with_the_Gho.M.wav",
+    "filename": "Asylum_Alone_with_the_Gho.M.wav",
+    "duration": 2.965333333333333,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 402088,
+    "hash": "2f3c0a78b8626fe4b20ef4b3cf9557b5"
+  },
+  "b5bcef14b3fedcc5": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Electric Motor,Small,Run,Med 1.wav",
+    "filename": "Electric Motor,Small,Run,Med 1.wav",
+    "duration": 5.770666666666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 3338054,
+    "hash": "9d6a6c9a81e2d911e81f8b249633dca1"
+  },
+  "74db89de88e386d3": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Calculations and Text-020.M.wav",
+    "filename": "Calculations and Text-020.M.wav",
+    "duration": 5.568,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1523206,
+    "hash": "f4736ec5fa3b5871a8fcae9ca228ce0e"
+  },
+  "736844bee9060378": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/RoomToneVentilation01.M.wav",
+    "filename": "RoomToneVentilation01.M.wav",
+    "duration": 11.296,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1140850,
+    "hash": "19bd1f54b2421e5fc376f7a07242f61c"
+  },
+  "ee0d60cc69a15c6d": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Fire Burning - Bonfire 01.wav",
+    "filename": "Fire Burning - Bonfire 01.wav",
+    "duration": 60.16266666666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 34939822,
+    "hash": "af0d5cf8539a12af6c82d18a666d0e5a"
+  },
+  "e77f2b5b70db4f6c": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 飞行01】Wasp - Fly_01.wav",
+    "filename": "【怪兽 黄蜂 飞行01】Wasp - Fly_01.wav",
+    "duration": 1.3031770833333334,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 814234,
+    "hash": "a516dabb0db392cd05ae3e9de53efd4f"
+  },
+  "a320a709aa779abd": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【金属车库门硬击05】Impacts Source.M.wav",
+    "filename": "【金属车库门硬击05】Impacts Source.M.wav",
+    "duration": 1.6930625,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 271762,
+    "hash": "a7ab40d11f8cf8e19a23e76868932104"
+  },
+  "0f4f933e9078b244": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BRS_Data_Beep_Modern_13-glued.wav",
+    "filename": "BRS_Data_Beep_Modern_13-glued.wav",
+    "duration": 0.1523809523809524,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 24254,
+    "hash": "765e560c30f82c4023b3771e6a438309"
+  },
+  "2e52b741a31a0348": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/00004.wav",
+    "filename": "00004.wav",
+    "duration": 1.5786666666666667,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 151596,
+    "hash": "936758e6c4b7b04a72e602210a771914"
+  },
+  "8d4d59a43cba50c2": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/00010.wav",
+    "filename": "00010.wav",
+    "duration": 0.7466666666666667,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 71724,
+    "hash": "034670e5829a83350d3e3e1dc54047c8"
+  },
+  "22fb05822f9e7f65": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【厚实惰性金属连接】Chunky Inert Me.M.wav",
+    "filename": "【厚实惰性金属连接】Chunky Inert Me.M.wav",
+    "duration": 0.619,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 355016,
+    "hash": "2f44e74426c762f4ed2e270e9f78354d"
+  },
+  "415fb98795bbc59e": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/CLOTHFlp_ORGANIC-Impact-1.M-glued-01.wav",
+    "filename": "CLOTHFlp_ORGANIC-Impact-1.M-glued-01.wav",
+    "duration": 0.630875,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 364120,
+    "hash": "c27f1c0450f125bd764a31a8c03d7696"
+  },
+  "a5449d60a6f946af": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Ancient_Game_Mechanism_Button_Tap_5_Metal_Slide.wav",
+    "filename": "Ancient_Game_Mechanism_Button_Tap_5_Metal_Slide.wav",
+    "duration": 1.0833333333333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 757754,
+    "hash": "49814df97ed642859a732b984c9dfa90"
+  },
+  "939947c981ecad08": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/00000.wav",
+    "filename": "00000.wav",
+    "duration": 1.0453333333333332,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 100396,
+    "hash": "eb4f30ebe02aaf10c9e0ba136f01feeb"
+  },
+  "54e67e9db0e931ec": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【机械脚步声08】footstep_a_mech_mega_08.wav",
+    "filename": "【机械脚步声08】footstep_a_mech_mega_08.wav",
+    "duration": 1.43921875,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1870930,
+    "hash": "22709039d3a19579060455bdcbdc9d39"
+  },
+  "c35126eef371aa2b": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 扑击预告03】Wasp - Swoop_Announce03.wav",
+    "filename": "【怪兽 黄蜂 扑击预告03】Wasp - Swoop_Announce03.wav",
+    "duration": 1.4802291666666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 916146,
+    "hash": "32aa6bd7781aaf528ed970521eea0c37"
+  },
+  "8b968c2fa1b99cbf": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 狼人 脚步 砾石 06】Werewolf - Footstep_Gravel_06.wav",
+    "filename": "【怪兽 狼人 脚步 砾石 06】Werewolf - Footstep_Gravel_06.wav",
+    "duration": 0.5889375,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 403800,
+    "hash": "f1b6aa38929cfe44532fe9c0d2d84d3c"
+  },
+  "2e3c9b54d3eda573": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_Oneshot_Alien_Game_We.M-glued.wav",
+    "filename": "ESM_Oneshot_Alien_Game_We.M-glued.wav",
+    "duration": 0.4858125,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 81868,
+    "hash": "13eaba5eb63d555b03e80bb4bad4cf67"
+  },
+  "faf1949f706135d3": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BRS_Door_Wood_Stove_Open_Slow_1.wav",
+    "filename": "BRS_Door_Wood_Stove_Open_Slow_1.wav",
+    "duration": 7.035646258503402,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 942954,
+    "hash": "ca89c398ff7ecfa9147e9410e4751af6"
+  },
+  "77092e64656199be": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/bug_tense-4.M.wav",
+    "filename": "bug_tense-4.M.wav",
+    "duration": 1.818125,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 326714,
+    "hash": "2e46061429694a4f97076c721de78261"
+  },
+  "2104d35825af8473": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/DoorWoodshed_S011FO.366.wav",
+    "filename": "DoorWoodshed_S011FO.366.wav",
+    "duration": 0.8373333333333334,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 494668,
+    "hash": "ec6ae829cc49703120b2b107a5aba467"
+  },
+  "2c83a21a9a1a6391": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/GamePieces_S011SP.228.wav",
+    "filename": "GamePieces_S011SP.228.wav",
+    "duration": 2.4426666666666668,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1420860,
+    "hash": "6e0c234ce3290b2e5e0659dbf6d0fbfd"
+  },
+  "5799acdb216453fc": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【锻造金属碎片翻动06】forge_metal_a_scrap_shuffles_06.wav",
+    "filename": "【锻造金属碎片翻动06】forge_metal_a_scrap_shuffles_06.wav",
+    "duration": 0.6691666666666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 669876,
+    "hash": "9353029ba17b24811110539d7c2c8c63"
+  },
+  "020f4626e58fdac5": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/FIRESizz_Torch Sizzle Hard 01_B00M_ONE.wav",
+    "filename": "FIRESizz_Torch Sizzle Hard 01_B00M_ONE.wav",
+    "duration": 15.392270833333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 10871342,
+    "hash": "6faae4ac7bc95b76039d01268190c55c"
+  },
+  "5bf89b1023c45a1e": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 小生物 咬跳02】Small Creature - Bite_Jump02.wav",
+    "filename": "【怪兽 小生物 咬跳02】Small Creature - Bite_Jump02.wav",
+    "duration": 0.94021875,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 604948,
+    "hash": "3c92210c71a52ab6429b4782741e46a2"
+  },
+  "0ad05377487da0ae": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/BRS_Foley_Belt_Buckle_Metal_Clinks.wav",
+    "filename": "BRS_Foley_Belt_Buckle_Metal_Clinks.wav",
+    "duration": 54.57850340136054,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 7232502,
+    "hash": "04bc1273a4c5fd9bb200397411979cc6"
+  },
+  "0f6aa2a2dd96774f": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ESM_One_Shot_Vocal_Spider_Queen_Monster_Attack_2_Insect_Bug_Screech_Squeal_Angry_Combat.wav",
+    "filename": "ESM_One_Shot_Vocal_Spider_Queen_Monster_Attack_2_Insect_Bug_Screech_Squeal_Angry_Combat.wav",
+    "duration": 0.9649270833333333,
+    "sample_rate": 96000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 465764,
+    "hash": "c954a8b4a57d8cb5c2170d1432dee73f"
+  },
+  "eaf09f88beb52541": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 吸血虫 转身 03】Leech - Turn_03.wav",
+    "filename": "【怪兽 吸血虫 转身 03】Leech - Turn_03.wav",
+    "duration": 0.7562916666666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 498998,
+    "hash": "70813aadd6fde5d75b5f813abb12add1"
+  },
+  "c6a49d3f467787ee": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/Footstep Robot 2_01.M.wav",
+    "filename": "Footstep Robot 2_01.M.wav",
+    "duration": 0.32,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 50122,
+    "hash": "3c91150002903643b298a1d784a5d26c"
+  },
+  "4b42644fca5dc773": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/InsectVoiceAnger_BU01.378.wav",
+    "filename": "InsectVoiceAnger_BU01.378.wav",
+    "duration": 0.7413333333333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 439740,
+    "hash": "e66691a2d17c21c7f8b86bf49016ebb7"
+  },
+  "e3bbdc210b7ebfaf": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 翅膀拍动08】Wasp - Wi-2.M.wav",
+    "filename": "【怪兽 黄蜂 翅膀拍动08】Wasp - Wi-2.M.wav",
+    "duration": 0.9521041666666666,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 193598,
+    "hash": "55fd9c3814f4f5976f0f4e8220dcbc81"
+  },
+  "93ec4c8059dfe903": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 吸血虫 转身 04】Leech - Turn_04.wav",
+    "filename": "【怪兽 吸血虫 转身 04】Leech - Turn_04.wav",
+    "duration": 1.0127916666666668,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 646742,
+    "hash": "f0c9b80d92f6a4309ec9c7d7c84ccabd"
+  },
+  "8d0f9185f0ead8bb": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 潜行者 后脚摩擦01】Prowler - fs_toe_nr_01.wav",
+    "filename": "【怪兽 潜行者 后脚摩擦01】Prowler - fs_toe_nr_01.wav",
+    "duration": 0.26625,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 216838,
+    "hash": "30c36ad46df9892482756757fd7b7fc9"
+  },
+  "272be02002c5d60e": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 杂音 大肉撞击08】Fodder - impact_flesh_large_08.wav",
+    "filename": "【怪兽 杂音 大肉撞击08】Fodder - impact_flesh_large_08.wav",
+    "duration": 1.0850416666666667,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 688462,
+    "hash": "15d412d9bdff98f2357c6e55ada1fa80"
+  },
+  "1f974a13d51e516e": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【汽车宝马车内开启声05】Mechanical Source - Car BMW Interior opening 05.wav",
+    "filename": "【汽车宝马车内开启声05】Mechanical Source - Car BMW Interior opening 05.wav",
+    "duration": 0.7024791666666667,
+    "sample_rate": 192000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 876398,
+    "hash": "8a361add24e771c96080730b1c353d77"
+  },
+  "6b9d5c4ed20f30e8": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/F_SAND1_rg.wav",
+    "filename": "F_SAND1_rg.wav",
+    "duration": 0.905578231292517,
+    "sample_rate": 44100,
+    "channels": 1,
+    "format": "WAV",
+    "size": 80254,
+    "hash": "91f12b62980d897650c1bdf8d1bd5802"
+  },
+  "0220ef744eebfecf": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/CatMeow_S08AN.47.wav",
+    "filename": "CatMeow_S08AN.47.wav",
+    "duration": 0.3253333333333333,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 198972,
+    "hash": "0369b72a395db0f743bf481935e2a2a4"
+  },
+  "9fecb3e03e76671f": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 近处嗡嗡声】Wasp - BuzzNear_Loop.wav",
+    "filename": "【怪兽 黄蜂 近处嗡嗡声】Wasp - BuzzNear_Loop.wav",
+    "duration": 3.2535416666666666,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1937558,
+    "hash": "41448fe58a73e58dcdf2e7b4dd4551ae"
+  },
+  "c4e16bf457cefa1d": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【电钻 基础电锤 06】Driller Source - Makita Hammer Driller Basic Servo  06.wav",
+    "filename": "【电钻 基础电锤 06】Driller Source - Makita Hammer Driller Basic Servo  06.wav",
+    "duration": 2.402625,
+    "sample_rate": 192000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 2834990,
+    "hash": "4c35573f85dc338261b54e831cdd4702"
+  },
+  "72d13f153496dbad": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/QP02 0181 Wind deciduous forest gentle leafy detail.wav",
+    "filename": "QP02 0181 Wind deciduous forest gentle leafy detail.wav",
+    "duration": 98.22152083333333,
+    "sample_rate": 48000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 28447602,
+    "hash": "4d21248d7097125c9bd87c2d959631f0"
+  },
+  "81b9c2e7991780dd": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/CrunchPretzelStick_S011TX_4.wav",
+    "filename": "CrunchPretzelStick_S011TX_4.wav",
+    "duration": 1.4826666666666666,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 940332,
+    "hash": "587a40e2b2d4f06e18fe49613c31d013"
+  },
+  "d71a32a8fd627a74": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 飞行04】Wasp - Fly_04.wav",
+    "filename": "【怪兽 黄蜂 飞行04】Wasp - Fly_04.wav",
+    "duration": 1.8633645833333334,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1136902,
+    "hash": "b10a52b42fb574530cb137939d6c8c4d"
+  },
+  "9a3bd777fce55e74": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 潜行者 脚趾15】Prowler - fs_toe_15.wav",
+    "filename": "【怪兽 潜行者 脚趾15】Prowler - fs_toe_15.wav",
+    "duration": 0.23908333333333334,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 201174,
+    "hash": "abfe6523ca8e097438625877b76de195"
+  },
+  "78a00e52db7288c1": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【破裂 石膏撞击B04】Rupture - Pla.M.wav",
+    "filename": "【破裂 石膏撞击B04】Rupture - Pla.M.wav",
+    "duration": 2.304,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 1488820,
+    "hash": "0536336286417944815f7097ad32f47d"
+  },
+  "28e02929db7c3222": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/00002.wav",
+    "filename": "00002.wav",
+    "duration": 1.8773333333333333,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 180268,
+    "hash": "630b15d249d314de754dccd78c6590b0"
+  },
+  "44ce4a8529a4e8f1": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/ELECTRIC SPARK Electricity Pylon, Taser Gun, Short x6.wav",
+    "filename": "ELECTRIC SPARK Electricity Pylon, Taser Gun, Short x6.wav",
+    "duration": 7.9814375,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 5090698,
+    "hash": "a620c1ba27b7c955e4197f9f6767fdf7"
+  },
+  "9b4702a0cf4f2429": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/【怪兽 黄蜂 翅膀拍动06】Wasp - WingFlap06.wav",
+    "filename": "【怪兽 黄蜂 翅膀拍动06】Wasp - WingFlap06.wav",
+    "duration": 3.26240625,
+    "sample_rate": 96000,
+    "channels": 2,
+    "format": "WAV",
+    "size": 1942648,
+    "hash": "9cb2d7c1f6b07d0a1e902db2c06a17eb"
+  },
+  "e2c9c4d596f73479": {
+    "file_path": "/Volumes/Studio Hub/音效设计工程/比赛参加/SDBC2361/太空猫传奇-音效设计比赛参加工程/Media/bug_die-1.M.wav",
+    "filename": "bug_die-1.M.wav",
+    "duration": 1.3973333333333333,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "WAV",
+    "size": 286202,
+    "hash": "e82988336dbfd86c2a930ce33cadcccb"
+  }
+}
