@@ -319,14 +319,15 @@ async def _scan_and_import_task(
     write_log('info', '任务开始', {'task_id': task_id, 'folder_path': folder_path, 'recursive': recursive, 'client_id': client_id})
     # #endregion
     
+    # 初始化管理器
+    ws_manager = get_ws_manager()
+    db_manager = get_db_manager()
+    scanner = AudioScanner()
+    
     # 添加详细日志
     logger.info(f"[SCAN_TASK] 任务ID: {task_id}, 文件夹: {folder_path}, 递归: {recursive}, 客户端: {client_id}")
     logger.info(f"[SCAN_TASK] ws_manager 连接数: {ws_manager.get_connection_count()}")
     logger.info(f"[SCAN_TASK] 活跃连接: {list(ws_manager.active_connections.keys())}")
-
-    ws_manager = get_ws_manager()
-    db_manager = get_db_manager()
-    scanner = AudioScanner()
 
     try:
         # 第一步：扫描所有文件
@@ -341,6 +342,13 @@ async def _scan_and_import_task(
         total = len(audio_files)
         logger.info(f"[SCAN_TASK] 扫描完成，找到 {total} 个音频文件")
         write_log('info', '扫描完成', {'total': total, 'files': [f.path for f in audio_files[:5]]})  # 只记录前5个
+        
+        # 发送扫描统计日志到前端
+        await ws_manager.send_scan_log(
+            client_id, task_id, 'info', 
+            f"扫描完成统计: 找到 {total} 个音频文件",
+            {'total': total, 'folder_path': folder_path}
+        )
 
         if total == 0:
             write_log('warning', '未找到音频文件')

@@ -2643,8 +2643,34 @@
                         showNotification(message.data.message, 'info');
                     }
                     break;
+                case 'scan_log':
+                    // 扫描调试日志 - 在 F12 控制台显示
+                    handleScanLog(message.data);
+                    break;
                 case 'pong':
                     // 心跳响应
+                    break;
+            }
+        }
+
+        // 处理扫描日志 - 在 F12 控制台显示详细日志
+        function handleScanLog(data) {
+            const { log_type, message, data: logData } = data;
+            const prefix = '[SCANNER]';
+            
+            switch (log_type) {
+                case 'info':
+                    console.log(`%c${prefix} ${message}`, 'color: #3b82f6; font-weight: bold;', logData || '');
+                    break;
+                case 'warning':
+                    console.warn(`%c${prefix} ${message}`, 'color: #f59e0b; font-weight: bold;', logData || '');
+                    break;
+                case 'error':
+                    console.error(`%c${prefix} ${message}`, 'color: #ef4444; font-weight: bold;', logData || '');
+                    break;
+                case 'debug':
+                default:
+                    console.log(`%c${prefix} ${message}`, 'color: #6b7280;', logData || '');
                     break;
             }
         }

@@ -214,6 +214,36 @@ class ConnectionManager:
         }
         await self.broadcast(msg, client_id)
 
+    async def send_scan_log(
+        self,
+        client_id: str,
+        task_id: str,
+        log_type: str,
+        message: str,
+        data: Optional[dict] = None
+    ):
+        """
+        发送扫描日志消息（用于调试）
+
+        Args:
+            client_id: 客户端标识
+            task_id: 任务ID
+            log_type: 日志类型 (info/warning/error/debug)
+            message: 日志消息
+            data: 附加数据
+        """
+        msg = {
+            "type": "scan_log",
+            "task_id": task_id,
+            "data": {
+                "log_type": log_type,
+                "message": message,
+                "data": data or {},
+                "timestamp": asyncio.get_event_loop().time()
+            }
+        }
+        await self.broadcast(msg, client_id)
+
     def is_task_cancelled(self, task_id: str) -> bool:
         """
         检查任务是否已取消
