@@ -22,6 +22,10 @@ CLAP 音频-文本嵌入模型封装
     }
     
     HuggingFace: https://huggingface.co/laion/larger_clap_general
+    
+许可证 / License:
+    MIT License - 允许商业使用，需保留版权声明
+    详见: https://huggingface.co/laion/larger_clap_general
 """
 
 import logging

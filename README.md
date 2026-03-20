@@ -216,6 +216,26 @@ npm run build
 
 **HuggingFace**: https://huggingface.co/laion/larger_clap_general
 
+**许可证 / License**: 
+- 模型基于 MIT License 开源，允许商业使用
+- 遵循 LAION 的使用条款，请确保合法合规使用
+- 详见: https://huggingface.co/laion/larger_clap_general
+
 ## 许可证
 
-MIT License
+本项目采用 MIT License 开源许可证
+
+### 第三方组件许可证
+
+| 组件 | 许可证 | 说明 |
+|------|--------|------|
+| CLAP Model (laion/larger_clap_general) | MIT | 音频-文本嵌入模型 |
+| Electron | MIT | 桌面应用框架 |
+| FastAPI | MIT | 后端 API 框架 |
+| Transformers | Apache 2.0 | HuggingFace 模型库 |
+| ChromaDB | Apache 2.0 | 向量数据库 |
+
+**免责声明**: 
+- 本软件仅供学习和研究使用
+- 使用 CLAP 模型时请遵守 LAION 的使用条款
+- 用户需自行承担使用本软件的风险和责任
