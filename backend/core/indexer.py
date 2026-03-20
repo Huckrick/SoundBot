@@ -34,9 +34,13 @@ def get_chroma_client(persist_directory: Optional[str] = None) -> chromadb.Persi
     # 按路径缓存客户端，不同工程使用不同客户端
     if persist_directory not in _chroma_clients:
         Path(persist_directory).mkdir(parents=True, exist_ok=True)
+        # 配置 ChromaDB 使用隔离的 SQLite 设置
         _chroma_clients[persist_directory] = chromadb.PersistentClient(
             path=persist_directory,
-            settings=Settings(anonymized_telemetry=False)
+            settings=Settings(
+                anonymized_telemetry=False,
+                is_persistent=True
+            )
         )
     return _chroma_clients[persist_directory]
 

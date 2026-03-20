@@ -265,9 +265,12 @@ class DatabaseManager:
     def _migrate_db(self, cursor, projects_table_exists):
         """迁移现有数据库到新版结构"""
         try:
+            _get_logger().info("开始数据库迁移...")
+            
             # 1. 检查 files 表是否有 project_id 列
             cursor.execute("PRAGMA table_info(files)")
             columns = [row[1] for row in cursor.fetchall()]
+            _get_logger().debug(f"files 表列: {columns}")
 
             if 'project_id' not in columns:
                 _get_logger().info("迁移：添加 project_id 列到 files 表")
@@ -290,6 +293,7 @@ class DatabaseManager:
                 """)
 
             # 确保默认工程存在（无论表是否刚创建）
+            _get_logger().info("迁移：确保默认工程存在")
             cursor.execute("""
                 INSERT OR IGNORE INTO projects (id, name, description)
                 VALUES ('default', '默认工程', '系统默认工程')
@@ -356,6 +360,8 @@ class DatabaseManager:
             _get_logger().info("数据库迁移完成")
         except Exception as e:
             _get_logger().error(f"数据库迁移失败: {e}")
+            import traceback
+            _get_logger().error(traceback.format_exc())
             raise
 
     def _row_to_record(self, row: sqlite3.Row) -> AudioFileRecord:
