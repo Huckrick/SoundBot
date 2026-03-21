@@ -154,7 +154,18 @@ class LLMClient:
             headers.update(self.headers)
 
         # 根据 provider 确定 API 格式
-        if self.provider in ("kimi_coding", "anthropic"):
+        if self.provider in ("kimi_coding",):
+            # Kimi Coding Anthropic 格式：POST /v1/messages
+            # 注意：需要 /v1 前缀
+            payload = {
+                "model": self.model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "stream": True
+            }
+            url = self.base_url.rstrip("/") + "/v1/messages"
+        elif self.provider == "anthropic":
             # Anthropic 格式：POST /v1/messages
             payload = {
                 "model": self.model,
@@ -163,7 +174,7 @@ class LLMClient:
                 "max_tokens": max_tokens,
                 "stream": True
             }
-            url = self.base_url.rstrip("/") + "/messages"
+            url = self.base_url.rstrip("/") + "/v1/messages"
         else:
             # OpenAI 格式：POST /chat/completions
             payload = {
@@ -257,7 +268,16 @@ class LLMClient:
             headers.update(self.headers)
 
         # 根据 provider 确定 API 格式
-        if self.provider in ("kimi_coding", "anthropic"):
+        if self.provider in ("kimi_coding",):
+            # Kimi Coding Anthropic 格式：POST /v1/messages
+            payload = {
+                "model": self.model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens
+            }
+            url = self.base_url.rstrip("/") + "/v1/messages"
+        elif self.provider == "anthropic":
             # Anthropic 格式：POST /v1/messages
             payload = {
                 "model": self.model,
@@ -265,7 +285,7 @@ class LLMClient:
                 "temperature": temperature,
                 "max_tokens": max_tokens
             }
-            url = self.base_url.rstrip("/") + "/messages"
+            url = self.base_url.rstrip("/") + "/v1/messages"
         else:
             # OpenAI 格式：POST /chat/completions
             payload = {
