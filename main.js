@@ -1013,11 +1013,16 @@ async function startBackendServer() {
             const modelResponse = await fetch(`${API_BASE_URL}/model/status`);
             if (modelResponse.ok) {
               const modelStatus = await modelResponse.json();
-              if (modelStatus.loaded) {
+              const isLoaded = modelStatus.model_status?.loaded || modelStatus.loaded;
+              const isLoading = modelStatus.model_status?.loading || modelStatus.loading;
+              
+              if (isLoaded) {
                 clearInterval(checkServer);
                 isStarting = false;
                 console.log('[Backend] 服务启动完成，模型已加载');
                 resolve();
+              } else if (isLoading) {
+                console.log(`[Backend] 模型加载中... (${retries}/${maxHealthChecks})`);
               } else {
                 console.log(`[Backend] 等待模型加载... (${retries}/${maxHealthChecks})`);
               }
