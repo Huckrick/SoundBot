@@ -51,7 +51,7 @@
         "siliconflow": {
             "base_url": "https://api.siliconflow.cn/v1",
             "api_key": "",
-            "model": "Qwen/Qwen2.5-7B-Instruct"
+            "model": "BAAI/bge-m3"
         },
         "custom": {
             "base_url": "https://your-api.com/v1",

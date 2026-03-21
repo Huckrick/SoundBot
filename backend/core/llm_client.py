@@ -68,7 +68,7 @@ class LLMClient:
     def is_available(self) -> bool:
         """检查 LLM 服务是否可用"""
         try:
-            # 尝试获取模型列表
+            # 构建 headers
             headers = {}
             if self.api_key:
                 headers["Authorization"] = f"Bearer {self.api_key}"
@@ -77,9 +77,24 @@ class LLMClient:
             if hasattr(self, 'headers') and self.headers:
                 headers.update(self.headers)
 
-            url = self.base_url.rstrip("/") + "/models"
-            response = requests.get(url, headers=headers, timeout=5)
-            return response.status_code == 200
+            # Kimi Coding 使用 Anthropic 格式，测试 /v1/messages 端点
+            if self.provider == "kimi_coding":
+                url = self.base_url.rstrip("/") + "/v1/messages"
+                payload = {
+                    "model": self.model or "k2p5",
+                    "messages": [{"role": "user", "content": "hi"}],
+                    "max_tokens": 1,
+                    "stream": False
+                }
+                response = requests.post(url, headers=headers, json=payload, timeout=5)
+                # 200 或认证错误都表示服务可用
+                return response.status_code in [200, 400, 401, 403]
+            else:
+                # 其他 provider 使用 /models 端点
+                url = self.base_url.rstrip("/") + "/models"
+                response = requests.get(url, headers=headers, timeout=5)
+                return response.status_code == 200
+                
         except requests.exceptions.ConnectionError:
             logger.warning(f"LLM 服务连接失败: {self.base_url}，请确保服务已启动")
             return False
@@ -207,15 +222,23 @@ class LLMClient:
             )
             response.raise_for_status()
             
+            pending_data = None  # 用于缓存 event: 后的 data:
+            
             for line in response.iter_lines():
                 if not line:
                     continue
 
                 line = line.decode('utf-8')
-
-                # Anthropic SSE 格式: data: {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": "..."}}
-                if line.startswith("data: "):
-                    data_str = line[6:]  # 去掉 "data: " 前缀
+                
+                # 处理 event: 行（Kimi Coding/Anthropic 格式）
+                if line.startswith("event: "):
+                    # 缓存 event 类型，等待下一个 data: 行
+                    pending_data = line[7:].strip()
+                    continue
+                
+                # 处理 data: 行（注意：有些 API 返回 data: {...}，有些返回 data:{...}）
+                if line.startswith("data:"):
+                    data_str = line[5:].lstrip()  # 去掉 "data:" 前缀并去除前导空格
 
                     if data_str == "[DONE]":
                         break
@@ -223,7 +246,7 @@ class LLMClient:
                     try:
                         data = json.loads(data_str)
 
-                        # Anthropic 流式格式
+                        # Anthropic/Kimi Coding 流式格式
                         if data.get("type") == "content_block_delta":
                             delta = data.get("delta", {})
                             if delta.get("type") == "text_delta":
