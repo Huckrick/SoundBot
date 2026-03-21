@@ -10,6 +10,20 @@
 
 ---
 
+## 📥 下载 / Download
+
+[![Download for macOS](https://img.shields.io/badge/Download-macOS-blue.svg)](https://github.com/Huckrick/SoundBot/releases/latest)  
+[![Download for Windows](https://img.shields.io/badge/Download-Windows-blue.svg)](https://github.com/Huckrick/SoundBot/releases/latest)
+
+**最新版本 / Latest Release**: [v0.1.0-alpha](https://github.com/Huckrick/SoundBot/releases/latest)
+
+### 界面预览 / Screenshot
+
+![SoundBot Home1](./Home1.png)  
+![SoundBot Home2](./Home2.png)
+
+---
+
 ## 📝 关于本项目 / About This Project
 
 **开发环境 / Development Environment**：本项目完全在 macOS 环境下开发和测试  
