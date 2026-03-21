@@ -143,7 +143,8 @@ class LLMClient:
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """流式调用"""
         headers = {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "anthropic-version": "2023-06-01"
         }
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
@@ -151,18 +152,29 @@ class LLMClient:
         # 合并自定义 headers
         if hasattr(self, 'headers') and self.headers:
             headers.update(self.headers)
-        
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "stream": True
-        }
-        
-        # 构建请求 URL
-        url = self.base_url.rstrip("/") + "/chat/completions"
-        
+
+        # 根据 provider 确定 API 格式
+        if self.provider in ("kimi_coding", "anthropic"):
+            # Anthropic 格式：POST /v1/messages
+            payload = {
+                "model": self.model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "stream": True
+            }
+            url = self.base_url.rstrip("/") + "/messages"
+        else:
+            # OpenAI 格式：POST /chat/completions
+            payload = {
+                "model": self.model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "stream": True
+            }
+            url = self.base_url.rstrip("/") + "/chat/completions"
+
         full_content = ""
         
         try:
@@ -179,38 +191,47 @@ class LLMClient:
             for line in response.iter_lines():
                 if not line:
                     continue
-                
+
                 line = line.decode('utf-8')
-                
-                # SSE 格式: data: {...}
+
+                # Anthropic SSE 格式: data: {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": "..."}}
                 if line.startswith("data: "):
                     data_str = line[6:]  # 去掉 "data: " 前缀
-                    
+
                     if data_str == "[DONE]":
                         break
-                    
+
                     try:
                         data = json.loads(data_str)
-                        
+
+                        # Anthropic 流式格式
+                        if data.get("type") == "content_block_delta":
+                            delta = data.get("delta", {})
+                            if delta.get("type") == "text_delta":
+                                content = delta.get("text", "")
+                                if content:
+                                    full_content += content
+                                    yield {"type": "content", "content": content}
+
                         # OpenAI 格式
-                        if "choices" in data:
+                        elif "choices" in data:
                             delta = data["choices"][0].get("delta", {})
                             content = delta.get("content", "")
-                            
+
                             if content:
                                 full_content += content
                                 yield {"type": "content", "content": content}
-                        
+
                         # Ollama 格式
                         elif "message" in data:
                             content = data["message"].get("content", "")
                             if content:
                                 full_content += content
                                 yield {"type": "content", "content": content}
-                                
+
                     except json.JSONDecodeError:
                         continue
-            
+
             yield {"type": "done", "full_content": full_content}
             
         except requests.exceptions.RequestException as e:
@@ -225,7 +246,8 @@ class LLMClient:
     ) -> str:
         """非流式调用"""
         headers = {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "anthropic-version": "2023-06-01"
         }
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
@@ -233,16 +255,27 @@ class LLMClient:
         # 合并自定义 headers
         if hasattr(self, 'headers') and self.headers:
             headers.update(self.headers)
-        
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "stream": False
-        }
-        
-        url = self.base_url.rstrip("/") + "/chat/completions"
+
+        # 根据 provider 确定 API 格式
+        if self.provider in ("kimi_coding", "anthropic"):
+            # Anthropic 格式：POST /v1/messages
+            payload = {
+                "model": self.model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens
+            }
+            url = self.base_url.rstrip("/") + "/messages"
+        else:
+            # OpenAI 格式：POST /chat/completions
+            payload = {
+                "model": self.model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "stream": False
+            }
+            url = self.base_url.rstrip("/") + "/chat/completions"
         
         try:
             response = requests.post(
@@ -252,17 +285,24 @@ class LLMClient:
                 timeout=120
             )
             response.raise_for_status()
-            
+
             data = response.json()
-            
+
+            # Anthropic 格式
+            if "content" in data and isinstance(data["content"], list):
+                # Anthropic 响应：{"content": [{"type": "text", "text": "..."}]}
+                for block in data["content"]:
+                    if block.get("type") == "text":
+                        return block.get("text", "")
+
             # OpenAI 格式
             if "choices" in data:
                 return data["choices"][0]["message"]["content"]
-            
+
             # Ollama 格式
             elif "message" in data:
                 return data["message"]["content"]
-            
+
             else:
                 raise RuntimeError(f"未知的响应格式: {data}")
             
