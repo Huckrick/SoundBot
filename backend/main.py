@@ -1110,13 +1110,15 @@ async def search_audio(request: schemas.SearchRequest):
         # 转换为响应格式
         search_results = []
         for r in results:
+            # 使用 getattr 避免与 Python 内置 format 函数冲突
+            file_format = getattr(r, 'format', '') or ''
             audio_file = schemas.AudioFile(
                 path=r.file_path,
                 filename=r.filename,
                 duration=r.duration,
                 sample_rate=r.metadata.get("sample_rate", 0),
                 channels=r.metadata.get("channels", 0),
-                format=r.format,
+                format=file_format,
                 size=r.metadata.get("size", 0)
             )
             search_results.append(schemas.SearchResult(
@@ -1648,12 +1650,27 @@ async def stream_audio_from_cache(file_path: str):
         buffer.seek(0)
         wav_bytes = buffer.read()
 
+        # 处理中文文件名：使用 ASCII 文件名避免编码问题
         filename = audio_file.name
+        # 将中文文件名转为 ASCII 表示（使用 URL 编码或替换）
+        try:
+            # 尝试使用 RFC 5987 编码
+            from urllib.parse import quote
+            encoded_filename = quote(filename, safe='')
+            content_disposition = f"attachment; filename*=UTF-8''{encoded_filename}"
+        except:
+            # 回退：使用纯 ASCII 文件名
+            safe_filename = file_path.split('/')[-1] if '/' in file_path else file_path
+            safe_filename = ''.join(c if c.isalnum() or c in '._-' else '_' for c in safe_filename)
+            if not safe_filename.endswith('.wav'):
+                safe_filename += '.wav'
+            content_disposition = f'attachment; filename="{safe_filename}"'
+
         return Response(
             content=wav_bytes,
             media_type="audio/wav",
             headers={
-                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Disposition": content_disposition,
                 "X-Cached": "true" if cached_entry else "false",
                 "X-Duration": str(audio_data.shape[-1] / sample_rate if audio_data.ndim > 1 else len(audio_data) / sample_rate),
             }

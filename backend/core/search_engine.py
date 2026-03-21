@@ -200,7 +200,8 @@ class OptimizedAudioSearcher(AudioSearcher):
         self,
         query: str,
         filename: str,
-        metadata: Dict[str, Any]
+        metadata: Dict[str, Any],
+        is_ucs_expanded: bool = False
     ) -> Tuple[float, str]:
         """
         计算关键词匹配分数（文件名和标签优先）
@@ -209,6 +210,7 @@ class OptimizedAudioSearcher(AudioSearcher):
             query: 查询文本
             filename: 文件名
             metadata: 文件元数据
+            is_ucs_expanded: 是否是 UCS 扩展的查询词
 
         Returns:
             (关键词匹配分数, 匹配级别)
@@ -235,9 +237,19 @@ class OptimizedAudioSearcher(AudioSearcher):
             match_level = "exact"
         elif query_lower in filename_base:
             # 查询词是文件名的子串
-            scores.append(0.95)
-            if match_level != "exact":
-                match_level = "exact"
+            # 对于 UCS 扩展的短词（如 "hit", "drop"），要求更严格的匹配
+            if is_ucs_expanded and len(query_lower) <= 4:
+                # 短词需要作为完整单词匹配（前后是分隔符或边界）
+                # 构建正则：匹配作为独立单词的查询词
+                pattern = r'(^|[_\-\s])' + re.escape(query_lower) + r'($|[_\-\s])'
+                if re.search(pattern, filename_base):
+                    scores.append(0.95)
+                    if match_level != "exact":
+                        match_level = "exact"
+            else:
+                scores.append(0.95)
+                if match_level != "exact":
+                    match_level = "exact"
 
         # 文件名包含查询词的大部分（支持中英文）
         if len(query_tokens) > 1:
@@ -265,9 +277,17 @@ class OptimizedAudioSearcher(AudioSearcher):
                 scores.append(1.0)
                 match_level = "exact"
             elif token in filename_base:
-                scores.append(0.88)
-                if match_level != "exact":
-                    match_level = "partial"
+                # 对于 UCS 扩展的短词，要求完整单词匹配
+                if is_ucs_expanded and len(token) <= 4:
+                    pattern = r'(^|[_\-\s])' + re.escape(token) + r'($|[_\-\s])'
+                    if re.search(pattern, filename_base):
+                        scores.append(0.88)
+                        if match_level != "exact":
+                            match_level = "partial"
+                else:
+                    scores.append(0.88)
+                    if match_level != "exact":
+                        match_level = "partial"
 
         # 2. 解析后的文件名描述匹配
         name_description = metadata.get("name_description", "")
@@ -471,70 +491,78 @@ class OptimizedAudioSearcher(AudioSearcher):
         第2层：分词扩展搜索
 
         使用中文分词 + UCS 关键词扩展进行多路召回
+        优化：优先使用原始查询，UCS扩展的结果降低权重
         """
         if not query or not query.strip():
             return []
 
         # 获取扩展查询词
         expanded_queries = self._text_processor.expand_query(query)
+        
+        # 标记原始查询
+        original_query = query.lower().strip()
 
         # 如果扩展结果很少（只有原始查询），也尝试使用扩展词本身
-        # 这样可以搜索文件名包含查询词的文件
         if len(expanded_queries) <= 1:
             # 尝试使用原始查询的分词结果进行搜索
             tokens = self._text_processor.tokenize(query)
             if tokens and len(tokens) > 1:
                 expanded_queries.extend(tokens)
-            # 不再直接返回空列表，而是继续使用原始查询进行搜索
 
         all_files = self._get_all_files(filters)
         results = []
 
-        # 使用集合跟踪已处理的文件，避免重复
-        processed_paths = set()
+        # 使用字典跟踪每个文件的最佳匹配分数
+        file_best_match = {}
 
         for expanded_query in expanded_queries:
-            # 对于英文单词等没有扩展的查询，也需要搜索原始查询
-            is_original = expanded_query.lower() == query.lower()
+            is_original = expanded_query.lower() == original_query
+            is_ucs_expanded = not is_original  # 标记是否是 UCS 扩展的查询
             
-            # 不再跳过原始查询，确保原始查询的精确匹配结果被包含
-            # 即使与第1层有重复，后续会去重并保留最高分数
-
             for metadata in all_files:
                 file_path = metadata.get("file_path", "")
-
-                # 避免重复处理同一文件
-                if file_path in processed_paths:
-                    continue
-
                 filename = metadata.get("filename", "")
+                
                 keyword_score, match_level = self._keyword_match_score(
-                    expanded_query, filename, metadata
+                    expanded_query, filename, metadata,
+                    is_ucs_expanded=is_ucs_expanded
                 )
 
-                # 对于无扩展的查询，降低匹配要求
-                min_score = 0.3 if len(expanded_queries) <= 1 else 0.5
-                if match_level in ("exact", "partial", "weak") and keyword_score >= min_score:
-                    processed_paths.add(file_path)
-                    final_score = self._compute_adaptive_score(
-                        keyword_score, 0.0, match_level
-                    )
+                # 对于 UCS 扩展的查询，提高匹配门槛
+                if is_original:
+                    min_score = 0.3  # 原始查询使用较低门槛
+                else:
+                    min_score = 0.6  # UCS 扩展查询需要更高的匹配度
+                    # 对于 UCS 扩展的结果，降低分数权重
+                    keyword_score = keyword_score * 0.7
 
-                    results.append(SearchResult(
-                        file_path=file_path,
-                        filename=filename,
-                        similarity=final_score,
-                        duration=metadata.get("duration", 0.0),
-                        format=metadata.get("format", "") or "",
-                        metadata={
-                            **metadata,
-                            "match_level": match_level,
-                            "keyword_score": keyword_score,
-                            "semantic_score": 0.0,
-                            "search_layer": 2,
-                            "matched_query": expanded_query
-                        }
-                    ))
+                if match_level in ("exact", "partial", "weak") and keyword_score >= min_score:
+                    # 只保留每个文件的最佳匹配
+                    if file_path not in file_best_match or file_best_match[file_path][0] < keyword_score:
+                        file_best_match[file_path] = (keyword_score, match_level, expanded_query, metadata)
+
+        # 构建结果列表
+        for file_path, (keyword_score, match_level, matched_query, metadata) in file_best_match.items():
+            filename = metadata.get("filename", "")
+            final_score = self._compute_adaptive_score(
+                keyword_score, 0.0, match_level
+            )
+
+            results.append(SearchResult(
+                file_path=file_path,
+                filename=filename,
+                similarity=final_score,
+                duration=metadata.get("duration", 0.0),
+                format=metadata.get("format", "") or "",
+                metadata={
+                    **metadata,
+                    "match_level": match_level,
+                    "keyword_score": keyword_score,
+                    "semantic_score": 0.0,
+                    "search_layer": 2,
+                    "matched_query": matched_query
+                }
+            ))
 
         # 按分数排序
         results.sort(key=lambda x: x.similarity, reverse=True)
