@@ -50,8 +50,6 @@
 ### 📁 项目管理 / Project Management
 - **多项目管理** - 创建和管理多个音效库项目
 - **Multi-Project Management** - Create and manage multiple sound libraries
-- **智能分类** - 自动按 UCS 标准分类音效
-- **Smart Categorization** - Auto-categorize sounds by UCS standards
 
 ### 🤖 AI 对话助手 / AI Chat Assistant
 - **多 LLM 支持** - 支持 OpenAI、Azure、Gemini、Kimi、Claude、DeepSeek、SiliconFlow 等
