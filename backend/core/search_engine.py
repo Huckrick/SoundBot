@@ -250,6 +250,32 @@ class OptimizedAudioSearcher(AudioSearcher):
                 scores.append(0.95)
                 if match_level != "exact":
                     match_level = "exact"
+        else:
+            # 中文模糊匹配：查询词中的任意字符出现在文件名中
+            # 如"石头"可以匹配包含"石"字的"石膏"
+            if any('\u4e00' <= c <= '\u9fff' for c in query_lower):
+                # 提取查询词中的所有中文字符
+                query_chars = set(c for c in query_lower if '\u4e00' <= c <= '\u9fff')
+                
+                # 将文件名分词
+                filename_tokens = re.split(r'[_\-\s\[\]【】]+', filename_base)
+                
+                # 检查是否有中文字符匹配
+                matched_chars = set()
+                for token in filename_tokens:
+                    for char in query_chars:
+                        if char in token:
+                            matched_chars.add(char)
+                
+                # 如果匹配了查询词中的任意中文字符
+                if matched_chars:
+                    # 计算匹配率
+                    match_ratio = len(matched_chars) / len(query_chars)
+                    if match_ratio >= 0.5:  # 至少匹配50%的字符
+                        score = 0.6 + match_ratio * 0.25  # 0.6 - 0.85
+                        scores.append(score)
+                        if match_level == "none":
+                            match_level = "partial"
 
         # 文件名包含查询词的大部分（支持中英文）
         if len(query_tokens) > 1:

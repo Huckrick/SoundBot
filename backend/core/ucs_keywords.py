@@ -339,7 +339,8 @@ class UCSKeywordProcessor:
         """
         使用中文分词扩展查询
 
-        结合 jieba 分词和 UCS 关键词扩展，实现更全面的查询扩展
+        策略：只使用原始查询 + jieba 分词，禁用 UCS 关键词映射
+        原因：UCS 映射质量不高，会导致大量误匹配
 
         Args:
             query: 原始查询
@@ -353,15 +354,7 @@ class UCSKeywordProcessor:
         expanded = [query]  # 保留原始查询
         seen = {query.lower()}
 
-        # 方法1：直接使用 UCS 扩展原始查询
-        ucs_expanded = expand_query_with_ucs(query)
-        for q in ucs_expanded:
-            q_lower = q.lower()
-            if q_lower not in seen and len(q_lower) > 1:
-                seen.add(q_lower)
-                expanded.append(q)
-
-        # 方法2：如果有中文，使用 jieba 分词后扩展
+        # 只使用 jieba 分词扩展，禁用 UCS 映射
         if _jieba_available and re.search(r'[\u4e00-\u9fff]', query):
             tokens = self.tokenize(query)
 
@@ -369,14 +362,6 @@ class UCSKeywordProcessor:
                 if token.lower() not in seen and len(token) > 1:
                     seen.add(token.lower())
                     expanded.append(token)
-
-                    # 对每个分词结果再进行 UCS 扩展
-                    token_expanded = expand_query_with_ucs(token)
-                    for q in token_expanded:
-                        q_lower = q.lower()
-                        if q_lower not in seen and len(q_lower) > 1:
-                            seen.add(q_lower)
-                            expanded.append(q)
 
         # 去重并保持原始查询在首位
         return list(dict.fromkeys(expanded))
