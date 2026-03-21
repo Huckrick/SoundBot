@@ -60,7 +60,7 @@
           "arch": ["x64", "arm64"]
         }
       ],
-      "icon": "assets/icon.icns"
+      "icon": "build/icon.icns"
     },
     "win": {
       "target": [
@@ -69,7 +69,7 @@
           "arch": ["x64"]
         }
       ],
-      "icon": "assets/icon.ico"
+      "icon": "build/icon.png"
     },
     "linux": {
       "target": ["AppImage"],
