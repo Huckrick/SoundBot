@@ -136,7 +136,9 @@ function createWindow() {
   });
 
   // 加载本地 index.html 文件
-  mainWindow.loadFile('index.html');
+  // 使用绝对路径确保打包后能正确找到文件
+  const indexPath = path.join(__dirname, 'index.html');
+  mainWindow.loadFile(indexPath);
 
   // 窗口准备好后显示
   mainWindow.once('ready-to-show', () => {
