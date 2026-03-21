@@ -6,6 +6,10 @@ on:
       - 'v*'
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  PYTHONIOENCODING: utf-8
+
 jobs:
   build-macos:
     runs-on: macos-latest
@@ -85,28 +89,33 @@ jobs:
         run: npm ci
 
       - name: Setup Python virtual environment
+        shell: pwsh
         run: |
           cd backend
           python -m venv venv
-          .\venv\Scripts\activate
+          .\venv\Scripts\Activate.ps1
           pip install --upgrade pip
           pip install -r requirements.txt
           echo "Python dependencies installed:"
           pip list | head -20
 
       - name: Download AI models
+        shell: pwsh
         run: |
           cd backend
-          .\venv\Scripts\activate
+          .\venv\Scripts\Activate.ps1
           cd ..
           python scripts/download_models.py
+        env:
+          PYTHONIOENCODING: utf-8
 
       - name: Check package size
+        shell: pwsh
         run: |
-          echo "Backend size:"
-          du -sh backend/ || Get-ChildItem backend/ -Recurse | Measure-Object -Property Length -Sum
-          echo "Models size:"
-          du -sh models/ || Get-ChildItem models/ -Recurse | Measure-Object -Property Length -Sum
+          Write-Host "Backend size:"
+          Get-ChildItem backend/ -Recurse | Measure-Object -Property Length -Sum | Select-Object Sum
+          Write-Host "Models size:"
+          Get-ChildItem models/ -Recurse | Measure-Object -Property Length -Sum | Select-Object Sum
 
       - name: Build Windows
         run: npm run build:win
