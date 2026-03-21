@@ -25,13 +25,79 @@ LLM 和 Embedding 配置管理器
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, asdict
+from urllib.parse import urlparse
 import requests
 
 import config
 from utils.logger import get_logger
+
+
+def validate_url(url: str, allowed_schemes: List[str] = None) -> bool:
+    """
+    验证 URL 是否安全，防止 SSRF 攻击
+    
+    Args:
+        url: 要验证的 URL
+        allowed_schemes: 允许的协议列表，默认为 ['http', 'https']
+        
+    Returns:
+        bool: URL 是否安全
+    """
+    if not url:
+        return False
+    
+    if allowed_schemes is None:
+        allowed_schemes = ['http', 'https']
+    
+    try:
+        parsed = urlparse(url)
+        
+        # 检查协议
+        if parsed.scheme not in allowed_schemes:
+            return False
+        
+        # 检查是否有主机名
+        if not parsed.hostname:
+            return False
+        
+        # 禁止访问内网地址
+        hostname = parsed.hostname.lower()
+        
+        # 检查是否是 IP 地址
+        ip_pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
+        if re.match(ip_pattern, hostname):
+            # 检查是否是内网 IP
+            ip_parts = hostname.split('.')
+            first_octet = int(ip_parts[0])
+            second_octet = int(ip_parts[1])
+            
+            # 10.0.0.0/8
+            if first_octet == 10:
+                return False
+            # 172.16.0.0/12
+            if first_octet == 172 and 16 <= second_octet <= 31:
+                return False
+            # 192.168.0.0/16
+            if first_octet == 192 and second_octet == 168:
+                return False
+            # 127.0.0.0/8 (localhost)
+            if first_octet == 127:
+                return False
+            # 0.0.0.0
+            if hostname == '0.0.0.0':
+                return False
+        
+        # 禁止 localhost 域名
+        if hostname in ['localhost', '127.0.0.1', '::1']:
+            return False
+        
+        return True
+    except Exception:
+        return False
 
 logger = get_logger(__name__)
 
@@ -519,6 +585,10 @@ class LLMConfigManager:
         
         if not base_url:
             return {"success": False, "message": "API 地址不能为空", "models": []}
+        
+        # 验证 URL 安全性，防止 SSRF 攻击
+        if not validate_url(base_url):
+            return {"success": False, "message": "API 地址不安全，请使用有效的 HTTP/HTTPS 地址", "models": []}
         
         try:
             # 尝试获取模型列表

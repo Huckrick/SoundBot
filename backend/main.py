@@ -18,6 +18,7 @@
 """FastAPI 后端服务，用于音效管理器的 AI 语义搜索功能。"""
 
 import os
+import re
 import time
 import asyncio
 import json
@@ -25,6 +26,51 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
 from concurrent.futures import ThreadPoolExecutor
+
+
+def validate_path(path: str, allow_absolute: bool = True) -> bool:
+    """
+    验证路径是否安全，防止路径遍历攻击
+    
+    Args:
+        path: 要验证的路径
+        allow_absolute: 是否允许绝对路径
+        
+    Returns:
+        bool: 路径是否安全
+    """
+    if not path:
+        return False
+    
+    # 解码 URL 编码
+    import urllib.parse
+    decoded_path = urllib.parse.unquote(path)
+    
+    # 规范化路径
+    normalized = os.path.normpath(decoded_path)
+    
+    # 检查是否包含路径遍历字符
+    if '..' in normalized:
+        return False
+    
+    # 检查是否包含空字节（Null byte）
+    if '\x00' in decoded_path:
+        return False
+    
+    # 检查是否包含危险的特殊字符
+    dangerous_patterns = [
+        r'\.{2,}',  # 多个点
+        r'[~`]',     # 波浪号和反引号
+    ]
+    for pattern in dangerous_patterns:
+        if re.search(pattern, decoded_path):
+            return False
+    
+    # 如果不允许绝对路径，检查是否是相对路径
+    if not allow_absolute and os.path.isabs(normalized):
+        return False
+    
+    return True
 
 from fastapi import FastAPI, HTTPException, Query, Path as PathParam, BackgroundTasks, WebSocket, WebSocketDisconnect, Body
 from fastapi.responses import FileResponse, StreamingResponse, Response
@@ -2115,6 +2161,10 @@ async def set_temp_dir(request: schemas.TempDirRequest):
     
     new_dir = request.temp_dir
     
+    # 验证路径安全性，防止路径遍历攻击
+    if not validate_path(new_dir):
+        raise HTTPException(status_code=400, detail="路径包含非法字符")
+    
     # 验证路径是否存在
     if not os.path.exists(new_dir):
         raise HTTPException(status_code=400, detail="指定的目录不存在")
@@ -2750,7 +2800,7 @@ async def update_folder_mapping(project_id: str, folder_path: str, user_folder_i
         }
     except Exception as e:
         logger.error(f"更新文件夹映射失败: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="更新文件夹映射失败，请检查日志")
 
 
 # ==================== AI Chat API ====================
@@ -2871,7 +2921,7 @@ async def save_ai_config(request: schemas.AIConfigRequest):
         }
     except Exception as e:
         logger.error(f"保存 AI 配置失败: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="保存配置失败，请检查日志")
 
 
 @app.post("/api/v1/ai/config/test")

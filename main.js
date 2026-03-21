@@ -109,8 +109,8 @@ function createWindow() {
       nodeIntegration: false, // 禁用 Node.js 集成，确保安全
       contextIsolation: true, // 启用上下文隔离
       preload: path.join(__dirname, 'preload.js'), // 预加载脚本
-      webSecurity: false, // 禁用 Web 安全以允许本地 HTTP 请求
-      allowRunningInsecureContent: true // 允许运行不安全内容（本地开发需要）
+      webSecurity: true, // 启用 Web 安全
+      allowRunningInsecureContent: false // 禁止运行不安全内容
     },
     titleBarStyle: 'default',
     show: false, // 先隐藏窗口，等加载完成再显示
