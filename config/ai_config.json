@@ -1,6 +1,6 @@
 {
     "llm": {
-        "provider": "lm_studio",
+        "provider": "kimi_coding",
         "lm_studio": {
             "base_url": "http://localhost:1234/v1",
             "model": ""
@@ -32,11 +32,10 @@
         },
         "kimi_coding": {
             "base_url": "https://api.kimi.com/coding",
-            "api_key": "",
+            "api_key": "sk-kimi-PwWlgPKaHR1laR1SLhdqdzmDMCQrOve7K6HEKsoEfn2iU81ZclNatTqAyDj1Q2DP",
             "model": "k2p5",
             "headers": {
-                "User-Agent": "Kimi Claw Plugin",
-                "X-Kimi-Claw-ID": ""
+                "User-Agent": "Kimi Claw Plugin"
             }
         },
         "anthropic": {
@@ -62,11 +61,7 @@
     },
     "embedding": {
         "provider": "default",
-        "default": {
-            "model_name": "laion/larger_clap_general",
-            "dimension": 512,
-            "description": "CLAP 音频-文本嵌入模型（默认）"
-        },
+        "default": {},
         "local": {
             "type": "lm_studio",
             "base_url": "http://localhost:1234/v1",

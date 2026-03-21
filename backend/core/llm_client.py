@@ -42,25 +42,22 @@ class LLMClient:
         """从配置管理器加载配置"""
         llm_config = self._config_manager.get_llm_config()
         provider = llm_config.get("provider", "lm_studio")
-        
-        if provider == LLMProvider.LM_STUDIO:
-            cfg = llm_config.get("lm_studio", {})
-            self.provider = LLMProvider.LM_STUDIO
-            self.base_url = cfg.get("base_url", "http://localhost:1234/v1")
-            self.model = cfg.get("model", "")
-            self.api_key = ""
-        elif provider == LLMProvider.OLLAMA:
-            cfg = llm_config.get("ollama", {})
-            self.provider = LLMProvider.OLLAMA
-            self.base_url = cfg.get("base_url", "http://localhost:11434/v1")
-            self.model = cfg.get("model", "")
-            self.api_key = ""
-        else:  # external
-            cfg = llm_config.get("external", {})
-            self.provider = LLMProvider.EXTERNAL
-            self.base_url = cfg.get("base_url", "https://api.openai.com/v1")
-            self.model = cfg.get("model", "gpt-4o-mini")
-            self.api_key = cfg.get("api_key", "")
+
+        # 动态获取 provider 配置
+        provider_cfg = llm_config.get(provider, {})
+        self.provider = provider
+        self.base_url = provider_cfg.get("base_url", "")
+        self.model = provider_cfg.get("model", "")
+        self.api_key = provider_cfg.get("api_key", "")
+
+        # 特殊处理某些 provider
+        if provider == "kimi_coding":
+            # Kimi Coding 需要特殊 headers
+            self.headers = provider_cfg.get("headers", {
+                "User-Agent": "Kimi Claw Plugin"
+            })
+        else:
+            self.headers = {}
     
     def reload_config(self):
         """重新加载配置"""
@@ -74,7 +71,11 @@ class LLMClient:
             headers = {}
             if self.api_key:
                 headers["Authorization"] = f"Bearer {self.api_key}"
-            
+
+            # 合并自定义 headers
+            if hasattr(self, 'headers') and self.headers:
+                headers.update(self.headers)
+
             url = self.base_url.rstrip("/") + "/models"
             response = requests.get(url, headers=headers, timeout=5)
             return response.status_code == 200
@@ -146,6 +147,10 @@ class LLMClient:
         }
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
+
+        # 合并自定义 headers
+        if hasattr(self, 'headers') and self.headers:
+            headers.update(self.headers)
         
         payload = {
             "model": self.model,
@@ -224,6 +229,10 @@ class LLMClient:
         }
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
+
+        # 合并自定义 headers
+        if hasattr(self, 'headers') and self.headers:
+            headers.update(self.headers)
         
         payload = {
             "model": self.model,
