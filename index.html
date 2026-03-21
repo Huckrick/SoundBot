@@ -1137,9 +1137,9 @@
                         currentBlobUrl = null;
                     }
                     updatePlaybackUI();
-                    // 如果有搜索结果，保持显示搜索结果；否则显示正常列表
+                    // 如果有搜索结果（包括AI搜索），保持显示搜索结果；否则显示正常列表
                     const searchQuery = document.getElementById('searchInput').value.trim();
-                    if (searchQuery && allSearchResults.length > 0) {
+                    if (allSearchResults.length > 0) {
                         renderSoundList('', allSearchResults);
                     } else {
                         renderSoundList(searchQuery);
@@ -1301,9 +1301,9 @@
                 }
 
                 updatePlaybackUI();
-                // 如果有搜索结果，保持显示搜索结果；否则显示正常列表
+                // 如果有搜索结果（包括AI搜索），保持显示搜索结果；否则显示正常列表
                 const searchQuery = document.getElementById('searchInput').value.trim();
-                if (searchQuery && allSearchResults.length > 0) {
+                if (allSearchResults.length > 0) {
                     renderSoundList('', allSearchResults);
                 } else {
                     renderSoundList(searchQuery);
@@ -3328,6 +3328,17 @@
             
             // 清空现有内容
             container.innerHTML = '';
+            
+            // 保存到 allSearchResults，这样播放结束时不会刷新回默认列表
+            allSearchResults = results.map((r, index) => ({
+                id: `ai-result-${index}`,
+                name: r.filename,
+                filePath: r.file_path || r.path,
+                duration: r.duration,
+                format: r.format,
+                similarity: r.similarity,
+                tags: ['AI搜索']
+            }));
 
             // 更新结果计数
             const headerText = document.querySelector('main .h-10 .flex-1');
