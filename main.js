@@ -928,14 +928,20 @@ async function startBackendServer() {
         backendProcess = null;
       }
 
+      // 准备环境变量
+      const envVars = {
+        ...process.env,
+        PYTHONUNBUFFERED: '1',
+        SOUNDBOT_MODELS_PATH: modelsPath
+      };
+      console.log(`[Backend] 环境变量 SOUNDBOT_MODELS_PATH: ${envVars.SOUNDBOT_MODELS_PATH}`);
+      console.log(`[Backend] Python 命令: ${pythonCmd}`);
+      console.log(`[Backend] main.py 路径: ${mainPy}`);
+
       // 启动后端进程
       backendProcess = spawn(pythonCmd, [mainPy], {
         cwd: backendPath,
-        env: { 
-          ...process.env, 
-          PYTHONUNBUFFERED: '1',
-          SOUNDBOT_MODELS_PATH: modelsPath  // 传递模型路径给后端
-        },
+        env: envVars,
         stdio: ['ignore', 'pipe', 'pipe']
       });
 
