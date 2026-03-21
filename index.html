@@ -5005,6 +5005,10 @@
 
         // ==================== EVENT LISTENERS ====================
         document.addEventListener('DOMContentLoaded', async () => {
+            console.log('[Frontend] DOMContentLoaded 开始执行');
+            console.log('[Frontend] window.electronAPI:', window.electronAPI);
+            console.log('[Frontend] window.electronAPI?.backendAPI:', window.electronAPI?.backendAPI);
+            
             // 绑定输入弹窗事件
             document.getElementById('inputModalCancel').addEventListener('click', hideInputModal);
             document.getElementById('inputModalConfirm').addEventListener('click', confirmInputModal);
