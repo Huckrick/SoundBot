@@ -7,23 +7,11 @@
 
 import logging
 import sys
-import os
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
 
 import config
-
-
-class SafeStreamHandler(logging.StreamHandler):
-    """安全的流处理器，处理 Broken pipe 错误"""
-    
-    def emit(self, record):
-        try:
-            super().emit(record)
-        except (BrokenPipeError, OSError):
-            # 管道断开时忽略错误
-            pass
 
 
 def setup_logger(
@@ -55,8 +43,8 @@ def setup_logger(
         datefmt="%Y-%m-%d %H:%M:%S"
     )
     
-    # 控制台处理器（使用安全处理器）
-    console_handler = SafeStreamHandler(sys.stdout)
+    # 控制台处理器
+    console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(level)
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)

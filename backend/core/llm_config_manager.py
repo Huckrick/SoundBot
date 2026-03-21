@@ -516,6 +516,39 @@ class LLMConfigManager:
             if custom_headers:
                 headers.update(custom_headers)
             
+            # Kimi Coding 使用 Anthropic 格式，可能没有 /models 端点
+            # 尝试直接调用 /v1/messages 进行简单测试
+            if provider == "kimi_coding":
+                test_url = base_url.rstrip("/") + "/v1/messages"
+                test_payload = {
+                    "model": model or "k2p5",
+                    "messages": [{"role": "user", "content": "hi"}],
+                    "max_tokens": 1,
+                    "stream": False
+                }
+                response = requests.post(test_url, headers=headers, json=test_payload, timeout=10)
+                
+                # Anthropic 格式返回 200 或某些错误码都表示服务存在
+                if response.status_code == 200:
+                    return {
+                        "success": True,
+                        "message": "Kimi Coding 连接成功",
+                        "models": [model or "k2p5"]
+                    }
+                elif response.status_code in [400, 401, 403]:
+                    # 认证错误或参数错误，但服务是可用的
+                    return {
+                        "success": True,
+                        "message": "Kimi Coding 服务可用（可能需要检查 API Key）",
+                        "models": [model or "k2p5"]
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": f"连接失败: HTTP {response.status_code}",
+                        "models": []
+                    }
+            
             # LM Studio 和 Ollama 都支持 /models 端点
             models_url = base_url.rstrip("/") + "/models"
             

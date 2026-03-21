@@ -3296,6 +3296,12 @@
                     updateLoadingMessage(event.content || '搜索中...');
                     break;
 
+                case 'chat':
+                    // 对话模式 - 直接显示回复
+                    removeLoadingMessage();
+                    addChatMessage(event.content);
+                    break;
+
                 case 'results':
                     // 显示摘要
                     if (event.summary) {
@@ -3331,10 +3337,11 @@
 
             results.forEach((result, index) => {
                 const file = result;
+                const filePath = file.file_path || file.path; // 兼容两种字段名
                 const soundItem = document.createElement('div');
                 soundItem.className = 'sound-item flex items-center py-2 px-4 border-b cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors';
                 soundItem.style.borderColor = 'var(--border-color)';
-                soundItem.dataset.path = file.path;
+                soundItem.dataset.path = filePath;
                 soundItem.dataset.index = index;
 
                 soundItem.innerHTML = `
@@ -3352,12 +3359,12 @@
                     <div class="flex-1 min-w-0 flex items-center gap-2">
                         <div class="flex-1 min-w-0">
                             <div class="text-sm font-medium truncate" style="color: var(--text-primary);">${escapeHtml(file.filename)}</div>
-                            <div class="text-xs truncate opacity-60" style="color: var(--text-secondary);">${escapeHtml(file.path)}</div>
+                            <div class="text-xs truncate opacity-60" style="color: var(--text-secondary);">${escapeHtml(filePath)}</div>
                         </div>
                     </div>
                     <div class="w-24 text-right text-sm font-mono" style="color: var(--text-secondary);">${formatDuration(file.duration)}</div>
                     <div class="w-16 flex justify-center">
-                        <button class="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 play-btn" title="播放" data-path="${escapeHtml(file.path)}">
+                        <button class="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 play-btn" title="播放" data-path="${escapeHtml(filePath)}">
                             <i data-lucide="play" class="w-4 h-4"></i>
                         </button>
                     </div>
@@ -3384,10 +3391,10 @@
                     } else {
                         // 选中音效
                         const soundObj = {
-                            path: file.path,
+                            path: filePath,
                             filename: file.filename,
                             duration: file.duration,
-                            filePath: file.path
+                            filePath: filePath
                         };
                         selectSound(soundObj);
                     }

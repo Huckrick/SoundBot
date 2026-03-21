@@ -6,11 +6,11 @@ AI 对话服务 - 自然语言音效搜索
 import json
 import asyncio
 from typing import Optional, List, Dict, Any, AsyncGenerator
-from dataclasses import dataclass
 
 from utils.logger import get_logger
 from core.llm_client import get_llm_client
 from core.search_engine import get_optimized_searcher_sync
+from core.searcher import SearchResult
 
 logger = get_logger(__name__)
 
@@ -61,27 +61,6 @@ SYSTEM_PROMPT = """你是 SoundMind 音效管理器的智能助手。
 """
 
 
-@dataclass
-class SearchResult:
-    """搜索结果"""
-    id: str
-    filename: str
-    filepath: str
-    similarity: float
-    duration: float = 0.0
-    format: str = ""
-    
-    def to_dict(self) -> dict:
-        return {
-            "id": self.id,
-            "filename": self.filename,
-            "filepath": self.filepath,
-            "similarity": round(self.similarity, 3),
-            "duration": self.duration,
-            "format": self.format
-        }
-
-
 class AIChatService:
     """AI 对话服务"""
     
@@ -128,10 +107,11 @@ class AIChatService:
             result = await self._ask_llm(message, conversation_history)
             
             if result.get("type") == "chat":
-                # 闲聊模式
+                # 闲聊模式 - 用普通对话生成真实回复
+                chat_response = await self._generate_chat_response(message, conversation_history)
                 yield {
                     "type": "chat",
-                    "content": result.get("response", "你好！有什么可以帮你的？")
+                    "content": chat_response
                 }
             else:
                 # 搜索模式
@@ -152,7 +132,7 @@ class AIChatService:
                 
                 yield {
                     "type": "results",
-                    "results": [r.to_dict() for r in results],
+                    "results": [r.dict() for r in results],
                     "count": len(results),
                     "summary": summary
                 }
@@ -215,25 +195,18 @@ class AIChatService:
             return {"type": "search", "keywords": [message], "response": f"搜索: {message}"}
     
     async def _search(self, query: str, top_k: int, threshold: float) -> List[SearchResult]:
-        """执行搜索"""
+        """执行搜索 - 使用与手动搜索相同的 search_async 方法"""
         try:
-            results = self.searcher.search(
+            # 使用 search_async 与手动搜索保持一致，包含三层搜索架构
+            results, stats = await self.searcher.search_async(
                 query=query,
                 top_k=top_k,
-                min_similarity=threshold
+                min_similarity=threshold,
+                use_cache=True
             )
             
-            return [
-                SearchResult(
-                    id=r.get("id", ""),
-                    filename=r.get("filename", ""),
-                    filepath=r.get("filepath", ""),
-                    similarity=r.get("similarity", 0),
-                    duration=r.get("duration", 0),
-                    format=r.get("format", "")
-                )
-                for r in results
-            ]
+            logger.info(f"AI 搜索 '{query}': 找到 {len(results)} 个结果, 缓存命中: {stats.get('cache_hit', False)}")
+            return results
         except Exception as e:
             logger.error(f"搜索失败: {e}")
             return []
@@ -246,6 +219,33 @@ class AIChatService:
         if count == 1:
             return f"找到 1 个音效: {results[0].filename}"
         return f"找到 {count} 个相关音效"
+    
+    async def _generate_chat_response(self, message: str, history: Optional[List[Dict]] = None) -> str:
+        """生成闲聊回复 - 使用普通对话模式，不限制身份"""
+        messages = []
+        if history:
+            for h in history[-5:]:
+                messages.append(h)
+        messages.append({"role": "user", "content": message})
+        
+        # 使用简单的系统提示词，不限制模型身份
+        chat_system_prompt = """你是一个有帮助的 AI 助手。请直接回答用户的问题，不要回避身份问题。"""
+        
+        full_response = ""
+        async for chunk in self.llm_client.chat(
+            messages=messages,
+            system_prompt=chat_system_prompt,
+            temperature=0.7,
+            max_tokens=512,
+            stream=True
+        ):
+            if chunk["type"] == "content":
+                full_response += chunk["content"]
+            elif chunk["type"] == "error":
+                logger.error(f"生成聊天回复失败: {chunk['content']}")
+                return "抱歉，我现在有点忙，稍后再聊好吗？"
+        
+        return full_response.strip() or "你好！有什么可以帮你的吗？"
 
 
 async def stream_to_sse(generator: AsyncGenerator[Dict[str, Any], None]) -> AsyncGenerator[str, None]:

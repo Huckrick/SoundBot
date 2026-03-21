@@ -2836,6 +2836,7 @@ async def save_ai_config(request: schemas.AIConfigRequest):
     try:
         from core.llm_config_manager import get_llm_config_manager
         from core.llm_client import reset_llm_client
+        from core.ai_chat_service import reset_ai_chat_service
         
         config_manager = get_llm_config_manager()
         
@@ -2846,8 +2847,9 @@ async def save_ai_config(request: schemas.AIConfigRequest):
             embedding_config=request.embedding_config
         )
         
-        # 重置 LLM 客户端以应用新配置
+        # 重置 LLM 客户端和 AI Chat 服务以应用新配置
         reset_llm_client()
+        reset_ai_chat_service()
         
         return {
             "success": True,
