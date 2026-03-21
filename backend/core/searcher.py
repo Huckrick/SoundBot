@@ -129,7 +129,7 @@ class AudioSearcher:
                     filename=metadata.get("filename", ""),
                     similarity=similarity,
                     duration=metadata.get("duration", 0.0),
-                    format=metadata.get("format", ""),
+                    format=metadata.get("format", "") or "",
                     metadata=metadata
                 ))
         
@@ -193,7 +193,7 @@ class AudioSearcher:
                     filename=metadata.get("filename", ""),
                     similarity=similarity,
                     duration=metadata.get("duration", 0.0),
-                    format=metadata.get("format", ""),
+                    format=metadata.get("format", "") or "",
                     metadata=metadata
                 ))
 

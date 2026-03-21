@@ -9,6 +9,8 @@ import hashlib
 import logging
 from pathlib import Path
 from typing import List, Optional, Dict, Any
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
 
 import chromadb
 from chromadb.config import Settings
@@ -142,6 +144,122 @@ class AudioIndexer:
         """
         return hashlib.sha256(file_path.encode()).hexdigest()[:16]
 
+    def _batch_process_files(
+        self,
+        files_to_process: List[tuple],
+        embedder,
+        is_update: bool = False,
+        batch_size: int = 32,
+        max_workers: int = 4
+    ) -> int:
+        """
+        批量处理文件（并行生成 embedding，批量写入 ChromaDB）
+        
+        Args:
+            files_to_process: 待处理文件列表 [(file_id, file_path, audio_file), ...]
+            embedder: embedding 生成器
+            is_update: 是否为更新操作
+            batch_size: 批量大小
+            max_workers: 并行线程数
+            
+        Returns:
+            成功处理的文件数量
+        """
+        if not files_to_process or embedder is None:
+            return 0
+        
+        total = len(files_to_process)
+        processed = 0
+        failed = 0
+        start_time = time.time()
+        
+        logger.info(f"[BATCH] 开始批量处理 {total} 个文件, 批次大小: {batch_size}, 并行数: {max_workers}")
+        
+        # 分批处理
+        for batch_start in range(0, total, batch_size):
+            batch_end = min(batch_start + batch_size, total)
+            batch = files_to_process[batch_start:batch_end]
+            
+            # 并行生成 embedding
+            results = []
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_to_file = {
+                    executor.submit(self._generate_embedding_for_file, file_id, file_path, audio_file, embedder): 
+                    (file_id, file_path, audio_file) 
+                    for file_id, file_path, audio_file in batch
+                }
+                
+                for future in as_completed(future_to_file):
+                    result = future.result()
+                    if result:
+                        results.append(result)
+                    else:
+                        failed += 1
+            
+            # 批量写入 ChromaDB
+            if results:
+                try:
+                    ids = [r['file_id'] for r in results]
+                    embeddings = [r['embedding'] for r in results]
+                    metadatas = [r['metadata'] for r in results]
+                    
+                    if is_update:
+                        self.collection.update(ids=ids, embeddings=embeddings, metadatas=metadatas)
+                    else:
+                        self.collection.add(ids=ids, embeddings=embeddings, metadatas=metadatas)
+                    
+                    # 更新元数据记录
+                    for r in results:
+                        self.indexed_files_meta[r['file_id']] = r['metadata']
+                    
+                    processed += len(results)
+                    
+                except Exception as e:
+                    logger.error(f"[BATCH] 批量写入 ChromaDB 失败: {e}")
+                    failed += len(results)
+            
+            # 进度报告
+            elapsed = time.time() - start_time
+            speed = (batch_end) / elapsed if elapsed > 0 else 0
+            logger.info(f"[BATCH] 进度: {batch_end}/{total} ({batch_end/total*100:.1f}%), 速度: {speed:.1f} 文件/秒")
+            print(f"[BATCH] 进度: {batch_end}/{total} ({batch_end/total*100:.1f}%), 速度: {speed:.1f} 文件/秒", flush=True)
+        
+        total_time = time.time() - start_time
+        logger.info(f"[BATCH] 批量处理完成: 成功 {processed}, 失败 {failed}, 耗时 {total_time:.2f} 秒, 平均速度: {processed/total_time:.1f} 文件/秒")
+        
+        return processed
+
+    def _generate_embedding_for_file(self, file_id: str, file_path: str, audio_file, embedder) -> Optional[Dict]:
+        """为单个文件生成 embedding 和元数据"""
+        try:
+            # 生成 embedding
+            embedding = embedder.audio_to_embedding(file_path)
+            
+            # 准备元数据
+            metadata = {
+                "file_path": file_path,
+                "filename": audio_file.filename,
+                "duration": audio_file.duration,
+                "sample_rate": audio_file.sample_rate,
+                "channels": audio_file.channels,
+                "format": audio_file.format,
+                "size": audio_file.size,
+                "hash": self._get_file_hash(file_path),
+                "folder_path": audio_file.folder_path,
+                "parsed_name": audio_file.parsed_name,
+                "name_description": audio_file.name_description,
+                "metadata_tags": json.dumps(audio_file.metadata_tags, ensure_ascii=False) if audio_file.metadata_tags else "{}"
+            }
+            
+            return {
+                'file_id': file_id,
+                'embedding': embedding.tolist(),
+                'metadata': metadata
+            }
+        except Exception as e:
+            logger.error(f"生成 embedding 失败 {file_path}: {e}")
+            return None
+
     def index_audio_files(
         self,
         folder_path: str,
@@ -159,20 +277,40 @@ class AudioIndexer:
         Returns:
             索引结果统计
         """
-        logger.info(f"开始索引文件夹: {folder_path}")
+        logger.info(f"[INDEXER] 开始索引文件夹: {folder_path}")
+        print(f"[INDEXER] 开始索引文件夹: {folder_path}", flush=True)
 
         # 扫描音频文件
         scanner = AudioScanner()
+        logger.info(f"[INDEXER] 调用 scanner.scan...")
+        print(f"[INDEXER] 调用 scanner.scan...", flush=True)
         audio_files = scanner.scan(folder_path, recursive)
 
-        logger.info(f"找到 {len(audio_files)} 个音频文件")
+        logger.info(f"[INDEXER] 扫描完成，找到 {len(audio_files)} 个音频文件")
+        print(f"[INDEXER] 扫描完成，找到 {len(audio_files)} 个音频文件", flush=True)
 
         # 尝试初始化 embedder，如果失败则跳过 embedding
         embedder = None
         if is_embedder_available():
             embedder = get_embedder()
         else:
-            logger.warning("Embedder 不可用，将只扫描文件，不生成语义索引")
+            logger.warning("Embedder 不可用，等待模型加载...")
+            # 等待模型加载完成（最多等待60秒）
+            import time
+            wait_time = 0
+            max_wait = 60
+            while wait_time < max_wait:
+                if is_embedder_available():
+                    embedder = get_embedder()
+                    logger.info(f"模型加载完成，等待了 {wait_time} 秒")
+                    break
+                time.sleep(1)
+                wait_time += 1
+                if wait_time % 10 == 0:
+                    logger.info(f"等待模型加载... {wait_time}/{max_wait} 秒")
+            
+            if embedder is None:
+                logger.error(f"模型加载超时（{max_wait}秒），将只扫描文件，不生成语义索引")
 
         # 如果没有 embedder，直接返回扫描结果（不建索引）
         if embedder is None:
@@ -203,85 +341,13 @@ class AudioIndexer:
         
         logger.info(f"需要新增: {len(to_add)}, 需要更新: {len(to_update)}")
         
-        # 处理新增文件
-        added_count = 0
-        for file_id, file_path, audio_file in to_add:
-            try:
-                # 生成 embedding
-                if embedder is None:
-                    # 没有 embedder 时，不应到达此处
-                    logger.warning(f"跳过 embedding: {file_path}")
-                    continue
-                    
-                embedding = embedder.audio_to_embedding(file_path)
-                
-                # 准备元数据（包含文件名解析信息）
-                metadata = {
-                    "file_path": file_path,
-                    "filename": audio_file.filename,
-                    "duration": audio_file.duration,
-                    "sample_rate": audio_file.sample_rate,
-                    "channels": audio_file.channels,
-                    "format": audio_file.format,
-                    "size": audio_file.size,
-                    "hash": self._get_file_hash(file_path),
-                    "folder_path": audio_file.folder_path,
-                    "parsed_name": audio_file.parsed_name,
-                    "name_description": audio_file.name_description,
-                    # 将元数据标签序列化为字符串
-                    "metadata_tags": json.dumps(audio_file.metadata_tags, ensure_ascii=False) if audio_file.metadata_tags else "{}"
-                }
-
-                # 添加到 ChromaDB
-                self.collection.add(
-                    ids=[file_id],
-                    embeddings=[embedding.tolist()],
-                    metadatas=[metadata]
-                )
-
-                # 更新元数据记录
-                self.indexed_files_meta[file_id] = metadata
-                added_count += 1
-
-            except Exception as e:
-                logger.error(f"索引文件失败 {file_path}: {e}")
-
-        # 处理需要更新的文件
-        updated_count = 0
-        for file_id, file_path, audio_file in to_update:
-            try:
-                # 生成新的 embedding
-                embedding = embedder.audio_to_embedding(file_path)
-
-                # 准备新的元数据（包含文件名解析信息）
-                metadata = {
-                    "file_path": file_path,
-                    "filename": audio_file.filename,
-                    "duration": audio_file.duration,
-                    "sample_rate": audio_file.sample_rate,
-                    "channels": audio_file.channels,
-                    "format": audio_file.format,
-                    "size": audio_file.size,
-                    "hash": self._get_file_hash(file_path),
-                    "folder_path": audio_file.folder_path,
-                    "parsed_name": audio_file.parsed_name,
-                    "name_description": audio_file.name_description,
-                    "metadata_tags": json.dumps(audio_file.metadata_tags, ensure_ascii=False) if audio_file.metadata_tags else "{}"
-                }
-
-                # 更新 ChromaDB
-                self.collection.update(
-                    ids=[file_id],
-                    embeddings=[embedding.tolist()],
-                    metadatas=[metadata]
-                )
-                
-                # 更新元数据记录
-                self.indexed_files_meta[file_id] = metadata
-                updated_count += 1
-                
-            except Exception as e:
-                logger.error(f"更新索引失败 {file_path}: {e}")
+        # 批量处理新增文件
+        added_count = self._batch_process_files(to_add, embedder, is_update=False)
+        
+        # 批量处理更新文件
+        updated_count = self._batch_process_files(to_update, embedder, is_update=True)
+        
+        logger.info(f"批量处理完成: 新增 {added_count}, 更新 {updated_count}")
         
         # 保存索引元数据
         self._save_indexed_meta()

@@ -313,43 +313,106 @@ class OptimizedAudioSearcher(AudioSearcher):
         self,
         filters: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
-        """获取所有文件用于关键词搜索（支持大数据集）"""
+        """获取所有文件用于关键词搜索（从 SQLite 数据库获取，支持未索引的文件）"""
         try:
+            # 从 SQLite 数据库获取文件列表，而不是 ChromaDB
+            # 这样可以搜索到未索引的文件（只有元数据，没有向量）
+            from core.database import get_db_manager
+            db_manager = get_db_manager()
+            
+            # 获取所有文件记录
+            all_records = db_manager.get_all_files()
+            
+            # 转换为与 ChromaDB 元数据兼容的格式
             all_files = []
-            offset = 0
-            batch_size = 10000
+            for record in all_records:
+                # 从 filename 提取格式（扩展名）
+                filename = record.filename
+                file_ext = filename.split('.')[-1].lower() if '.' in filename else ""
+                
+                metadata = {
+                    "file_path": record.path,
+                    "filename": filename,
+                    "duration": record.duration,
+                    "format": file_ext,
+                    "size": record.file_size,
+                    "sample_rate": record.sample_rate,
+                    "channels": record.channels,
+                    "folder_path": "",  # SQLite 中没有这个字段
+                    "parsed_name": "",  # SQLite 中没有这个字段
+                    "name_description": "",  # SQLite 中没有这个字段
+                    "metadata_tags": record.tags,  # 使用 tags 字段
+                }
+                
+                # 应用过滤条件
+                if filters:
+                    skip = False
+                    for key, condition in filters.items():
+                        if key == "duration":
+                            # 处理 $gte, $lte 等条件
+                            if isinstance(condition, dict):
+                                if "$gte" in condition and metadata.get("duration", 0) < condition["$gte"]:
+                                    skip = True
+                                    break
+                                if "$lte" in condition and metadata.get("duration", 0) > condition["$lte"]:
+                                    skip = True
+                                    break
+                            elif metadata.get("duration") != condition:
+                                skip = True
+                                break
+                        elif key in ["sample_rate", "channels"]:
+                            if metadata.get(key) != condition:
+                                skip = True
+                                break
+                        elif key == "format":
+                            if metadata.get("format", "").lower() != condition.lower():
+                                skip = True
+                                break
+                    
+                    if skip:
+                        continue
+                
+                all_files.append(metadata)
             
-            while True:
-                results = self.collection.get(
-                    limit=batch_size,
-                    offset=offset,
-                    where=filters if filters else None
-                )
-                
-                if not results or not results.get("ids"):
-                    break
-                
-                for i, file_id in enumerate(results["ids"]):
-                    metadata = results["metadatas"][i]
-                    all_files.append(metadata)
-                
-                # 如果获取的数量小于批次大小，说明已经获取完所有数据
-                if len(results["ids"]) < batch_size:
-                    break
-                
-                offset += batch_size
-                
-                # 安全限制：最多获取100万个文件
-                if offset > 1000000:
-                    logger.warning(f"文件数量超过100万，停止获取更多文件")
-                    break
-            
-            logger.info(f"获取文件列表完成: {len(all_files)} 个文件")
+            logger.info(f"从 SQLite 获取文件列表完成: {len(all_files)} 个文件")
             return all_files
             
         except Exception as e:
-            logger.warning(f"获取文件列表失败: {e}")
-            return []
+            logger.warning(f"从 SQLite 获取文件列表失败: {e}")
+            # 如果 SQLite 获取失败，回退到 ChromaDB
+            try:
+                all_files = []
+                offset = 0
+                batch_size = 10000
+                
+                while True:
+                    results = self.collection.get(
+                        limit=batch_size,
+                        offset=offset,
+                        where=filters if filters else None
+                    )
+                    
+                    if not results or not results.get("ids"):
+                        break
+                    
+                    for i, file_id in enumerate(results["ids"]):
+                        metadata = results["metadatas"][i]
+                        all_files.append(metadata)
+                    
+                    if len(results["ids"]) < batch_size:
+                        break
+                    
+                    offset += batch_size
+                    
+                    if offset > 1000000:
+                        logger.warning(f"文件数量超过100万，停止获取更多文件")
+                        break
+                
+                logger.info(f"从 ChromaDB 获取文件列表完成: {len(all_files)} 个文件")
+                return all_files
+            except Exception as e2:
+                logger.error(f"从 ChromaDB 获取文件列表也失败: {e2}")
+                return []
 
     def _exact_keyword_search(
         self,
@@ -374,8 +437,8 @@ class OptimizedAudioSearcher(AudioSearcher):
             filename = metadata.get("filename", "")
             keyword_score, match_level = self._keyword_match_score(query, filename, metadata)
 
-            # 放宽匹配要求：包含 weak 匹配，同时降低分数阈值
-            if match_level in ("exact", "partial", "weak") and keyword_score >= 0.5:
+            # 放宽匹配要求：包含 weak 匹配，同时降低分数阈值到 0.3
+            if match_level in ("exact", "partial", "weak") and keyword_score >= 0.3:
                 final_score = self._compute_adaptive_score(
                     keyword_score, 0.0, match_level
                 )
@@ -385,7 +448,7 @@ class OptimizedAudioSearcher(AudioSearcher):
                     filename=filename,
                     similarity=final_score,
                     duration=metadata.get("duration", 0.0),
-                    format=metadata.get("format", ""),
+                    format=metadata.get("format", "") or "",
                     metadata={
                         **metadata,
                         "match_level": match_level,
@@ -422,9 +485,7 @@ class OptimizedAudioSearcher(AudioSearcher):
             tokens = self._text_processor.tokenize(query)
             if tokens and len(tokens) > 1:
                 expanded_queries.extend(tokens)
-            else:
-                # 如果无法扩展，至少对原始查询进行文件名匹配
-                return []
+            # 不再直接返回空列表，而是继续使用原始查询进行搜索
 
         all_files = self._get_all_files(filters)
         results = []
@@ -464,7 +525,7 @@ class OptimizedAudioSearcher(AudioSearcher):
                         filename=filename,
                         similarity=final_score,
                         duration=metadata.get("duration", 0.0),
-                        format=metadata.get("format", ""),
+                        format=metadata.get("format", "") or "",
                         metadata={
                             **metadata,
                             "match_level": match_level,
@@ -551,7 +612,7 @@ class OptimizedAudioSearcher(AudioSearcher):
                         filename=filename,
                         similarity=final_score,
                         duration=metadata.get("duration", 0.0),
-                        format=metadata.get("format", ""),
+                        format=metadata.get("format", "") or "",
                         metadata={
                             **metadata,
                             "match_level": match_level,
@@ -698,7 +759,7 @@ class OptimizedAudioSearcher(AudioSearcher):
                     filename=metadata.get("filename", ""),
                     similarity=semantic_sim,
                     duration=metadata.get("duration", 0.0),
-                    format=metadata.get("format", ""),
+                    format=metadata.get("format", "") or "",
                     metadata={
                         **metadata,
                         "semantic_score": semantic_sim,
@@ -778,13 +839,13 @@ class OptimizedAudioSearcher(AudioSearcher):
         exact_results = self._exact_keyword_search(query, filters)
         all_results.extend(exact_results)
         stats["layers"]["exact"] = len(exact_results)
-        logger.debug(f"第1层(精确关键词): 找到 {len(exact_results)} 个结果")
+        logger.info(f"第1层(精确关键词): 找到 {len(exact_results)} 个结果, 查询='{query}'")
         
         # 第2层：分词扩展搜索
         expanded_results = self._expanded_keyword_search(query, filters)
         all_results.extend(expanded_results)
         stats["layers"]["expanded"] = len(expanded_results)
-        logger.debug(f"第2层(分词扩展): 找到 {len(expanded_results)} 个结果")
+        logger.info(f"第2层(分词扩展): 找到 {len(expanded_results)} 个结果, 查询='{query}'")
         
         # 如果 embedder 不可用，只返回关键词搜索结果
         if embedder is None:
@@ -816,7 +877,12 @@ class OptimizedAudioSearcher(AudioSearcher):
 
         for i, q in enumerate(expanded_queries):
             try:
-                query_embedding = embedder.text_to_embedding(q)
+                # 在线程池中执行 embedding 生成，避免阻塞事件循环
+                import asyncio
+                loop = asyncio.get_event_loop()
+                query_embedding = await loop.run_in_executor(
+                    None, embedder.text_to_embedding, q
+                )
 
                 if progress_callback:
                     progress = 0.5 + (i * 0.3 / len(expanded_queries))
@@ -923,7 +989,7 @@ class OptimizedAudioSearcher(AudioSearcher):
                     filename=metadata.get("filename", ""),
                     similarity=similarity,
                     duration=metadata.get("duration", 0.0),
-                    format=metadata.get("format", ""),
+                    format=metadata.get("format", "") or "",
                     metadata=metadata
                 ))
 

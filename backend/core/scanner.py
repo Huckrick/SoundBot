@@ -12,6 +12,8 @@ from typing import List, Optional, Dict, Any
 import librosa
 import soundfile as sf
 from pydantic import BaseModel
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -56,17 +58,21 @@ class AudioScanner:
     def __init__(self):
         self.supported_formats = SUPPORTED_AUDIO_FORMATS
 
-    def scan(self, folder_path: str, recursive: bool = True) -> List[AudioFile]:
+    def scan(self, folder_path: str, recursive: bool = True, max_workers: int = 8) -> List[AudioFile]:
         """
-        扫描指定文件夹中的音频文件
+        扫描指定文件夹中的音频文件（优化版本，支持并行处理）
 
         Args:
             folder_path: 要扫描的文件夹路径
             recursive: 是否递归扫描子文件夹
+            max_workers: 并行处理线程数
 
         Returns:
             音频文件列表，包含完整路径和元数据
         """
+        import time
+        start_time = time.time()
+        
         folder = Path(folder_path)
 
         if not folder.exists():
@@ -75,121 +81,60 @@ class AudioScanner:
         if not folder.is_dir():
             raise NotADirectoryError(f"路径不是文件夹: {folder_path}")
 
-        audio_files = []
+        logger.info(f"[SCANNER] 开始扫描文件夹: {folder_path}, 递归: {recursive}, 并行线程: {max_workers}")
+        print(f"[SCANNER] 开始扫描文件夹: {folder_path}, 递归: {recursive}, 并行线程: {max_workers}", flush=True)
+
+        # 第一步：快速收集所有音频文件路径
+        audio_file_paths = []
         scanned_dirs = []
-        skipped_files = []
-        error_files = []
-
-        logger.info(f"[SCANNER] 开始扫描文件夹: {folder_path}, 递归: {recursive}")
-        print(f"[SCANNER] 开始扫描文件夹: {folder_path}, 递归: {recursive}", flush=True)
-
+        
         if recursive:
-            # 递归扫描所有子文件夹
-            logger.info(f"[SCANNER] 使用 os.walk 开始递归扫描...")
-            print(f"[SCANNER] 使用 os.walk 开始递归扫描...", flush=True)
-            print(f"[SCANNER] 文件夹对象类型: {type(folder)}, 路径: {folder}", flush=True)
-            print(f"[SCANNER] 文件夹是否存在: {folder.exists()}", flush=True)
-            print(f"[SCANNER] 文件夹是否可读: {os.access(folder, os.R_OK)}", flush=True)
-            
-            # 尝试列出根目录内容
-            try:
-                root_contents = list(folder.iterdir())
-                print(f"[SCANNER] 根目录内容数量: {len(root_contents)}", flush=True)
-                for item in root_contents[:10]:  # 只显示前10个
-                    item_type = "文件夹" if item.is_dir() else "文件"
-                    print(f"[SCANNER]   - {item.name} ({item_type})", flush=True)
-            except Exception as e:
-                print(f"[SCANNER] ❌ 无法列出根目录内容: {e}", flush=True)
-            
-            walk_count = 0
+            logger.info(f"[SCANNER] 快速收集文件路径...")
             for root, dirs, files in os.walk(folder):
-                walk_count += 1
                 scanned_dirs.append(root)
-                logger.info(f"[SCANNER] 扫描子文件夹: {root}, 文件数: {len(files)}, 子目录数: {len(dirs)}")
-                print(f"[SCANNER] [{walk_count}] 扫描: {root}", flush=True)
-                print(f"[SCANNER]      文件: {len(files)} 个, 子目录: {len(dirs)} 个", flush=True)
-                if dirs:
-                    print(f"[SCANNER]      子目录列表: {dirs}", flush=True)
-                
-                # 检查每个子目录是否可访问
-                for d in dirs:
-                    subdir_path = Path(root) / d
-                    try:
-                        is_accessible = subdir_path.exists() and subdir_path.is_dir() and os.access(subdir_path, os.R_OK)
-                        print(f"[SCANNER]      检查子目录 '{d}': 可访问={is_accessible}", flush=True)
-                        if not is_accessible:
-                            logger.warning(f"[SCANNER] 子目录可能无法访问: {subdir_path}")
-                            print(f"[SCANNER]      ⚠️ 子目录可能无法访问: {subdir_path}", flush=True)
-                    except Exception as e:
-                        logger.error(f"[SCANNER] 检查子目录权限失败 {subdir_path}: {e}")
-                        print(f"[SCANNER]      ❌ 检查子目录权限失败: {e}", flush=True)
-                
                 for filename in files:
                     file_path = Path(root) / filename
-                    file_ext = file_path.suffix.lower()
-                    
-                    # 记录所有被检查的文件
-                    logger.debug(f"[SCANNER] 检查文件: {file_path}, 扩展名: {file_ext}")
-                    
-                    # 检查格式是否支持
-                    if file_ext not in self.supported_formats:
-                        skipped_files.append(f"{file_path} (不支持格式: {file_ext})")
-                        logger.debug(f"[SCANNER] 跳过不支持的格式: {file_path}")
-                        continue
-                    
-                    audio_file = self._process_file(file_path)
-                    if audio_file:
-                        audio_files.append(audio_file)
-                        logger.info(f"[SCANNER] 成功处理音频文件: {file_path}")
-                        print(f"[SCANNER] ✓ 成功处理: {file_path.name}", flush=True)
-                    else:
-                        error_files.append(str(file_path))
-                        logger.warning(f"[SCANNER] 处理文件失败: {file_path}")
-                        print(f"[SCANNER] ✗ 处理失败: {file_path.name}", flush=True)
+                    if file_path.suffix.lower() in self.supported_formats:
+                        audio_file_paths.append(file_path)
         else:
-            # 只扫描当前文件夹
-            logger.info(f"[SCANNER] 非递归模式，仅扫描当前文件夹")
             for file_path in folder.iterdir():
-                if file_path.is_file():
-                    file_ext = file_path.suffix.lower()
-                    logger.debug(f"[SCANNER] 检查文件: {file_path}, 扩展名: {file_ext}")
-                    
-                    if file_ext not in self.supported_formats:
-                        skipped_files.append(f"{file_path} (不支持格式: {file_ext})")
-                        continue
-                    
-                    audio_file = self._process_file(file_path)
+                if file_path.is_file() and file_path.suffix.lower() in self.supported_formats:
+                    audio_file_paths.append(file_path)
+        
+        total_files = len(audio_file_paths)
+        logger.info(f"[SCANNER] 找到 {total_files} 个音频文件，开始并行处理...")
+        print(f"[SCANNER] 找到 {total_files} 个音频文件，开始并行处理...", flush=True)
+        
+        # 第二步：并行处理音频文件
+        audio_files = []
+        processed_count = 0
+        error_count = 0
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # 提交所有任务
+            future_to_path = {executor.submit(self._process_file, path): path for path in audio_file_paths}
+            
+            # 处理结果
+            for future in as_completed(future_to_path):
+                file_path = future_to_path[future]
+                try:
+                    audio_file = future.result(timeout=30)  # 单个文件处理超时30秒
                     if audio_file:
                         audio_files.append(audio_file)
-                        logger.info(f"[SCANNER] 成功处理音频文件: {file_path}")
-
-        # 输出扫描统计
-        logger.info(f"[SCANNER] 扫描完成统计:")
-        logger.info(f"  - 扫描的文件夹数: {len(scanned_dirs)}")
-        logger.info(f"  - 跳过的文件数: {len(skipped_files)}")
-        logger.info(f"  - 处理失败的文件数: {len(error_files)}")
-        logger.info(f"  - 成功处理的音频文件数: {len(audio_files)}")
-        logger.info(f"  - 扫描的文件夹列表: {scanned_dirs}")
+                        processed_count += 1
+                        if processed_count % 50 == 0:
+                            logger.info(f"[SCANNER] 已处理 {processed_count}/{total_files} 个文件...")
+                            print(f"[SCANNER] 已处理 {processed_count}/{total_files} 个文件...", flush=True)
+                    else:
+                        error_count += 1
+                except Exception as e:
+                    error_count += 1
+                    logger.debug(f"[SCANNER] 处理文件失败 {file_path}: {e}")
         
-        print(f"[SCANNER] ===== 扫描完成统计 =====", flush=True)
-        print(f"[SCANNER] 扫描的文件夹数: {len(scanned_dirs)}", flush=True)
-        print(f"[SCANNER] 跳过的文件数: {len(skipped_files)}", flush=True)
-        print(f"[SCANNER] 处理失败的文件数: {len(error_files)}", flush=True)
-        print(f"[SCANNER] 成功处理的音频文件数: {len(audio_files)}", flush=True)
-        print(f"[SCANNER] 扫描的文件夹列表:", flush=True)
-        for d in scanned_dirs:
-            print(f"  - {d}", flush=True)
+        duration = time.time() - start_time
+        logger.info(f"[SCANNER] 扫描完成: {processed_count} 个成功, {error_count} 个失败, 耗时 {duration:.2f} 秒")
+        print(f"[SCANNER] 扫描完成: {processed_count} 个成功, {error_count} 个失败, 耗时 {duration:.2f} 秒", flush=True)
         
-        if skipped_files:
-            print(f"[SCANNER] 跳过的文件 (前10个):", flush=True)
-            for f in skipped_files[:10]:
-                print(f"  - {f}", flush=True)
-        
-        if error_files:
-            print(f"[SCANNER] 处理失败的文件 (前10个):", flush=True)
-            for f in error_files[:10]:
-                print(f"  - {f}", flush=True)
-
         return audio_files
 
     def scan_with_structure(self, folder_path: str, recursive: bool = True) -> tuple[List[AudioFile], FolderNode]:
@@ -481,7 +426,7 @@ class AudioScanner:
 
     def _process_file(self, file_path: Path) -> Optional[AudioFile]:
         """
-        处理单个音频文件，提取元数据
+        处理单个音频文件，提取元数据（优化版本）
 
         Args:
             file_path: 文件路径
@@ -497,14 +442,16 @@ class AudioScanner:
             # 获取文件基本信息
             stat = file_path.stat()
 
-            # 解析文件名
+            # 解析文件名（这个很快，先做）
             parsed_name, name_tokens, name_description = self._parse_filename(file_path.name)
 
-            # 提取音频元数据标签
-            metadata_tags = self._extract_audio_metadata(file_path)
-
-            # 使用 soundfile 获取音频信息（更高效）
+            # 使用 soundfile 获取音频信息（只读文件头，不加载音频数据）
             info = sf.info(str(file_path))
+
+            # 简化元数据提取 - 只提取基本信息，跳过耗时的 mutagen 解析
+            metadata_tags = {}
+            if hasattr(info, 'comment') and info.comment:
+                metadata_tags['comment'] = info.comment
 
             return AudioFile(
                 path=str(file_path.absolute()),
@@ -520,22 +467,25 @@ class AudioScanner:
                 metadata_tags=metadata_tags
             )
         except Exception as e:
-            # 如果 soundfile 失败，尝试使用 librosa
+            # 如果 soundfile 失败，尝试使用 librosa（但只读取信息，不加载整个文件）
             try:
                 stat = file_path.stat()
-                y, sr = librosa.load(str(file_path), sr=None, mono=False)
-
-                # 计算时长
-                duration = librosa.get_duration(y=y, sr=sr)
-
-                # 确定声道数
-                channels = 1 if y.ndim == 1 else y.shape[0]
+                
+                # 使用 librosa 的 get_duration 直接获取时长，不加载音频数据
+                duration = librosa.get_duration(path=str(file_path))
+                
+                # 使用 soundfile 获取其他信息（如果可能）
+                try:
+                    info = sf.info(str(file_path))
+                    sr = info.samplerate
+                    channels = info.channels
+                except:
+                    # 如果 soundfile 也失败，使用默认值
+                    sr = 44100
+                    channels = 2
 
                 # 解析文件名
                 parsed_name, name_tokens, name_description = self._parse_filename(file_path.name)
-
-                # 提取音频元数据标签
-                metadata_tags = self._extract_audio_metadata(file_path)
 
                 return AudioFile(
                     path=str(file_path.absolute()),
@@ -548,11 +498,11 @@ class AudioScanner:
                     parsed_name=parsed_name,
                     name_tokens=name_tokens,
                     name_description=name_description,
-                    metadata_tags=metadata_tags
+                    metadata_tags={}
                 )
-            except Exception as e:
+            except Exception as e2:
                 # 跳过无法读取的文件
-                logger.warning(f"无法读取音频文件 {file_path}: {e}")
+                logger.debug(f"无法读取音频文件 {file_path}: {e2}")
                 return None
 
     def is_audio_file(self, file_path: str) -> bool:

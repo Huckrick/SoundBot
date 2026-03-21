@@ -595,14 +595,19 @@ async def scan_and_index(request: schemas.ScanRequest):
     try:
         start_time = time.time()
         
+        logger.info(f"[SCAN_API] 开始扫描和索引: {folder}")
+        
         # 获取或创建索引器
         indexer = get_indexer()
+        logger.info(f"[SCAN_API] 获取 indexer 成功: {indexer}")
         
         # 执行索引
+        logger.info(f"[SCAN_API] 调用 index_audio_files...")
         result = indexer.index_audio_files(
             folder_path=str(folder),
             recursive=request.recursive
         )
+        logger.info(f"[SCAN_API] index_audio_files 返回: {result}")
         
         duration = time.time() - start_time
         
@@ -1144,7 +1149,9 @@ async def search_audio(request: schemas.SearchRequest):
         )
 
     except Exception as e:
+        import traceback
         logger.error(f"搜索失败: {e}")
+        logger.error(f"搜索失败详细堆栈: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
