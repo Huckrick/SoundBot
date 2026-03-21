@@ -132,16 +132,16 @@
             </div>
             <div class="relative">
                 <button id="importBtn" class="menu-btn px-3 py-1.5 rounded-md text-sm font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-1.5">
-                    <i data-lucide="upload" class="w-4 h-4"></i>导入
+                    <i data-lucide="upload" class="w-4 h-4"></i><span data-i18n="file.import">导入</span>
                 </button>
                 <!-- 导入下拉菜单 -->
                 <div id="importDropdown" class="dropdown-menu hidden absolute top-full left-0 mt-2 w-48 rounded-lg shadow-xl border py-2 z-50"
                      style="background-color: var(--bg-secondary); border-color: var(--border-color);">
                     <button id="importFileBtn" class="w-full px-4 py-2 text-sm text-left hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2">
-                        <i data-lucide="file-audio" class="w-4 h-4"></i>导入音频文件
+                        <i data-lucide="file-audio" class="w-4 h-4"></i><span data-i18n="file.import.audio">导入音频文件</span>
                     </button>
                     <button id="importFolderBtn" class="w-full px-4 py-2 text-sm text-left hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2">
-                        <i data-lucide="folder-plus" class="w-4 h-4"></i>导入文件夹
+                        <i data-lucide="folder-plus" class="w-4 h-4"></i><span data-i18n="file.import.folder">导入文件夹</span>
                     </button>
                 </div>
             </div>
@@ -259,9 +259,9 @@
             <div class="h-10 flex items-center justify-between px-4 border-b text-xs font-medium uppercase tracking-wider opacity-70"
                  style="border-color: var(--border-color);">
                 <div class="flex items-center">
-                    <i data-lucide="folder-tree" class="w-4 h-4 mr-2"></i>文件夹
+                    <i data-lucide="folder-tree" class="w-4 h-4 mr-2"></i><span data-i18n="folder.title">文件夹</span>
                 </div>
-                <button id="addFolderBtn" class="p-1 rounded-md hover:bg-white/10 transition-colors" title="新建文件夹">
+                <button id="addFolderBtn" class="p-1 rounded-md hover:bg-white/10 transition-colors" data-i18n-title="folder.add">
                     <i data-lucide="plus" class="w-3.5 h-3.5 opacity-70"></i>
                 </button>
             </div>
@@ -273,7 +273,7 @@
             <!-- Category Section -->
             <div class="h-10 flex items-center px-4 border-b text-xs font-medium uppercase tracking-wider opacity-70"
                  style="border-color: var(--border-color);">
-                <i data-lucide="tags" class="w-4 h-4 mr-2"></i>分类
+                <i data-lucide="tags" class="w-4 h-4 mr-2"></i><span data-i18n="category.title">分类</span>
             </div>
             <div class="flex-1 overflow-y-auto p-2" id="categoryTree"></div>
         </aside>
@@ -283,11 +283,11 @@
             <div class="h-10 flex items-center border-b px-4 text-xs font-medium uppercase tracking-wider opacity-70 shrink-0"
                  style="border-color: var(--border-color);">
                 <div class="w-10 flex justify-center"><input type="checkbox" id="selectAll" class="w-4 h-4 rounded border-gray-300"></div>
-                <div class="w-12 flex justify-center">封面</div>
-                <div class="w-32 flex justify-center">波形</div>
-                <div class="flex-1 min-w-0">文件名</div>
-                <div class="w-24 text-right">时长</div>
-                <div class="w-16 flex justify-center">操作</div>
+                <div class="w-12 flex justify-center" data-i18n="sound.cover">封面</div>
+                <div class="w-32 flex justify-center" data-i18n="sound.waveform">波形</div>
+                <div class="flex-1 min-w-0" data-i18n="sound.filename">文件名</div>
+                <div class="w-24 text-right" data-i18n="sound.duration">时长</div>
+                <div class="w-16 flex justify-center" data-i18n="sound.action">操作</div>
             </div>
             <div class="flex-1 overflow-y-auto" id="soundList"></div>
         </main>
@@ -298,9 +298,9 @@
             <div class="h-10 flex items-center justify-between px-4 border-b text-xs font-medium uppercase tracking-wider opacity-70"
                  style="border-color: var(--border-color);">
                 <div class="flex items-center">
-                    <i data-lucide="bot" class="w-4 h-4 mr-2"></i>AI 助手
+                    <i data-lucide="bot" class="w-4 h-4 mr-2"></i><span data-i18n="ai.assistant.title">AI 助手</span>
                 </div>
-                <button id="openAISettingsBtnChat" class="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors" title="AI 设置">
+                <button id="openAISettingsBtnChat" class="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors" data-i18n-title="settings.ai">
                     <i data-lucide="settings" class="w-4 h-4"></i>
                 </button>
             </div>
@@ -311,13 +311,13 @@
                             <i data-lucide="bot" class="w-3.5 h-3.5"></i>
                         </div>
                         <div class="flex-1">
-                            <div class="rounded-2xl rounded-tl-sm px-3 py-2 text-xs" style="background-color: var(--bg-tertiary);">
+                            <div class="rounded-2xl rounded-tl-sm px-3 py-2 text-xs" style="background-color: var(--bg-tertiary);" data-i18n="ai.chat.welcome.short">
                                 你好！我是你的音效管理助手。你可以用自然语言描述你需要的音效，比如：
                             </div>
                             <div class="mt-2 flex flex-wrap gap-1.5">
-                                <button class="example-prompt px-2.5 py-1 rounded-full text-xs border transition-colors hover:border-gray-500" style="border-color: var(--border-color);">"帮我找雨声音效"</button>
-                                <button class="example-prompt px-2.5 py-1 rounded-full text-xs border transition-colors hover:border-gray-500" style="border-color: var(--border-color);">"恐怖氛围的"</button>
-                                <button class="example-prompt px-2.5 py-1 rounded-full text-xs border transition-colors hover:border-gray-500" style="border-color: var(--border-color);">"轻快背景音乐"</button>
+                                <button class="example-prompt px-2.5 py-1 rounded-full text-xs border transition-colors hover:border-gray-500" style="border-color: var(--border-color);" data-i18n="ai.example.rain">"帮我找雨声音效"</button>
+                                <button class="example-prompt px-2.5 py-1 rounded-full text-xs border transition-colors hover:border-gray-500" style="border-color: var(--border-color);" data-i18n="ai.example.horror">"恐怖氛围的"</button>
+                                <button class="example-prompt px-2.5 py-1 rounded-full text-xs border transition-colors hover:border-gray-500" style="border-color: var(--border-color);" data-i18n="ai.example.music">"轻快背景音乐"</button>
                             </div>
                         </div>
                     </div>
@@ -347,7 +347,7 @@
                 <span id="waveformFileName" class="text-sm font-medium truncate max-w-md"></span>
                 <!-- 缩放控制 -->
                 <div class="flex items-center gap-1" id="zoomControls">
-                    <button id="zoomOutBtn" class="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors" title="缩小">
+                    <button id="zoomOutBtn" class="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors" data-i18n-title="player.zoom.out">
                         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="11" cy="11" r="8"></circle>
                             <line x1="8" y1="11" x2="14" y2="11"></line>
@@ -355,7 +355,7 @@
                         </svg>
                     </button>
                     <span id="zoomLevelDisplay" class="text-xs min-w-12 text-center">100%</span>
-                    <button id="zoomInBtn" class="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors" title="放大">
+                    <button id="zoomInBtn" class="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors" data-i18n-title="player.zoom.in">
                         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="11" cy="11" r="8"></circle>
                             <line x1="11" y1="8" x2="11" y2="14"></line>
@@ -363,7 +363,7 @@
                             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                         </svg>
                     </button>
-                    <button id="zoomResetBtn" class="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors ml-1" title="重置缩放">
+                    <button id="zoomResetBtn" class="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors ml-1" data-i18n-title="player.zoom.reset">
                         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
                             <path d="M3 3v5h5"></path>
@@ -374,15 +374,15 @@
             <div class="flex items-center gap-4 font-mono text-xs opacity-70">
                 <!-- 采样率显示 -->
                 <span id="sampleRateInfo" class="hidden">
-                    采样率: <span id="sampleRateValue">--</span> Hz
+                    <span data-i18n="sound.sample.rate">采样率</span>: <span id="sampleRateValue">--</span> Hz
                 </span>
                 <!-- 比特深度显示 -->
                 <span id="bitDepthInfo" class="hidden">
-                    比特深度: <span id="bitDepthValue">--</span> bit
+                    <span data-i18n="sound.bit.depth">比特深度</span>: <span id="bitDepthValue">--</span> bit
                 </span>
                 <!-- 选区信息 -->
                 <span id="selectionInfo" class="hidden">
-                    选区: <span id="selectionStart">0.00</span>s - <span id="selectionEnd">0.00</span>s
+                    <span data-i18n="player.selection">选区</span>: <span id="selectionStart">0.00</span>s - <span id="selectionEnd">0.00</span>s
                 </span>
             </div>
         </div>
@@ -397,7 +397,7 @@
             <!-- 拖拽手柄（选区拖拽导出） -->
             <div id="dragHandle" class="absolute top-0 h-6 z-20 cursor-grab hidden" style="background: linear-gradient(to bottom, rgba(59, 130, 246, 0.5), rgba(59, 130, 246, 0.2)); border-bottom: 2px solid rgba(59, 130, 246, 0.8);">
                 <div class="flex items-center justify-center h-full">
-                    <span id="dragHandleText" class="text-xs text-white font-medium whitespace-nowrap">拖拽导出</span>
+                    <span id="dragHandleText" class="text-xs text-white font-medium whitespace-nowrap" data-i18n="player.drag.export">拖拽导出</span>
                 </div>
             </div>
 
@@ -429,7 +429,7 @@
             <button id="nextBtn" class="w-9 h-9 rounded-lg flex items-center justify-center transition-colors hover:bg-black/5 dark:hover:bg-white/5 opacity-50 hover:opacity-100">
                 <i data-lucide="skip-forward" class="w-5 h-5"></i>
             </button>
-            <button id="loopBtn" class="w-9 h-9 rounded-lg flex items-center justify-center transition-colors hover:bg-black/5 dark:hover:bg-white/5 opacity-50" title="循环播放">
+            <button id="loopBtn" class="w-9 h-9 rounded-lg flex items-center justify-center transition-colors hover:bg-black/5 dark:hover:bg-white/5 opacity-50" data-i18n-title="player.loop">
                 <i data-lucide="repeat" class="w-5 h-5"></i>
             </button>
         </div>
@@ -3378,7 +3378,7 @@
                     </div>
                     <div class="w-24 text-right text-sm font-mono" style="color: var(--text-secondary);">${formatDuration(file.duration)}</div>
                     <div class="w-16 flex justify-center">
-                        <button class="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 play-btn" title="播放" data-path="${escapeHtml(filePath)}">
+                        <button class="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 play-btn" data-i18n-title="player.play" data-path="${escapeHtml(filePath)}">
                             <i data-lucide="play" class="w-4 h-4"></i>
                         </button>
                     </div>
@@ -4900,13 +4900,13 @@
 
             // 根据状态显示不同的进度文本
             const statusMap = {
-                'scanning': '扫描中',
-                'analyzing': '分析波形',
-                'saving': '保存数据',
-                'indexing': '向量索引',
-                'processing': '处理中'
+                'scanning': i18n.t('status.scanning'),
+                'analyzing': i18n.t('status.analyzing'),
+                'saving': i18n.t('status.saving'),
+                'indexing': i18n.t('status.indexing'),
+                'processing': i18n.t('status.processing')
             };
-            const statusText = statusMap[data.status] || '处理中';
+            const statusText = statusMap[data.status] || i18n.t('status.processing');
 
             if (data.scanned !== undefined && data.total !== undefined) {
                 progressText.textContent = `${statusText}: ${data.scanned} / ${data.total} (${data.progress || 0}%)`;
@@ -5801,21 +5801,21 @@
                             
                             // 恢复拖拽文字
                             if (dragHandleText) {
-                                dragHandleText.textContent = '拖拽导出';
+                                dragHandleText.textContent = i18n.t('player.drag.export');
                             }
                             
                             return true;
                         } else {
                             console.error('[拖拽] 失败:', result?.message || result?.detail || result?.error || '未知错误', result);
                             if (dragHandleText) {
-                                dragHandleText.textContent = '生成失败';
+                                dragHandleText.textContent = i18n.t('player.drag.failed');
                             }
                             return false;
                         }
                     } catch (error) {
                         console.error('[拖拽] 异常:', error);
                         if (dragHandleText) {
-                            dragHandleText.textContent = '生成失败';
+                            dragHandleText.textContent = i18n.t('player.drag.failed');
                         }
                         return false;
                     } finally {
