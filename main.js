@@ -939,10 +939,15 @@ async function startBackendServer() {
       console.log(`[Backend] main.py 路径: ${mainPy}`);
 
       // 启动后端进程
+      console.log(`[Backend] 启动参数:`);
+      console.log(`[Backend]   cwd: ${backendPath}`);
+      console.log(`[Backend]   env.SOUNDBOT_MODELS_PATH: ${envVars.SOUNDBOT_MODELS_PATH}`);
+      console.log(`[Backend]   cmd: ${pythonCmd} ${mainPy}`);
+      
       backendProcess = spawn(pythonCmd, [mainPy], {
         cwd: backendPath,
         env: envVars,
-        stdio: ['ignore', 'pipe', 'pipe']
+        stdio: ['pipe', 'pipe', 'pipe']
       });
 
       // 收集启动日志
