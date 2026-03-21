@@ -644,6 +644,10 @@ async def scan_and_index(request: schemas.ScanRequest):
     - **folder_path**: 要扫描的文件夹路径
     - **recursive**: 是否递归扫描子文件夹
     """
+    # 验证路径安全性，防止路径遍历攻击
+    if not validate_path(request.folder_path):
+        raise HTTPException(status_code=400, detail="路径包含非法字符")
+    
     folder = Path(request.folder_path)
     
     if not folder.exists():
@@ -689,6 +693,10 @@ async def scan_only(request: schemas.ScanRequest):
     """
     仅扫描音频文件，不建立索引（用于没有模型的情况）
     """
+    # 验证路径安全性，防止路径遍历攻击
+    if not validate_path(request.folder_path):
+        raise HTTPException(status_code=400, detail="路径包含非法字符")
+    
     folder = Path(request.folder_path)
     
     if not folder.exists():
@@ -741,6 +749,10 @@ async def import_folder_async(
 
     后台执行扫描和导入，通过 WebSocket 推送进度。
     """
+    # 验证路径安全性，防止路径遍历攻击
+    if not validate_path(request.folder_path):
+        raise HTTPException(status_code=400, detail="路径包含非法字符")
+    
     folder = Path(request.folder_path)
 
     if not folder.exists() or not folder.is_dir():
@@ -1889,6 +1901,9 @@ async def export_clip(request: schemas.ClipRequest):
             output_path = Path(config.get_temp_clip_dir()) / temp_name
             logger.info(f"[裁切] 使用临时目录: {output_path}")
         elif request.output:
+            # 验证输出路径安全性，防止路径遍历攻击
+            if not validate_path(request.output):
+                raise HTTPException(status_code=400, detail="输出路径包含非法字符")
             output_path = Path(request.output)
             logger.info(f"[裁切] 使用指定输出路径: {output_path}")
         else:
@@ -2006,6 +2021,9 @@ async def audio_fade(request: schemas.FadeRequest):
         
         # 生成输出路径
         if request.output:
+            # 验证输出路径安全性，防止路径遍历攻击
+            if not validate_path(request.output):
+                raise HTTPException(status_code=400, detail="输出路径包含非法字符")
             output_path = Path(request.output)
         else:
             output_path = source_file.parent / f"{source_file.stem}_fade{source_file.suffix}"
