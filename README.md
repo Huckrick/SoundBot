@@ -1,7 +1,7 @@
 # 🎵 SoundBot - AI 音效管理器 / AI Sound Effect Manager
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Version](https://img.shields.io/badge/version-0.1.2--alpha-orange.svg)](https://github.com/Huckrick/SoundBot)
+[![Version](https://img.shields.io/badge/version-0.1.1--alpha-orange.svg)](https://github.com/Huckrick/SoundBot)
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![Electron](https://img.shields.io/badge/electron-28.x-9feaf9.svg)](https://www.electronjs.org/)
 
@@ -78,7 +78,7 @@ This project was inspired by **[OpenClaw](https://github.com/miaoxworld/openclaw
 
 ### 系统要求 / System Requirements
 
-- **macOS**: 10.15+ (Intel/Apple Silicon)
+- **macOS**: 10.12+ (Intel/Apple Silicon)
 - **Windows**: Windows 10/11 64-bit
 - **RAM**: 4GB+ (推荐 8GB)
 - **存储空间**: 2GB+ 可用空间 / 2GB+ free space
@@ -93,11 +93,7 @@ This project was inspired by **[OpenClaw](https://github.com/miaoxworld/openclaw
    - **macOS**: 打开 `.dmg` 文件，将 SoundBot 拖到 Applications 文件夹
    - **Windows**: 运行 `.exe` 安装程序，按向导完成安装
 
-3. **首次启动 / First Launch**
-   - 应用会自动下载 AI 模型（约 1.5GB）
-   - Application will automatically download AI models (~1.5GB)
-
-4. **开始使用 / Start Using**
+3. **开始使用 / Start Using**
    - 导入你的音效库文件夹
    - Import your sound effect library folder
    - 开始语义搜索！
@@ -231,4 +227,20 @@ the Free Software Foundation, either version 3 of the License, or
 - [ChromaDB](https://www.trychroma.com/) - 向量数据库 / Vector database
 - [FastAPI](https://fastapi.tiangolo.com/) - 高性能 Web 框架 / High-performance web framework
 - [Electron](https://www.electronjs.org/) - 跨平台桌面应用框架 / Cross-platform desktop framework
-- [WaveSurfer.js](https://wavesurfer-js.org/) - 音频波形
+- [WaveSurfer.js](https://wavesurfer-js.org/) - 音频波形可视化 / Audio waveform visualization
+- [Trae](https://www.trae.ai/) & [Cursor](https://cursor.sh/) - AI 编程工具 / AI programming tools
+
+***
+
+## 📞 联系我们 / Contact Us
+
+- 📧 邮箱 / Email：**Nagisa_Huckrick@yeah.net**
+- 🐛 Issue：[GitHub Issues](https://github.com/Huckrick/SoundBot/issues)
+- 💬 Discussions：[GitHub Discussions](https://github.com/Huckrick/SoundBot/discussions)
+
+***
+
+<p align="center">
+  Made with ❤️ by Nagisa_Huckrick (胡杨) using AI tools<br>
+  使用 AI 工具由 Nagisa_Huckrick (胡杨) 制作
+</p>
