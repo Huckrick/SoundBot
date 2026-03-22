@@ -15,15 +15,24 @@ backend_dir = spec_dir
 project_root = backend_dir.parent
 
 # 添加数据文件
-datas = [
-    # 配置文件
-    (str(backend_dir / 'core'), 'core'),
-    (str(backend_dir / 'routers'), 'routers'),
-    (str(backend_dir / 'models'), 'models'),
-    (str(backend_dir / 'utils'), 'utils'),
-    (str(backend_dir / 'config.py'), '.'),
-    (str(backend_dir / 'database.py'), '.'),
-]
+datas = []
+
+# 添加 core 目录
+if (backend_dir / 'core').exists():
+    datas.append((str(backend_dir / 'core'), 'core'))
+
+# 添加 utils 目录
+if (backend_dir / 'utils').exists():
+    datas.append((str(backend_dir / 'utils'), 'utils'))
+
+# 添加配置文件
+if (backend_dir / 'config.py').exists():
+    datas.append((str(backend_dir / 'config.py'), '.'))
+
+# 添加其他 Python 文件
+for py_file in ['database.py', 'reindex_folder.py', 'reset_and_reindex.py']:
+    if (backend_dir / py_file).exists():
+        datas.append((str(backend_dir / py_file), '.'))
 
 # 添加模型文件（如果存在）
 models_dir = project_root / 'models'
