@@ -131,7 +131,7 @@ jobs:
           pip install --upgrade pip
           # 安装依赖，但排除 uvloop（Windows 不支持）
           # 使用 Python 脚本解析 requirements.txt
-          python -c "
+          python -c @"
 import re
 with open('requirements.txt', 'r') as f:
     lines = f.readlines()
@@ -141,7 +141,7 @@ with open('requirements-windows.txt', 'w') as f:
         if not re.match(r'^\s*(uvloop|#)', line) and line.strip():
             f.write(line)
 print('Created requirements-windows.txt')
-"
+"@
           Write-Host "=== Filtered requirements (first 20 lines) ==="
           Get-Content requirements-windows.txt | Select-Object -First 20
           # 安装过滤后的依赖
