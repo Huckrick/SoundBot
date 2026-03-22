@@ -69,6 +69,20 @@ jobs:
           ls -lh dist/
           du -sh dist/
 
+      - name: List packaged files
+        run: |
+          echo "=== Checking if venv and models are packaged ==="
+          if [ -d "dist/mac/SoundBot.app/Contents/Resources/app" ]; then
+            echo "Checking app bundle contents:"
+            ls -la "dist/mac/SoundBot.app/Contents/Resources/app/"
+            echo ""
+            echo "Checking backend/venv:"
+            ls -la "dist/mac/SoundBot.app/Contents/Resources/app/backend/" | head -20
+            echo ""
+            echo "Checking models:"
+            ls -la "dist/mac/SoundBot.app/Contents/Resources/app/models/" 2>/dev/null || echo "models not found!"
+          fi
+
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
@@ -132,6 +146,27 @@ jobs:
           echo "=== Windows Build Size ==="
           ls -lh dist/
           du -sh dist/
+
+      - name: List packaged files
+        shell: pwsh
+        run: |
+          echo "=== Checking if venv and models are packaged ==="
+          if (Test-Path "dist/win-unpacked") {
+            echo "Checking unpacked contents:"
+            Get-ChildItem "dist/win-unpacked" -Recurse -Depth 2 | Select-Object FullName, Length
+            echo ""
+            echo "Checking backend:"
+            if (Test-Path "dist/win-unpacked/resources/app/backend") {
+              Get-ChildItem "dist/win-unpacked/resources/app/backend" | Select-Object Name
+            }
+            echo ""
+            echo "Checking models:"
+            if (Test-Path "dist/win-unpacked/resources/app/models") {
+              Get-ChildItem "dist/win-unpacked/resources/app/models" -Recurse | Measure-Object -Property Length -Sum
+            } else {
+              Write-Host "models not found!"
+            }
+          }
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
