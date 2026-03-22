@@ -39,7 +39,6 @@
       "assets/**/*",
       "backend/**/*",
       "config/**/*",
-      "!backend/venv",
       "!backend/__pycache__",
       "!backend/db/*.db",
       "!backend/**/*.pyc"
@@ -49,10 +48,10 @@
         "from": "backend",
         "to": "backend",
         "filter": [
+          "**/*",
           "!__pycache__",
           "!db/*.db",
           "!**/*.pyc",
-          "!venv/**/*",
           "!**/__pycache__/**/*"
         ]
       },
