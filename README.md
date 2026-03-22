@@ -1,26 +1,26 @@
-🎵 SoundBot - AI 音效管理器 / AI Sound Effect Manager
+# 🎵 SoundBot - AI 音效管理器 / AI Sound Effect Manager
 
-[!\[License: GPL v3\](https://img.shields.io/badge/License-GPLv3-blue.svg](https://www.gnu.org/licenses/gpl-3.0)
-[!\[Version\](https://img.shields.io/badge/version-0.1.2--alpha-orange.svg](https://github.com/Huckrick/SoundBot)
-[!\[Python\](https://img.shields.io/badge/python-3.12-blue.svg](https://www.python.org/)
-[!\[Electron\](https://img.shields.io/badge/electron-28.x-9feaf9.svg](https://www.electronjs.org/)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Version](https://img.shields.io/badge/version-0.1.0--alpha-orange.svg)](https://github.com/Huckrick/SoundBot)
+[![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
+[![Electron](https://img.shields.io/badge/electron-28.x-9feaf9.svg)](https://www.electronjs.org/)
 
-> 用自然语言找到你想要的任何声音 - AI 驱动的智能音效管理器桌面版\
+> 用自然语言找到你想要的任何声音 - AI 驱动的智能音效管理器桌面版  
 > Find any sound you want using natural language - AI-powered intelligent sound effect manager for desktop
 
-***
+---
 
 ## 📥 下载 / Download
 
-[!\[Download for macOS\](https://img.shields.io/badge/Download-macOS-blue.svg](https://github.com/Huckrick/SoundBot/releases/latest)\
-[!\[Download for Windows\](https://img.shields.io/badge/Download-Windows-blue.svg](https://github.com/Huckrick/SoundBot/releases/latest)
+[![Download for macOS](https://img.shields.io/badge/Download-macOS-blue.svg)](https://github.com/Huckrick/SoundBot/releases/latest)  
+[![Download for Windows](https://img.shields.io/badge/Download-Windows-blue.svg)](https://github.com/Huckrick/SoundBot/releases/latest)
 
 **最新版本 / Latest Release**: [v0.1.2-alpha](https://github.com/Huckrick/SoundBot/releases/latest)
 
 ### 界面预览 / Screenshot
 
-!\[SoundBot Home1]\(https://raw.githubusercontent.com/Huckrick/SoundBot/main/Home1.png\
-!\[SoundBot Home2]\(https://raw.githubusercontent.com/Huckrick/SoundBot/main/Home2.png
+![SoundBot Home1](./Home1.png)  
+![SoundBot Home2](./Home2.png)
 
 ***
 
