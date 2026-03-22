@@ -38,6 +38,11 @@ This project was developed and tested entirely in a macOS environment.
 > ⚠️ **本人并非专业程序员，不具备编程背景。本项目全部代码均由 AI 编程工具（Trae、Cursor 等）辅助生成，本人主要负责产品构思、功能设计和测试验证。**  
 > ⚠️ **I am not a professional programmer and have no programming background. All code in this project was generated with the assistance of AI programming tools (Trae, Cursor, etc.). I am primarily responsible for product conception, feature design, and testing verification.**
 
+**灵感来源 / Inspiration**：
+本项目的诞生深受 **[OpenClaw](https://github.com/miaoxworld/openclaw-manager)** 的启发。OpenClaw 作为业内领先的 AI 管理工具，展示了 AI 与工具软件结合的无限可能，让我看到了 AI 辅助音频管理的创新方向。感谢 OpenClaw 团队为 AI 应用生态做出的贡献！
+
+This project was inspired by **[OpenClaw](https://github.com/miaoxworld/openclaw-manager)**. As a leading AI management tool, OpenClaw demonstrated the infinite possibilities of combining AI with utility software, showing me the innovative direction of AI-assisted audio management. Thanks to the OpenClaw team for their contributions to the AI application ecosystem!
+
 **致谢 / Acknowledgments**：
 特别感谢以下 AI 编程工具对本项目的支持 / Special thanks to the following AI programming tools for supporting this project：
 - [Trae](https://www.trae.ai/) - 主要开发工具 / Primary development tool
