@@ -19,8 +19,8 @@
 
 ### 界面预览 / Screenshot
 
-!\[SoundBot Home1]\(./Home1.png null)\
-!\[SoundBot Home2]\(./Home2.png null)
+!\[SoundBot Home1]\(https://raw.githubusercontent.com/Huckrick/SoundBot/main/Home1.png null)\
+!\[SoundBot Home2]\(https://raw.githubusercontent.com/Huckrick/SoundBot/main/Home2.png null)
 
 ***
 
