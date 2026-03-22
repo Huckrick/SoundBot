@@ -1,6 +1,6 @@
 {
   "name": "soundbot-electron",
-  "version": "0.1.2-alpha",
+  "version": "0.1.1-alpha",
   "description": "SoundBot - AI 音效管理器桌面版",
   "main": "main.js",
   "scripts": {
