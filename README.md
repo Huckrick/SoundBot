@@ -1,43 +1,43 @@
 # 🎵 SoundBot - AI 音效管理器 / AI Sound Effect Manager
 
-[!\[License: GPL v3\](https://img.shields.io/badge/License-GPLv3-blue.svg null)](https://www.gnu.org/licenses/gpl-3.0)
-[!\[Version\](https://img.shields.io/badge/version-0.1.2--alpha-orange.svg null)](https://github.com/Huckrick/SoundBot)
-[!\[Python\](https://img.shields.io/badge/python-3.12-blue.svg null)](https://www.python.org/)
-[!\[Electron\](https://img.shields.io/badge/electron-28.x-9feaf9.svg null)](https://www.electronjs.org/)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Version](https://img.shields.io/badge/version-0.1.2--alpha-orange.svg)](https://github.com/Huckrick/SoundBot)
+[![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
+[![Electron](https://img.shields.io/badge/electron-28.x-9feaf9.svg)](https://www.electronjs.org/)
 
-> 用自然语言找到你想要的任何声音 - AI 驱动的智能音效管理器桌面版\
+> 用自然语言找到你想要的任何声音 - AI 驱动的智能音效管理器桌面版  
 > Find any sound you want using natural language - AI-powered intelligent sound effect manager for desktop
 
 ***
 
 ## 📥 下载 / Download
 
-[!\[Download for macOS\](https://img.shields.io/badge/Download-macOS-blue.svg null)](https://github.com/Huckrick/SoundBot/releases/latest)\
-[!\[Download for Windows\](https://img.shields.io/badge/Download-Windows-blue.svg null)](https://github.com/Huckrick/SoundBot/releases/latest)
+[![Download for macOS](https://img.shields.io/badge/Download-macOS-blue.svg)](https://github.com/Huckrick/SoundBot/releases/latest)  
+[![Download for Windows](https://img.shields.io/badge/Download-Windows-blue.svg)](https://github.com/Huckrick/SoundBot/releases/latest)
 
 **最新版本 / Latest Release**: [v0.1.1-alpha](https://github.com/Huckrick/SoundBot/releases/latest)
 
 ### 界面预览 / Screenshot
 
-!\[SoundBot Home1]\(https\://raw\.githubusercontent.com/Huckrick/SoundBot/main/Home1.png null)\
-!\[SoundBot Home2]\(https\://raw\.githubusercontent.com/Huckrick/SoundBot/main/Home2.png null)
+![SoundBot Home1](https://raw.githubusercontent.com/Huckrick/SoundBot/main/Home1.png)  
+![SoundBot Home2](https://raw.githubusercontent.com/Huckrick/SoundBot/main/Home2.png)
 
 ***
 
 ## 📝 关于本项目 / About This Project
 
-**开发环境 / Development Environment**：本项目完全在 macOS 环境下开发和测试\
+**开发环境 / Development Environment**：本项目完全在 macOS 环境下开发和测试  
 This project was developed and tested entirely in a macOS environment.
 
 **开发背景 / Development Background**：
 
-- 开发者 / Developer：**Nagisa\_Huckrick (胡杨)**
-- 📧 联系邮箱 / Contact Email：**<Nagisa_Huckrick@yeah.net>**
+- 开发者 / Developer：**Nagisa_Huckrick (胡杨)**
+- 📧 联系邮箱 / Contact Email：**Nagisa_Huckrick@yeah.net**
 - 🐙 GitHub：[@Huckrick](https://github.com/Huckrick)
 
 **重要声明 / Important Statement**：
 
-> ⚠️ **本人并非专业程序员，不具备编程背景。本项目全部代码均由 AI 编程工具（Trae、Cursor 等）辅助生成，本人主要负责产品构思、功能设计和测试验证。**\
+> ⚠️ **本人并非专业程序员，不具备编程背景。本项目全部代码均由 AI 编程工具（Trae、Cursor 等）辅助生成，本人主要负责产品构思、功能设计和测试验证。**  
 > ⚠️ **I am not a professional programmer and have no programming background. All code in this project was generated with the assistance of AI programming tools (Trae, Cursor, etc.). I am primarily responsible for product conception, feature design, and testing verification.**
 
 **灵感来源 / Inspiration**：
@@ -48,142 +48,60 @@ This project was inspired by **[OpenClaw](https://github.com/miaoxworld/openclaw
 **致谢 / Acknowledgments**：
 特别感谢以下 AI 编程工具对本项目的支持 / Special thanks to the following AI programming tools for supporting this project：
 
-- [Trae](https://www.trae.ai/) - 主要开发工具 / Primary development tool
-- [Cursor](https://cursor.sh/) - 辅助开发工具 / Auxiliary development tool
+- **[Trae](https://www.trae.ai/)** - 由字节跳动开发的 AI 编程工具 / AI programming tool by ByteDance
+- **[Cursor](https://cursor.sh/)** - 基于 VS Code 的 AI 编程编辑器 / AI-powered code editor based on VS Code
 
 ***
 
-## ⚠️ 免责声明 / Disclaimer
+## ✨ 功能特性 / Features
 
-**使用风险 / Usage Risks**：
+### 🎯 核心功能 / Core Features
 
-1. 本软件按"原样"提供，不提供任何明示或暗示的担保\
-   This software is provided "as is" without any express or implied warranties.
-2. 使用本软件产生的任何数据丢失或损坏，开发者不承担责任\
-   The developer is not responsible for any data loss or damage caused by using this software.
-3. 请在使用前备份重要数据\
-   Please backup important data before use.
+| 功能 / Feature | 描述 / Description |
+|---------------|-------------------|
+| 🔍 **语义搜索 / Semantic Search** | 输入"雨声"、"爆炸声"等自然语言，AI 理解你的意图 / Type "rain sound", "explosion" in natural language, AI understands your intent |
+| 🎵 **音频预览 / Audio Preview** | 支持选区截取并拖拽到 DAW 中使用 / Support selecting regions and dragging to DAW |
+| 🤖 **AI 对话 / AI Chat** | 与 AI 讨论音效需求，获取推荐 / Chat with AI about sound needs and get recommendations |
+| 📁 **批量导入 / Batch Import** | 支持整个文件夹批量索引 / Support batch indexing of entire folders |
+| 🏷️ **智能标签 / Smart Tags** | 自动生成 UCS 标准分类标签 / Auto-generate UCS standard classification tags |
 
-**版权与许可 / Copyright and License**：
+### 🚀 技术亮点 / Technical Highlights
 
-- 本项目采用 **GPL-3.0** 开源许可证\
-  This project is licensed under **GPL-3.0** open source license.
-- 您可以自由使用、修改和分发，但修改后的版本必须开源\
-  You are free to use, modify, and distribute, but modified versions must be open source.
-- 禁止将本软件用于非法用途\
-  It is prohibited to use this software for illegal purposes.
-
-**第三方服务 / Third-Party Services**：
-
-- AI 功能需要连接第三方 LLM 服务（OpenAI、Claude 等）\
-  AI features require connection to third-party LLM services (OpenAI, Claude, etc.).
-- 使用这些服务需遵守各自的服务条款\
-  Use of these services is subject to their respective terms of service.
-- 开发者不对第三方服务的可用性或数据处理方式负责\
-  The developer is not responsible for the availability or data processing of third-party services.
-
-**音频文件 / Audio Files**：
-
-- 本软件仅提供音效管理功能，不包含任何音频素材\
-  This software only provides sound effect management functionality and does not contain any audio materials.
-- 用户需自行确保拥有导入音频文件的合法使用权\
-  Users must ensure they have legal rights to use the imported audio files.
+- **🧠 CLAP 模型**：使用 LAION 的 CLAP 模型进行音频-文本嵌入 / Using LAION's CLAP model for audio-text embedding
+- **⚡ 高性能**：基于 FastAPI 的异步后端 / FastAPI-based async backend
+- **🔒 本地优先**：所有数据本地存储，保护隐私 / All data stored locally, privacy protected
+- **🎨 现代化 UI**：基于 Tailwind CSS 的响应式设计 / Modern responsive design with Tailwind CSS
 
 ***
 
-## ✨ 核心特性 / Core Features
-
-### 🤖 AI 自然语言搜索 / AI Natural Language Search
-
-- **描述即搜索** - 用自然语言描述音效（如"很闷的撞击声"、"下雨天在窗户边的雨声"）\
-  **Describe to Search** - Describe sounds in natural language (e.g., "dull thud", "rain by the window")
-- **智能关键词提取** - AI 自动分析需求并提取搜索关键词\
-  **Smart Keyword Extraction** - AI automatically analyzes requirements and extracts search keywords
-- **流式响应** - 实时看到 AI 思考和搜索结果\
-  **Streaming Response** - See AI thinking and search results in real-time
-
-### 🔍 语义向量搜索 / Semantic Vector Search
-
-- **CLAP 音频-文本对齐模型** - 基于 LAION 的对比学习预训练模型\
-  **CLAP Audio-Text Alignment Model** - Based on LAION's contrastive learning pre-trained model
-- **ChromaDB 向量数据库** - 高效的相似度检索，支持大规模音效库\
-  **ChromaDB Vector Database** - Efficient similarity retrieval, supporting large-scale sound libraries
-- **增量索引** - 只处理新文件，快速更新音效库\
-  **Incremental Indexing** - Only process new files for quick library updates
-
-### 🎛️ 多 LLM 支持 / Multi-LLM Support
-
-| 提供商 / Provider | 状态 / Status | 说明 / Description                            |
-| -------------- | ----------- | ------------------------------------------- |
-| LM Studio      | ✅           | 本地部署，隐私优先 / Local deployment, privacy-first |
-| Ollama         | ✅           | 开源模型，离线使用 / Open source models, offline use |
-| OpenAI         | ✅           | GPT-4o-mini 等 / GPT-4o-mini, etc.           |
-| Claude         | ✅           | Anthropic API                               |
-| DeepSeek       | ✅           | 国产大模型 / Chinese LLM                         |
-| Kimi           | ✅           | Moonshot API                                |
-| Gemini         | ✅           | Google AI                                   |
-
-### 🎨 现代化界面 / Modern Interface
-
-- **深色/浅色主题** - 一键切换，护眼设计\
-  **Dark/Light Theme** - One-click switching, eye-friendly design
-- **波形可视化** - WaveSurfer.js 实时音频波形\
-  **Waveform Visualization** - WaveSurfer.js real-time audio waveform
-- **音频预览** - 支持选区截取并拖拽到 DAW\
-  **Audio Preview** - Support selection and drag to DAW
-- **响应式布局** - 适配不同屏幕尺寸\
-  **Responsive Layout** - Adapt to different screen sizes
-
-***
-
-## 🚀 快速开始 / Quick Start
+## 📦 安装指南 / Installation Guide
 
 ### 系统要求 / System Requirements
 
-| 平台 / Platform | 最低要求 / Minimum Requirements          |
-| ------------- | ------------------------------------ |
-| macOS         | 11.0+ (Big Sur), Apple Silicon/Intel |
-| Windows       | Windows 10/11 64-bit                 |
-| Linux         | Ubuntu 20.04+, Debian 11+            |
+- **macOS**: 10.15+ (Intel/Apple Silicon)
+- **Windows**: Windows 10/11 64-bit
+- **RAM**: 4GB+ (推荐 8GB)
+- **存储空间**: 2GB+ 可用空间 / 2GB+ free space
 
-**硬件要求 / Hardware Requirements**：
-
-- 内存 / RAM：4GB+（推荐 8GB / recommended 8GB）
-- 磁盘 / Disk：2GB 可用空间（含 AI 模型 / including AI models）
-
-### 安装步骤 / Installation Steps
+### 快速开始 / Quick Start
 
 1. **下载安装包 / Download Installer**
-   - 访问 / Visit [Releases](https://github.com/Huckrick/SoundBot/releases) 页面
-   - 下载对应系统的安装包 / Download the installer for your system
-2. **macOS 安装 / macOS Installation**
-   ```bash
-   # 下载 .dmg 文件后双击安装
-   # Download .dmg and double-click to install
-   # 首次运行可能需要 / First run may require:
-   # 系统偏好设置 → 安全性与隐私 → 允许打开
-   # System Preferences → Security & Privacy → Allow
-   ```
-3. **Windows 安装 / Windows Installation**
-   ```bash
-   # 运行 .exe 安装程序
-   # Run the .exe installer
-   # 按向导完成安装
-   # Follow the wizard to complete installation
-   ```
-4. **首次启动 / First Launch**
-   - 应用会自动加载 AI 模型（约需 10-30 秒）\
-     The app will automatically load AI models (takes 10-30 seconds)
-   - 模型文件已内置，无需下载\
-     Model files are built-in, no download required
+   - 从 [Releases](https://github.com/Huckrick/SoundBot/releases) 页面下载对应系统的安装包
+   - Download the installer for your system from the [Releases](https://github.com/Huckrick/SoundBot/releases) page
 
-### 使用提示 / Usage Tips
+2. **安装应用 / Install Application**
+   - **macOS**: 打开 `.dmg` 文件，将 SoundBot 拖到 Applications 文件夹
+   - **Windows**: 运行 `.exe` 安装程序，按向导完成安装
 
-⚠️ **存储空间 / Storage Space**：
+3. **首次启动 / First Launch**
+   - 应用会自动下载 AI 模型（约 1.5GB）
+   - Application will automatically download AI models (~1.5GB)
 
-- 默认存储位置可以选择
-- 磁盘满了记得清理
-- 清理时注意不要影响 DAW 工程的引用
+4. **开始使用 / Start Using**
+   - 导入你的音效库文件夹
+   - Import your sound effect library folder
+   - 开始语义搜索！
+   - Start semantic searching!
 
 ***
 
@@ -191,21 +109,21 @@ This project was inspired by **[OpenClaw](https://github.com/miaoxworld/openclaw
 
 ### 前提条件 / Prerequisites
 
+- Python 3.12+
 - Node.js 18+
-- Python 3.12
 - Git
 
-### 安装步骤 / Installation
+### 本地开发 / Local Development
 
 ```bash
 # 克隆仓库 / Clone repository
 git clone https://github.com/Huckrick/SoundBot.git
 cd SoundBot
 
-# 安装前端依赖 / Install frontend dependencies
+# 安装 Node 依赖 / Install Node dependencies
 npm install
 
-# 安装后端依赖 / Install backend dependencies
+# 安装 Python 依赖 / Install Python dependencies
 cd backend
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
@@ -215,9 +133,60 @@ cd ..
 # 下载 AI 模型 / Download AI models
 python scripts/download_models.py
 
-# 启动开发模式 / Start development mode
+# 启动开发服务器 / Start development server
 npm run dev
 ```
+
+***
+
+## 📝 使用说明 / Usage Guide
+
+### 1. 导入音效库 / Import Sound Library
+
+1. 点击"选择文件夹"按钮
+2. 选择包含音效文件的文件夹
+3. 等待 AI 索引完成（首次可能需要几分钟）
+
+### 2. 语义搜索 / Semantic Search
+
+1. 在搜索框输入自然语言描述，如：
+   - "雨声" / "rain sound"
+   - "爆炸声" / "explosion"
+   - "科幻武器" / "sci-fi weapon"
+   - "恐怖氛围" / "horror atmosphere"
+2. 查看搜索结果，点击播放预览
+3. 拖拽到 DAW 中使用
+
+### 3. AI 对话 / AI Chat
+
+1. 点击右下角的 AI 对话按钮
+2. 描述你需要的音效，如：
+   - "我需要一些适合恐怖游戏的音效"
+   - "推荐一些科幻风格的 UI 音效"
+3. AI 会推荐相关音效并解释原因
+
+### 4. 音频预览 / Audio Preview
+
+- 点击音效卡片播放预览
+- 使用波形图选择特定区域
+- 拖拽选区到 DAW 时间线
+
+***
+
+## ⚠️ 注意事项 / Important Notes
+
+### 存储空间 / Storage Space
+
+- **默认存储位置**：用户目录下的 `.soundbot/` 文件夹
+- **模型文件**：约 1.5GB
+- **数据库**：根据音效库大小增长
+- **建议**：定期清理不需要的音效库，释放空间
+
+### 清理建议 / Cleanup Recommendations
+
+- 清理前请确保不影响 DAW 工程中的引用
+- 建议在 DAW 中先备份工程
+- 可以使用"重置数据库"功能重新开始
 
 ***
 
@@ -225,7 +194,11 @@ npm run dev
 
 欢迎提交 Issue 和 Pull Request！
 
-欢迎提交 Issue 和 Pull Request！
+### 提交 Issue / Submit Issue
+
+- 🐛 **Bug 报告**：描述问题、复现步骤、期望行为
+- ✨ **功能建议**：描述功能、使用场景、期望效果
+- 💬 **一般讨论**：使用 GitHub Discussions
 
 ### 提交 PR / Submit PR
 
@@ -258,20 +231,4 @@ the Free Software Foundation, either version 3 of the License, or
 - [ChromaDB](https://www.trychroma.com/) - 向量数据库 / Vector database
 - [FastAPI](https://fastapi.tiangolo.com/) - 高性能 Web 框架 / High-performance web framework
 - [Electron](https://www.electronjs.org/) - 跨平台桌面应用框架 / Cross-platform desktop framework
-- [WaveSurfer.js](https://wavesurfer-js.org/) - 音频波形可视化 / Audio waveform visualization
-- [Trae](https://www.trae.ai/) & [Cursor](https://cursor.sh/) - AI 编程工具 / AI programming tools
-
-***
-
-## 📞 联系我们 / Contact Us
-
-- 📧 邮箱 / Email：**<Nagisa_Huckrick@yeah.net>**
-- 🐛 Issue：[GitHub Issues](https://github.com/Huckrick/SoundBot/issues)
-- 💬 Discussions：[GitHub Discussions](https://github.com/Huckrick/SoundBot/discussions)
-
-***
-
-<p align="center">
-  Made with ❤️ by Nagisa_Huckrick (胡杨) using AI tools<br>
-  使用 AI 工具由 Nagisa_Huckrick (胡杨) 制作
-</p>
+- [WaveSurfer.js](https://wavesurfer-js.org/) - 音频波形
