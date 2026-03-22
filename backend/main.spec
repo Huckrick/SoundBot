@@ -4,13 +4,15 @@ PyInstaller spec file for SoundBot backend
 """
 
 import sys
+import os
 from pathlib import Path
 
 block_cipher = None
 
-# 获取项目根目录
-project_root = Path(__file__).parent.parent
-backend_dir = Path(__file__).parent
+# 获取项目根目录（spec 文件所在目录的父目录）
+spec_dir = Path(os.getcwd())
+backend_dir = spec_dir
+project_root = backend_dir.parent
 
 # 添加数据文件
 datas = [
