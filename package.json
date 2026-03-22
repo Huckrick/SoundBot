@@ -39,27 +39,12 @@
       "assets/**/*",
       "backend/**/*",
       "config/**/*",
+      "models/**/*",
       "!backend/__pycache__",
       "!backend/db/*.db",
-      "!backend/**/*.pyc"
-    ],
-    "extraResources": [
-      {
-        "from": "backend",
-        "to": "backend",
-        "filter": [
-          "**/*",
-          "!__pycache__",
-          "!db/*.db",
-          "!**/*.pyc",
-          "!**/__pycache__/**/*"
-        ]
-      },
-      {
-        "from": "models",
-        "to": "models",
-        "filter": ["**/*"]
-      }
+      "!backend/**/*.pyc",
+      "!backend/venv/**/__pycache__",
+      "!backend/venv/**/*.pyc"
     ],
     "mac": {
       "category": "public.app-category.music",
