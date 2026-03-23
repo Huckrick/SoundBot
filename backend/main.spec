@@ -8,8 +8,9 @@ import sys
 import os
 from pathlib import Path
 
-# 获取当前工作目录（应该是 backend/ 目录）
-spec_dir = Path(os.getcwd())
+# 获取当前 spec 文件所在目录
+spec_file = Path(os.path.abspath(SPECFILE))
+spec_dir = spec_file.parent
 backend_dir = spec_dir
 project_root = backend_dir.parent
 
@@ -33,6 +34,10 @@ if (backend_dir / 'config.py').exists():
 # 添加 models/schemas.py (Pydantic模型)
 if (backend_dir / 'models').exists():
     datas.append((str(backend_dir / 'models'), 'models'))
+
+# 添加 bootstrap.py
+if (backend_dir / 'bootstrap.py').exists():
+    datas.append((str(backend_dir / 'bootstrap.py'), '.'))
 
 # 隐藏导入 - 包含所有需要的依赖
 hiddenimports = [
@@ -186,7 +191,7 @@ excludes = [
     'transformers.models.beit', 'transformers.models.swin',
     
     # 其他大体积但不需要的
-    'google.protobuf.pyext',  # 使用纯 Python 版本
+    'google.protobuf.pyext',
     'grpc_tools', 'grpcio_tools',
     'tensorflow', 'tf', 'keras',
     'tensorboard', 'tensorboardX',
@@ -210,7 +215,7 @@ a = Analysis(
     win_private_assemblies=False,
     cipher=block_cipher,
     noarchive=False,
-    optimize=1,  # 字节码优化
+    optimize=1,
 )
 
 # 过滤掉不需要的二进制文件
@@ -238,16 +243,11 @@ exe = EXE(
     name=exe_name,
     debug=False,
     bootloader_ignore_signals=False,
-    strip=True,  # 去除符号表，减小体积
-    upx=True,    # UPX 压缩
-    upx_exclude=[
-        'vcruntime140.dll',
-        'vcruntime140_1.dll',
-        'msvcp140.dll',
-        'python*.dll',
-    ],
+    strip=False,
+    upx=False,
+    upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,  # 保留控制台用于调试，发布时可改为 False
+    console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
