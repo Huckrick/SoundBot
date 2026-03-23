@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 SoundBot 统一构建脚本
 ====================
@@ -23,6 +24,12 @@ import argparse
 import platform
 from pathlib import Path
 
+# Windows 编码修复
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 # 项目路径配置
 PROJECT_ROOT = Path(__file__).parent.parent
 BACKEND_DIR = PROJECT_ROOT / "backend"
@@ -32,6 +39,11 @@ ELECTRON_DIST_DIR = PROJECT_ROOT / "dist-electron"
 
 def log(message: str, level: str = "INFO"):
     """打印带颜色的日志"""
+    # Windows 控制台不支持 ANSI 颜色，禁用颜色
+    if sys.platform == 'win32':
+        print(f"[{level}] {message}")
+        return
+    
     colors = {
         "INFO": "\033[94m",      # 蓝色
         "SUCCESS": "\033[92m",   # 绿色
