@@ -56,16 +56,23 @@ def log(message: str, level: str = "INFO"):
     print(f"{color}[{level}]{reset} {message}")
 
 
-def run_command(cmd: list, cwd: Path = None, env: dict = None, shell: bool = False) -> subprocess.CompletedProcess:
+def run_command(cmd: list, cwd: Path = None, env: dict = None, shell: bool = False, capture: bool = True) -> subprocess.CompletedProcess:
     """执行命令并检查返回值"""
     log(f"执行: {' '.join(str(c) for c in cmd)}")
     
     # Windows 上使用 shell=True 来正确找到 npm
     if sys.platform == 'win32' and not shell:
         # 检查是否是 npm 命令
-        if cmd[0] in ['npm', 'npx']:
+        if len(cmd) > 0 and cmd[0] in ['npm', 'npx']:
             shell = True
             cmd = ' '.join(str(c) for c in cmd)
+    
+    # 对于长时间运行的命令（如 PyInstaller），实时输出避免卡住
+    if not capture:
+        result = subprocess.run(cmd, cwd=cwd, env=env, shell=shell)
+        if result.returncode != 0:
+            raise RuntimeError(f"命令失败: {cmd if isinstance(cmd, str) else ' '.join(str(c) for c in cmd)}")
+        return result
     
     result = subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True, shell=shell)
     if result.returncode != 0:
@@ -142,7 +149,8 @@ def build_backend() -> Path:
         "--clean"
     ]
     
-    run_command(cmd)
+    # PyInstaller 使用实时输出避免缓冲区卡住
+    run_command(cmd, capture=False)
     
     # 检查输出
     system = platform.system().lower()
