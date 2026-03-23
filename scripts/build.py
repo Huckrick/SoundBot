@@ -174,7 +174,8 @@ def build_backend() -> Path:
 def install_npm_deps():
     """安装 npm 依赖"""
     log("安装 npm 依赖...")
-    run_command(["npm", "install"], cwd=PROJECT_ROOT)
+    # npm 使用实时输出避免卡住
+    run_command(["npm", "install"], cwd=PROJECT_ROOT, capture=False)
 
 
 def build_electron(target_platform: str = None):
@@ -194,17 +195,17 @@ def build_electron(target_platform: str = None):
     # 根据平台选择构建命令
     if target_platform == "macos" or (target_platform is None and platform.system() == "Darwin"):
         log("构建 macOS 应用...")
-        run_command(["npm", "run", "build:mac"], cwd=PROJECT_ROOT)
+        run_command(["npm", "run", "build:mac"], cwd=PROJECT_ROOT, capture=False)
     elif target_platform == "windows" or (target_platform is None and platform.system() == "Windows"):
         log("构建 Windows 应用...")
-        run_command(["npm", "run", "build:win"], cwd=PROJECT_ROOT)
+        run_command(["npm", "run", "build:win"], cwd=PROJECT_ROOT, capture=False)
     elif target_platform == "linux":
         log("构建 Linux 应用...")
-        run_command(["npm", "run", "build:linux"], cwd=PROJECT_ROOT)
+        run_command(["npm", "run", "build:linux"], cwd=PROJECT_ROOT, capture=False)
     else:
         # 自动检测平台
         log("自动检测平台并构建...")
-        run_command(["npm", "run", "build"], cwd=PROJECT_ROOT)
+        run_command(["npm", "run", "build"], cwd=PROJECT_ROOT, capture=False)
     
     log("Electron 构建完成", "SUCCESS")
 
