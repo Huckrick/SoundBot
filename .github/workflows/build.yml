@@ -85,6 +85,12 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      - name: Verify backend exists
+        run: |
+          echo "=== Verifying backend ==="
+          ls -la dist/backend/
+          ls -la dist/backend/ | wc -l
+
       - name: Install Node dependencies
         run: npm ci
 
@@ -146,6 +152,13 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+
+      - name: Verify backend exists
+        shell: pwsh
+        run: |
+          Write-Host "=== Verifying backend ==="
+          Get-ChildItem dist/backend/ -Recurse
+          Write-Host "File count: $((Get-ChildItem dist/backend/ -Recurse).Count)"
 
       - name: Install Node dependencies
         run: npm ci
