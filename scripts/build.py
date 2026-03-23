@@ -56,10 +56,18 @@ def log(message: str, level: str = "INFO"):
     print(f"{color}[{level}]{reset} {message}")
 
 
-def run_command(cmd: list, cwd: Path = None, env: dict = None) -> subprocess.CompletedProcess:
+def run_command(cmd: list, cwd: Path = None, env: dict = None, shell: bool = False) -> subprocess.CompletedProcess:
     """执行命令并检查返回值"""
     log(f"执行: {' '.join(str(c) for c in cmd)}")
-    result = subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True)
+    
+    # Windows 上使用 shell=True 来正确找到 npm
+    if sys.platform == 'win32' and not shell:
+        # 检查是否是 npm 命令
+        if cmd[0] in ['npm', 'npx']:
+            shell = True
+            cmd = ' '.join(str(c) for c in cmd)
+    
+    result = subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True, shell=shell)
     if result.returncode != 0:
         log("=" * 60, "ERROR")
         log("命令 stdout:", "ERROR")
@@ -67,7 +75,7 @@ def run_command(cmd: list, cwd: Path = None, env: dict = None) -> subprocess.Com
         log("命令 stderr:", "ERROR")
         log(result.stderr, "ERROR")
         log("=" * 60, "ERROR")
-        raise RuntimeError(f"命令失败: {' '.join(str(c) for c in cmd)}")
+        raise RuntimeError(f"命令失败: {cmd if isinstance(cmd, str) else ' '.join(str(c) for c in cmd)}")
     if result.stdout:
         print(result.stdout)
     if result.stderr:
