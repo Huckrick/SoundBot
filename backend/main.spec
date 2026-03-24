@@ -431,15 +431,28 @@ a.binaries = [b for b in a.binaries if not any(x in str(b[0]) for x in binaries_
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-# 方案C: 使用 onedir 模式 (COLLECT 而非 EXE)
-# 这样所有依赖都以目录形式存在，更稳定
+# 方案C: 使用 onedir 模式
+# 先创建 EXE，再通过 COLLECT 收集所有依赖到目录
 exe_name = 'soundbot-backend'
 if sys.platform == 'win32':
     exe_name += '.exe'
 
-coll = COLLECT(
+exe = EXE(
     pyz,
     a.scripts,
+    [],
+    exclude_binaries=True,
+    name=exe_name,
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    runtime_tmpdir=None,
+    console=True,
+)
+
+coll = COLLECT(
+    exe,
     a.binaries,
     a.zipfiles,
     a.datas,
