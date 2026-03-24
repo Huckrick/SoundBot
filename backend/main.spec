@@ -434,15 +434,14 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 # 方案C: 使用 onedir 模式
 # 先创建 EXE，再通过 COLLECT 收集所有依赖到目录
 exe_name = 'soundbot-backend'
-if sys.platform == 'win32':
-    exe_name += '.exe'
+exe_name_with_ext = exe_name + ('.exe' if sys.platform == 'win32' else '')
 
 exe = EXE(
     pyz,
     a.scripts,
     [],
     exclude_binaries=True,
-    name=exe_name,
+    name=exe_name_with_ext,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
