@@ -92,6 +92,7 @@ hiddenimports = [
 
     # AI/ML 核心 - torch (方案A：添加完整模块)
     'torch',
+    'torch.testing',
     'torch.nn',
     'torch.nn.modules',
     'torch.nn.functional',
@@ -397,8 +398,8 @@ excludes = [
     'pdbpp', 'ipdb', 'pudb', 'pydevd',
     'cProfile', 'profile', 'pstats',
 
-    # 不必要的 torch 模块
-    'torch.testing',
+    # 注意：不要排除 torch.testing，PyTorch 需要它
+    # 'torch.testing',
     'torch.distributions',
 
     # 不必要的 transformers 功能（已移除，避免排除必要的）
