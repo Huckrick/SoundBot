@@ -94,12 +94,21 @@ def clean_build_dirs():
     """清理构建目录"""
     log("清理构建目录...")
     
-    dirs_to_clean = [
-        DIST_DIR,
-        BACKEND_DIR / "dist",
-        BACKEND_DIR / "build",
-        PROJECT_ROOT / "dist-electron",
-    ]
+    # 在 GitHub Actions 环境中，保留 dist 目录（因为 PyInstaller 已经构建好了）
+    if os.environ.get('GITHUB_ACTIONS') == 'true':
+        log("GitHub Actions 环境，保留 dist 目录")
+        dirs_to_clean = [
+            BACKEND_DIR / "dist",
+            BACKEND_DIR / "build",
+            PROJECT_ROOT / "dist-electron",
+        ]
+    else:
+        dirs_to_clean = [
+            DIST_DIR,
+            BACKEND_DIR / "dist",
+            BACKEND_DIR / "build",
+            PROJECT_ROOT / "dist-electron",
+        ]
     
     for dir_path in dirs_to_clean:
         if dir_path.exists():
@@ -131,6 +140,31 @@ def build_backend() -> Path:
     log("步骤 1: 构建 PyInstaller 后端")
     log("=" * 60)
     
+    # onedir 模式：输出是目录，不是单文件
+    system = platform.system().lower()
+    backend_dir_name = "soundbot-backend"
+    if system == "windows":
+        backend_dir_name += ".exe"
+    backend_dir_path = DIST_DIR / "backend" / "soundbot-backend"
+    
+    # 检查是否已有构建好的后端（GitHub Actions 环境中）
+    if backend_dir_path.exists():
+        # 检查目录大小
+        total_size = 0
+        for root, dirs, files in os.walk(backend_dir_path):
+            for f in files:
+                fp = os.path.join(root, f)
+                total_size += os.path.getsize(fp)
+        
+        size_mb = total_size / 1024 / 1024
+        if size_mb > 500:  # 如果大于 500MB，认为已经构建好了
+            log(f"检测到已构建的后端: {backend_dir_path}", "SUCCESS")
+            log(f"目录大小: {size_mb:.1f} MB")
+            log("跳过 PyInstaller 构建，使用现有后端")
+            return backend_dir_path
+        else:
+            log(f"现有后端太小 ({size_mb:.1f} MB)，重新构建", "WARNING")
+    
     # 确保依赖已安装
     install_python_deps()
     
@@ -151,13 +185,6 @@ def build_backend() -> Path:
     
     # PyInstaller 使用实时输出避免缓冲区卡住
     run_command(cmd, capture=False)
-
-    # onedir 模式：输出是目录，不是单文件
-    system = platform.system().lower()
-    backend_dir_name = "soundbot-backend"
-    if system == "windows":
-        backend_dir_name += ".exe"
-    backend_dir_path = backend_dist / "soundbot-backend"
 
     if not backend_dir_path.exists():
         raise RuntimeError(f"后端目录未生成: {backend_dir_path}")
