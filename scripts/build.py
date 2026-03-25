@@ -200,20 +200,20 @@ def build_electron(target_platform: str = None):
     # 确保 npm 依赖已安装
     install_npm_deps()
     
-    # 根据平台选择构建命令
+    # 根据平台选择构建命令（直接调用 electron-builder，避免 npm 脚本循环）
     if target_platform == "macos" or (target_platform is None and platform.system() == "Darwin"):
         log("构建 macOS 应用...")
-        run_command(["npm", "run", "build:mac"], cwd=PROJECT_ROOT, capture=False)
+        run_command(["npx", "electron-builder", "--mac"], cwd=PROJECT_ROOT, capture=False)
     elif target_platform == "windows" or (target_platform is None and platform.system() == "Windows"):
         log("构建 Windows 应用...")
-        run_command(["npm", "run", "build:win"], cwd=PROJECT_ROOT, capture=False)
+        run_command(["npx", "electron-builder", "--win"], cwd=PROJECT_ROOT, capture=False)
     elif target_platform == "linux":
         log("构建 Linux 应用...")
-        run_command(["npm", "run", "build:linux"], cwd=PROJECT_ROOT, capture=False)
+        run_command(["npx", "electron-builder", "--linux"], cwd=PROJECT_ROOT, capture=False)
     else:
         # 自动检测平台
         log("自动检测平台并构建...")
-        run_command(["npm", "run", "build"], cwd=PROJECT_ROOT, capture=False)
+        run_command(["npx", "electron-builder"], cwd=PROJECT_ROOT, capture=False)
     
     log("Electron 构建完成", "SUCCESS")
 
