@@ -398,9 +398,9 @@ excludes = [
     'pdbpp', 'ipdb', 'pudb', 'pydevd',
     'cProfile', 'profile', 'pstats',
 
-    # 注意：不要排除 torch.testing，PyTorch 需要它
+    # 注意：不要排除任何 torch 模块，PyTorch 需要它们全部
     # 'torch.testing',
-    'torch.distributions',
+    # 'torch.distributions',
 
     # 不必要的 transformers 功能（已移除，避免排除必要的）
 ]
