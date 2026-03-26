@@ -74,14 +74,33 @@ jobs:
           cd backend
           pyinstaller main.spec --distpath ../dist/backend --workpath ../dist/build
 
-      - name: Check backend size
+      - name: Verify backend build
         run: |
+          echo "=== Verifying backend build ==="
           if [ -d "dist/backend/soundbot-backend" ]; then
+            echo "✓ Backend directory exists"
+            ls -la dist/backend/soundbot-backend/
             du -sh dist/backend/soundbot-backend
-            echo "Backend directory exists"
+            echo "File count: $(find dist/backend/soundbot-backend -type f | wc -l)"
+            
+            # 检查关键文件
+            if [ -f "dist/backend/soundbot-backend/soundbot-backend" ]; then
+              echo "✓ Backend executable exists"
+            else
+              echo "✗ Backend executable not found"
+              exit 1
+            fi
+            
+            if [ -d "dist/backend/soundbot-backend/lib" ]; then
+              echo "✓ lib directory exists"
+            else
+              echo "✗ lib directory not found"
+              exit 1
+            fi
           else
-            echo "Backend directory not found"
+            echo "✗ Backend directory not found"
             ls -la dist/backend/
+            exit 1
           fi
 
       - name: Setup Node.js
@@ -89,18 +108,6 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-
-      - name: Verify backend exists
-        run: |
-          echo "=== Verifying backend ==="
-          if [ -d "dist/backend/soundbot-backend" ]; then
-            echo "Backend onedir exists"
-            ls -la dist/backend/soundbot-backend/
-            echo "File count: $(find dist/backend/soundbot-backend -type f | wc -l)"
-          else
-            echo "Backend onedir not found!"
-            ls -la dist/backend/
-          fi
 
       - name: Install Node dependencies
         run: npm ci
@@ -110,10 +117,20 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check build size
+      - name: Verify Electron build
         run: |
-          echo "=== Build Size ==="
+          echo "=== Verifying Electron build ==="
           ls -lh dist-electron/
+          
+          # 检查 DMG 文件
+          if ls dist-electron/*.dmg 1> /dev/null 2>&1; then
+            echo "✓ DMG file created"
+            DMG_SIZE=$(du -sh dist-electron/*.dmg | cut -f1)
+            echo "DMG size: $DMG_SIZE"
+          else
+            echo "✗ DMG file not found"
+            exit 1
+          fi
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
@@ -152,16 +169,36 @@ jobs:
           cd backend
           pyinstaller main.spec --distpath ../dist/backend --workpath ../dist/build
 
-      - name: Check backend size
+      - name: Verify backend build
         shell: pwsh
         run: |
+          Write-Host "=== Verifying backend build ==="
           $backendDir = "dist/backend/soundbot-backend"
           if (Test-Path $backendDir) {
+            Write-Host "✓ Backend directory exists"
+            Get-ChildItem $backendDir
             $size = (Get-ChildItem $backendDir -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
-            Write-Host "Backend directory size: $([math]::Round($size, 2)) MB"
+            Write-Host "Backend size: $([math]::Round($size, 2)) MB"
+            Write-Host "File count: $((Get-ChildItem $backendDir -Recurse).Count)"
+            
+            # 检查关键文件
+            if (Test-Path "$backendDir/soundbot-backend.exe") {
+              Write-Host "✓ Backend executable exists"
+            } else {
+              Write-Host "✗ Backend executable not found"
+              exit 1
+            }
+            
+            if (Test-Path "$backendDir/lib") {
+              Write-Host "✓ lib directory exists"
+            } else {
+              Write-Host "✗ lib directory not found"
+              exit 1
+            }
           } else {
-            Write-Host "Backend directory not found at: $backendDir"
+            Write-Host "✗ Backend directory not found"
             Get-ChildItem dist/backend/
+            exit 1
           }
 
       - name: Setup Node.js
@@ -169,20 +206,6 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-
-      - name: Verify backend exists
-        shell: pwsh
-        run: |
-          Write-Host "=== Verifying backend ==="
-          $backendDir = "dist/backend/soundbot-backend"
-          if (Test-Path $backendDir) {
-            Write-Host "Backend onedir exists"
-            Get-ChildItem $backendDir -Recurse | Select-Object FullName
-            Write-Host "File count: $((Get-ChildItem $backendDir -Recurse).Count)"
-          } else {
-            Write-Host "Backend onedir not found!"
-            Get-ChildItem dist/backend/
-          }
 
       - name: Install Node dependencies
         run: npm ci
@@ -192,10 +215,24 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check build size
+      - name: Verify Electron build
         shell: pwsh
         run: |
-          Get-ChildItem dist-electron/ | ForEach-Object { Write-Host "$($_.Name) - $([math]::Round($_.Length/1MB, 2)) MB" }
+          Write-Host "=== Verifying Electron build ==="
+          Get-ChildItem dist-electron/
+          
+          # 检查 EXE 文件
+          $exeFiles = Get-ChildItem dist-electron/*.exe
+          if ($exeFiles) {
+            Write-Host "✓ EXE file created"
+            foreach ($file in $exeFiles) {
+              $sizeMB = [math]::Round($file.Length / 1MB, 2)
+              Write-Host "EXE size: $sizeMB MB"
+            }
+          } else {
+            Write-Host "✗ EXE file not found"
+            exit 1
+          }
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
@@ -204,32 +241,31 @@ jobs:
           path: dist-electron/*.exe
           if-no-files-found: error
 
-  # 发布 Release
-  release:
+  # 创建 GitHub Release
+  create-release:
     needs: [build-models, build-macos, build-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      actions: read
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: List artifacts
+      - name: Display artifacts
         run: |
           echo "=== Downloaded artifacts ==="
-          find artifacts -type f \( -name "*.zip" -o -name "*.dmg" -o -name "*.exe" \) | sort
+          find artifacts -type f -exec ls -lh {} \;
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            artifacts/**/*.zip
-            artifacts/**/*.dmg
-            artifacts/**/*.exe
-          draft: false
+            artifacts/models-package/*.zip
+            artifacts/soundbot-macos/*.dmg
+            artifacts/soundbot-windows/*.exe
+          draft: true
           prerelease: false
           generate_release_notes: true
         env:

@@ -2,8 +2,6 @@
 """
 SoundBot Backend PyInstaller Spec
 打包为目录模式，支持 Windows/macOS/Linux
-方案A: 补充所有缺失的 hiddenimports
-方案C: 使用 onedir 模式提高稳定性
 """
 
 import sys
@@ -41,7 +39,7 @@ if (backend_dir / 'models').exists():
 if (backend_dir / 'bootstrap.py').exists():
     datas.append((str(backend_dir / 'bootstrap.py'), '.'))
 
-# 隐藏导入 - 包含所有需要的依赖 (方案A：补充所有缺失模块)
+# 隐藏导入 - 包含所有需要的依赖
 hiddenimports = [
     # FastAPI / Uvicorn
     'uvicorn',
@@ -55,17 +53,36 @@ hiddenimports = [
     'uvicorn.protocols.websockets',
     'uvicorn.protocols.websockets.auto',
     'uvicorn.protocols.websockets.wsproto_impl',
-    'uvicorn.asyncio',
-    'uvicorn.asyncio_driver',
+    'uvicorn.protocols.websockets.websockets_impl',
     'fastapi',
     'fastapi.middleware.cors',
+    'fastapi.middleware.trustedhost',
+    'fastapi.middleware.httpsredirect',
+    'fastapi.middleware.gzip',
+    'fastapi.openapi',
+    'fastapi.openapi.docs',
+    'fastapi.openapi.utils',
     'starlette',
     'starlette.middleware',
     'starlette.middleware.cors',
     'starlette.middleware.errors',
+    'starlette.middleware.exceptions',
+    'starlette.middleware.gzip',
+    'starlette.middleware.trustedhost',
+    'starlette.middleware.httpsredirect',
     'starlette.responses',
     'starlette.routing',
     'starlette.status',
+    'starlette.requests',
+    'starlette.websockets',
+    'starlette.background',
+    'starlette.concurrency',
+    'starlette.datastructures',
+    'starlette.types',
+    'starlette.config',
+    'starlette.exceptions',
+    'starlette.staticfiles',
+    'starlette.templating',
 
     # 数据库
     'chromadb',
@@ -78,8 +95,11 @@ hiddenimports = [
     'chromadb.db.duckdb',
     'chromadb.collection',
     'chromadb.errors',
+    'chromadb.telemetry',
+    'chromadb.utils',
     'aiosqlite',
     'sqlite3',
+    'sqlite3.dbapi2',
 
     # 数据验证
     'pydantic',
@@ -87,23 +107,50 @@ hiddenimports = [
     'pydantic_core',
     'pydantic.deprecated',
     'pydantic.deprecated.decorator',
+    'pydantic.json_schema',
+    'pydantic.root_model',
+    'pydantic.v1',
+    'pydantic.v1.fields',
+    'pydantic.v1.main',
+    'pydantic.v1.types',
     'annotated_types',
     'typing_extensions',
 
-    # AI/ML 核心 - torch (方案A：添加完整模块)
+    # AI/ML 核心 - torch
     'torch',
     'torch.testing',
     'torch.nn',
     'torch.nn.modules',
+    'torch.nn.modules.activation',
+    'torch.nn.modules.batchnorm',
+    'torch.nn.modules.container',
+    'torch.nn.modules.conv',
+    'torch.nn.modules.dropout',
+    'torch.nn.modules.flatten',
+    'torch.nn.modules.linear',
+    'torch.nn.modules.loss',
+    'torch.nn.modules.module',
+    'torch.nn.modules.normalization',
+    'torch.nn.modules.padding',
+    'torch.nn.modules.pooling',
     'torch.nn.functional',
     'torch.nn.utils',
+    'torch.nn.utils.rnn',
     'torch.utils',
     'torch.utils.data',
+    'torch.utils.data.dataloader',
+    'torch.utils.data.dataset',
+    'torch.utils.data.sampler',
     'torch.cuda',
     'torch.backends',
     'torch.backends.cudnn',
     'torch.backends.mps',
+    'torch.backends.cpu',
     'torch.optim',
+    'torch.optim.adam',
+    'torch.optim.adamw',
+    'torch.optim.sgd',
+    'torch.optim.lr_scheduler',
     'torch.distributed',
     'torch.multiprocessing',
     'torch.jit',
@@ -134,7 +181,7 @@ hiddenimports = [
     'torchvision.ops',
     'torchvision.transforms',
 
-    # transformers (方案A：添加完整 clap 模块)
+    # transformers
     'transformers',
     'transformers.utils',
     'transformers.utils.generic',
@@ -151,6 +198,18 @@ hiddenimports = [
     'transformers.models.clap.tokenization_clap',
     'transformers.models.clap.audio_processing_clap',
     'transformers.models.clap.modular_clap',
+    'transformers.models.auto',
+    'transformers.models.auto.modeling_auto',
+    'transformers.models.auto.configuration_auto',
+    'transformers.models.auto.tokenization_auto',
+    'transformers.models.auto.feature_extraction_auto',
+    'transformers.models.auto.processing_auto',
+    'transformers.tokenization_utils',
+    'transformers.tokenization_utils_base',
+    'transformers.pipelines',
+    'transformers.pipelines.base',
+    'transformers.pipelines.audio_classification',
+    'transformers.pipelines.automatic_speech_recognition',
     'sentence_transformers',
     'sentence_transformers.SentenceTransformer',
     'sentence_transformers.models',
@@ -241,16 +300,46 @@ hiddenimports = [
     'requests.api',
     'requests.models',
     'requests.sessions',
+    'requests.adapters',
+    'requests.cookies',
+    'requests.exceptions',
+    'requests.hooks',
+    'requests.status_codes',
+    'requests.structures',
+    'requests.utils',
     'urllib3',
     'urllib3.util',
     'urllib3.request',
     'urllib3.response',
+    'urllib3.connection',
+    'urllib3.connectionpool',
+    'urllib3.exceptions',
+    'urllib3.fields',
+    'urllib3.filepost',
+    'urllib3.poolmanager',
     'httpx',
     'httpx._client',
+    'httpx._config',
+    'httpx._exceptions',
+    'httpx._models',
+    'httpx._types',
+    'httpx._urls',
+    'httpx._utils',
     'httpcore',
     'httpcore._sync',
+    'httpcore._async',
+    'httpcore._exceptions',
+    'httpcore._models',
+    'httpcore._backends',
     'h11',
     'h11._util',
+    'h11._connection',
+    'h11._events',
+    'h11._headers',
+    'h11._readers',
+    'h11._state',
+    'h11._writers',
+    'h11._receivebuffer',
 
     # 工具库
     'jieba',
@@ -258,11 +347,27 @@ hiddenimports = [
     'jieba.analyse',
     'yaml',
     'yaml.cyaml',
+    'yaml.constructor',
+    'yaml.composer',
+    'yaml.parser',
+    'yaml.scanner',
+    'yaml.reader',
+    'yaml.resolver',
+    'yaml.dumper',
+    'yaml.loader',
+    'yaml.representer',
+    'yaml.serializer',
+    'yaml.emitter',
     'regex',
     'regex._regex',
     'tokenizers',
     'tokenizers.implementations',
     'tokenizers.models',
+    'tokenizers.trainers',
+    'tokenizers.pre_tokenizers',
+    'tokenizers.decoders',
+    'tokenizers.processors',
+    'tokenizers.normalizers',
     'safetensors',
     'safetensors.torch',
     'safetensors.numpy',
@@ -277,11 +382,22 @@ hiddenimports = [
     'tqdm',
     'tqdm.std',
     'tqdm.auto',
+    'tqdm.utils',
+    'tqdm.cli',
 
     # Hugging Face
     'huggingface_hub',
     'huggingface_hub.file_download',
     'huggingface_hub.utils',
+    'huggingface_hub.constants',
+    'huggingface_hub.hf_api',
+    'huggingface_hub.repository',
+    'huggingface_hub.snapshot_download',
+
+    # ONNX Runtime
+    'onnxruntime',
+    'onnxruntime.capi',
+    'onnxruntime.capi.onnxruntime_pybind11_state',
 
     # 其他
     'asyncio',
@@ -289,8 +405,14 @@ hiddenimports = [
     'asyncio.coroutines',
     'asyncio.events',
     'asyncio.queues',
+    'asyncio.tasks',
+    'asyncio.streams',
+    'asyncio.subprocess',
+    'asyncio.threads',
     'concurrent.futures',
     'concurrent.futures._base',
+    'concurrent.futures.process',
+    'concurrent.futures.thread',
     'pathlib',
     'pathlib._local',
     'json',
@@ -374,16 +496,39 @@ hiddenimports = [
     'typing_extensions._utils',
     'urllib.error',
     'urllib.robotparser',
+    'uuid',
+    'decimal',
+    'fractions',
+    'numbers',
+    'statistics',
+    'bisect',
+    'heapq',
+    'array',
+    'enum',
+    'dataclasses',
+    'abc',
+    'atexit',
+    'builtins',
 ]
 
-# 排除项 - 大幅减小体积（保留必要的 torch 模块）
+# 排除项 - 大幅减小体积
 excludes = [
-    # 只排除 GUI 相关（后端确实不需要）
+    # GUI 相关（后端不需要）
     'matplotlib', 'matplotlib.pyplot', 'matplotlib.backends',
     'PIL', 'PIL.Image', 'cv2', 'opencv',
     'tkinter', 'Tkinter', '_tkinter',
     'PyQt5', 'PyQt6', 'PySide2', 'PySide6', 'PyQt4',
     'wx', 'wxPython', 'kivy', 'pyglet',
+    # 测试相关
+    'pytest', '_pytest', 'unittest', 'doctest',
+    # 文档相关
+    'sphinx', 'docutils',
+    # IPython
+    'IPython', 'ipykernel', 'ipywidgets',
+    # Jupyter
+    'jupyter', 'jupyter_client', 'jupyter_core', 'notebook',
+    # 其他大体积且不需要的包
+    'tensorboard', 'wandb', 'mlflow',
 ]
 
 # 分析阶段
@@ -414,8 +559,7 @@ a.binaries = [b for b in a.binaries if not any(x in str(b[0]) for x in binaries_
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-# 方案C: 使用 onedir 模式
-# 先创建 EXE，再通过 COLLECT 收集所有依赖到目录
+# onedir 模式
 exe_name = 'soundbot-backend'
 exe_name_with_ext = exe_name + ('.exe' if sys.platform == 'win32' else '')
 

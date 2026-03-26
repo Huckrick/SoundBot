@@ -64,10 +64,8 @@
     "extraResources": [
       {
         "from": "dist/backend/soundbot-backend",
-        "to": "backend",
-        "filter": [
-          "**/*"
-        ]
+        "to": "backend/soundbot-backend",
+        "filter": ["**/*"]
       }
     ],
     "mac": {

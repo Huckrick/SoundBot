@@ -59,41 +59,97 @@ function getUserDataDir() {
 
 /**
  * 获取后端可执行文件路径
- * onedir 模式：dist/backend/soundbot-backend/soundbot-backend
+ * onedir 模式：resources/backend/soundbot-backend/soundbot-backend
  */
 function getBackendExecutable() {
   const exeName = process.platform === 'win32'
     ? 'soundbot-backend.exe'
     : 'soundbot-backend';
 
-  // onedir 模式的目录结构
-  const backendDir = 'soundbot-backend';
-
   // 可能的路径（按优先级）
   const possiblePaths = [
-    // 1. 开发环境
-    path.join(__dirname, 'backend', 'dist', 'backend', backendDir, exeName),
-    path.join(__dirname, 'backend', 'dist', backendDir, exeName),
-    path.join(__dirname, 'backend', backendDir, exeName),
+    // 1. 生产环境 - afterPack 复制后的路径
+    path.join(process.resourcesPath, 'backend', 'soundbot-backend', exeName),
 
-    // 2. 生产环境 - extraResources (onedir)
-    path.join(process.resourcesPath, 'backend', backendDir, exeName),
-    path.join(process.resourcesPath, 'backend', exeName),
+    // 2. 生产环境 - extraResources 路径
+    path.join(process.resourcesPath, 'backend', 'soundbot-backend', exeName),
 
-    // 3. 应用目录（便携模式）
-    path.join(getAppRootDir(), 'backend', backendDir, exeName),
-    path.join(getAppRootDir(), 'backend', exeName),
+    // 3. 开发环境
+    path.join(__dirname, 'dist', 'backend', 'soundbot-backend', exeName),
+    path.join(__dirname, 'backend', 'dist', 'backend', 'soundbot-backend', exeName),
+
+    // 4. 应用目录（便携模式）
+    path.join(getAppRootDir(), 'backend', 'soundbot-backend', exeName),
+    path.join(getAppRootDir(), 'resources', 'backend', 'soundbot-backend', exeName),
   ];
 
+  console.log('[Backend] Searching for backend executable...');
   for (const p of possiblePaths) {
+    console.log(`[Backend] Checking: ${p}`);
     if (fs.existsSync(p)) {
-      console.log(`[Backend] 找到后端可执行文件: ${p}`);
+      console.log(`[Backend] ✓ Found backend executable: ${p}`);
       return p;
     }
   }
 
-  console.error('[Backend] 未找到后端可执行文件，尝试过的路径:', possiblePaths);
+  console.error('[Backend] ✗ Backend executable not found. Tried paths:');
+  possiblePaths.forEach(p => console.error(`  - ${p}`));
   return null;
+}
+
+/**
+ * 验证后端目录完整性
+ */
+function verifyBackendIntegrity(backendDir) {
+  console.log(`[Backend] Verifying backend integrity: ${backendDir}`);
+
+  const requiredItems = [
+    'soundbot-backend',
+    'soundbot-backend.exe',
+    'lib',
+    'base_library.zip'
+  ];
+
+  const foundItems = [];
+  for (const item of requiredItems) {
+    const itemPath = path.join(backendDir, item);
+    if (fs.existsSync(itemPath)) {
+      foundItems.push(item);
+      const stats = fs.statSync(itemPath);
+      console.log(`[Backend] ✓ ${item} (${stats.isDirectory() ? 'dir' : 'file'})`);
+    }
+  }
+
+  if (foundItems.length === 0) {
+    console.error('[Backend] ✗ No required items found in backend directory');
+    return false;
+  }
+
+  // 检查目录大小
+  const getDirSize = (dir) => {
+    let size = 0;
+    const files = fs.readdirSync(dir);
+    for (const file of files) {
+      const filePath = path.join(dir, file);
+      const stats = fs.statSync(filePath);
+      if (stats.isDirectory()) {
+        size += getDirSize(filePath);
+      } else {
+        size += stats.size;
+      }
+    }
+    return size;
+  };
+
+  const totalSize = getDirSize(backendDir);
+  console.log(`[Backend] Total backend size: ${(totalSize / 1024 / 1024).toFixed(1)} MB`);
+
+  if (totalSize < 50 * 1024 * 1024) {
+    console.error('[Backend] ✗ Backend size is too small, may be incomplete');
+    return false;
+  }
+
+  return true;
 }
 
 /**
@@ -102,35 +158,40 @@ function getBackendExecutable() {
  */
 function findModelsDir() {
   const possiblePaths = [];
-  
+
   // 1. 环境变量（最高优先级）
   const envPath = process.env.SOUNDBOT_MODELS_PATH;
   if (envPath) {
     possiblePaths.push(envPath);
   }
-  
+
   // 2. 应用资源目录
   possiblePaths.push(path.join(process.resourcesPath, 'models'));
   possiblePaths.push(path.join(getAppRootDir(), 'models'));
-  
+
   // 3. 用户数据目录
   possiblePaths.push(path.join(getUserDataDir(), 'models'));
-  
+
   // 4. 开发环境
   possiblePaths.push(path.join(__dirname, 'models'));
   possiblePaths.push(path.join(__dirname, '..', 'models'));
-  
+
+  console.log('[Models] Searching for models directory...');
+
   // 查找第一个包含 clap 子目录的路径
   for (const modelsPath of possiblePaths) {
     const clapDir = path.join(modelsPath, 'clap');
+    console.log(`[Models] Checking: ${modelsPath}`);
     if (fs.existsSync(clapDir) && fs.statSync(clapDir).isDirectory()) {
-      console.log(`[Models] 找到模型目录: ${modelsPath}`);
+      console.log(`[Models] ✓ Found models directory: ${modelsPath}`);
       return modelsPath;
     }
   }
-  
+
   // 没找到，返回第一个路径（用于错误提示）
-  return possiblePaths[0] || path.join(getUserDataDir(), 'models');
+  const defaultPath = possiblePaths[0] || path.join(getUserDataDir(), 'models');
+  console.log(`[Models] ✗ Models not found, using default: ${defaultPath}`);
+  return defaultPath;
 }
 
 /**
@@ -139,7 +200,7 @@ function findModelsDir() {
 function checkModels() {
   const modelsDir = findModelsDir();
   const clapDir = path.join(modelsDir, 'clap');
-  
+
   return {
     exists: fs.existsSync(clapDir) && fs.statSync(clapDir).isDirectory(),
     path: modelsDir
@@ -163,7 +224,7 @@ async function showModelMissingDialog(modelsPath) {
     defaultId: 0,
     cancelId: 2
   });
-  
+
   if (result.response === 0) {
     shell.openExternal(`https://github.com/${GITHUB_REPO}/releases`);
   } else if (result.response === 1) {
@@ -171,7 +232,7 @@ async function showModelMissingDialog(modelsPath) {
     fs.mkdirSync(modelsPath, { recursive: true });
     shell.openPath(modelsPath);
   }
-  
+
   app.quit();
 }
 
@@ -180,25 +241,32 @@ async function showModelMissingDialog(modelsPath) {
  */
 async function startBackend() {
   if (backendProcess) {
-    console.log('[Backend] 后端服务已在运行');
+    console.log('[Backend] Backend service already running');
     return { success: true };
   }
-  
+
   // 检查模型
   const modelStatus = checkModels();
   if (!modelStatus.exists) {
-    console.warn('[Backend] 模型文件不存在:', modelStatus.path);
+    console.warn('[Backend] Model files not found:', modelStatus.path);
     await showModelMissingDialog(modelStatus.path);
     return { success: false, error: '缺少模型文件' };
   }
-  
+
   // 获取后端可执行文件
   const backendExe = getBackendExecutable();
   if (!backendExe) {
     dialog.showErrorBox('错误', '未找到后端可执行文件，请重新安装应用');
     return { success: false, error: '未找到后端可执行文件' };
   }
-  
+
+  // 验证后端目录完整性
+  const backendDir = path.dirname(backendExe);
+  if (!verifyBackendIntegrity(backendDir)) {
+    dialog.showErrorBox('错误', '后端文件不完整，请重新安装应用');
+    return { success: false, error: '后端文件不完整' };
+  }
+
   // 设置环境变量
   const env = {
     ...process.env,
@@ -206,65 +274,67 @@ async function startBackend() {
     PYTHONUNBUFFERED: '1',
     PYTHONIOENCODING: 'utf-8'
   };
-  
-  console.log(`[Backend] 启动后端: ${backendExe}`);
-  console.log(`[Backend] 模型路径: ${env.SOUNDBOT_MODELS_PATH}`);
-  
+
+  console.log(`[Backend] Starting backend: ${backendExe}`);
+  console.log(`[Backend] Working directory: ${backendDir}`);
+  console.log(`[Backend] Model path: ${env.SOUNDBOT_MODELS_PATH}`);
+
   try {
     // 启动后端进程
     backendProcess = spawn(backendExe, [], {
       env,
+      cwd: backendDir,
       stdio: ['pipe', 'pipe', 'pipe'],
       detached: false
     });
-    
+
     // 日志处理
     backendProcess.stdout.on('data', (data) => {
       const text = data.toString().trim();
       if (text) console.log(`[Backend] ${text}`);
     });
-    
+
     backendProcess.stderr.on('data', (data) => {
       const text = data.toString().trim();
       if (text) console.error(`[Backend] ${text}`);
     });
-    
+
     backendProcess.on('error', (error) => {
-      console.error('[Backend] 进程错误:', error);
+      console.error('[Backend] Process error:', error);
       backendProcess = null;
     });
-    
+
     backendProcess.on('exit', (code, signal) => {
-      console.log(`[Backend] 进程退出，代码: ${code}, 信号: ${signal}`);
+      console.log(`[Backend] Process exited, code: ${code}, signal: ${signal}`);
       backendProcess = null;
     });
-    
+
     // 等待服务启动
     return new Promise((resolve) => {
       let retries = 0;
       const maxRetries = 60; // 60秒超时
-      
+
       const interval = setInterval(async () => {
         try {
           const res = await fetch(`${API_BASE_URL}/health`);
           if (res.ok) {
             clearInterval(interval);
-            console.log('[Backend] 后端服务启动成功');
+            console.log('[Backend] ✓ Backend service started successfully');
             resolve({ success: true });
           }
         } catch (e) {
           retries++;
           if (retries >= maxRetries) {
             clearInterval(interval);
-            console.error('[Backend] 启动超时');
+            console.error('[Backend] ✗ Startup timeout');
             resolve({ success: false, error: '启动超时' });
           }
         }
       }, 1000);
     });
-    
+
   } catch (error) {
-    console.error('[Backend] 启动失败:', error);
+    console.error('[Backend] Startup failed:', error);
     return { success: false, error: error.message };
   }
 }
@@ -276,9 +346,9 @@ async function stopBackend() {
   if (!backendProcess) {
     return { success: true };
   }
-  
-  console.log('[Backend] 停止后端服务');
-  
+
+  console.log('[Backend] Stopping backend service');
+
   return new Promise((resolve) => {
     // 发送 SIGTERM
     if (process.platform === 'win32') {
@@ -286,15 +356,15 @@ async function stopBackend() {
     } else {
       backendProcess.kill('SIGTERM');
     }
-    
+
     // 等待进程退出
     const timeout = setTimeout(() => {
-      console.warn('[Backend] 强制终止后端进程');
+      console.warn('[Backend] Force killing backend process');
       backendProcess.kill('SIGKILL');
       backendProcess = null;
       resolve({ success: true });
     }, 5000);
-    
+
     backendProcess.on('exit', () => {
       clearTimeout(timeout);
       backendProcess = null;
@@ -353,7 +423,7 @@ function createWindow() {
   // 窗口准备好后显示
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    
+
     if (process.argv.includes('--dev')) {
       mainWindow.webContents.openDevTools();
     }
@@ -426,7 +496,7 @@ function setupIpcHandlers() {
   // 窗口控制
   ipcMain.handle('window-control', (event, action) => {
     if (!mainWindow) return;
-    
+
     switch (action) {
       case 'minimize':
         mainWindow.minimize();
@@ -467,11 +537,11 @@ function setupIpcHandlers() {
         method: data?.method || 'GET',
         headers: { 'Content-Type': 'application/json' }
       };
-      
+
       if (data?.body) {
         options.body = JSON.stringify(data.body);
       }
-      
+
       const response = await fetch(url, options);
       return await response.json();
     } catch (error) {
@@ -512,10 +582,10 @@ function setupIpcHandlers() {
       if (!fs.existsSync(filePath)) {
         return { success: false, error: '文件不存在' };
       }
-      
+
       const buffer = fs.readFileSync(filePath);
-      return { 
-        success: true, 
+      return {
+        success: true,
         data: Array.from(new Uint8Array(buffer))
       };
     } catch (error) {
@@ -549,11 +619,11 @@ function setupIpcHandlers() {
 
 app.whenReady().then(async () => {
   createWindow();
-  
+
   // 启动后端
   const result = await startBackend();
   if (!result.success) {
-    console.error('[App] 后端启动失败:', result.error);
+    console.error('[App] Backend startup failed:', result.error);
   }
 });
 
