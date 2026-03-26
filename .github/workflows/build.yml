@@ -91,10 +91,13 @@ jobs:
               exit 1
             fi
             
-            if [ -d "dist/backend/soundbot-backend/lib" ]; then
+            # PyInstaller 使用 _internal 目录 (新版本)
+            if [ -d "dist/backend/soundbot-backend/_internal" ]; then
+              echo "✓ _internal directory exists"
+            elif [ -d "dist/backend/soundbot-backend/lib" ]; then
               echo "✓ lib directory exists"
             else
-              echo "✗ lib directory not found"
+              echo "✗ Neither _internal nor lib directory found"
               exit 1
             fi
           else
@@ -189,10 +192,13 @@ jobs:
               exit 1
             }
             
-            if (Test-Path "$backendDir/lib") {
+            # PyInstaller 使用 _internal 目录 (新版本)
+            if (Test-Path "$backendDir/_internal") {
+              Write-Host "✓ _internal directory exists"
+            } elseif (Test-Path "$backendDir/lib") {
               Write-Host "✓ lib directory exists"
             } else {
-              Write-Host "✗ lib directory not found"
+              Write-Host "✗ Neither _internal nor lib directory found"
               exit 1
             }
           } else {

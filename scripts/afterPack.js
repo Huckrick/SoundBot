@@ -83,16 +83,24 @@ exports.default = async function(context) {
   const keyFiles = [
     'soundbot-backend',
     'soundbot-backend.exe',
-    'lib',
+    '_internal',  // PyInstaller 新版本使用 _internal
+    'lib',        // 旧版本使用 lib
     'base_library.zip'
   ];
 
+  let foundCount = 0;
   for (const file of keyFiles) {
     const filePath = path.join(backendTargetDir, file);
     if (fs.existsSync(filePath)) {
       const stats = fs.statSync(filePath);
       console.log(`[afterPack] ✓ ${file} (${stats.isDirectory() ? 'dir' : 'file'})`);
+      foundCount++;
     }
+  }
+
+  if (foundCount < 2) {
+    console.error(`[afterPack] ERROR: Too few key files found (${foundCount})`);
+    throw new Error(`Backend verification failed: only ${foundCount} key files found`);
   }
 
   console.log('[afterPack] Done!');

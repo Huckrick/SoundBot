@@ -106,7 +106,8 @@ function verifyBackendIntegrity(backendDir) {
   const requiredItems = [
     'soundbot-backend',
     'soundbot-backend.exe',
-    'lib',
+    '_internal',  // PyInstaller 新版本使用 _internal
+    'lib',        // 旧版本使用 lib
     'base_library.zip'
   ];
 
@@ -120,8 +121,8 @@ function verifyBackendIntegrity(backendDir) {
     }
   }
 
-  if (foundItems.length === 0) {
-    console.error('[Backend] ✗ No required items found in backend directory');
+  if (foundItems.length < 2) {
+    console.error('[Backend] ✗ Too few required items found in backend directory');
     return false;
   }
 
