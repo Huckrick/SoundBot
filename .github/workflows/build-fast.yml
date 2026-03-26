@@ -65,7 +65,7 @@ jobs:
           Write-Host "=== Building PyInstaller backend ==="
           cd backend
           pyinstaller main.spec --distpath ../dist/backend --workpath ../dist/build --noconfirm
-          Write-Host "Backend size: $([math]::Round((Get-ChildItem ../dist/backend/soundbot-backend.exe).Length/1MB,2)) MB"
+          Write-Host "Backend size: $([math]::Round((Get-ChildItem ../dist/backend/soundbot_backend.exe).Length/1MB,2)) MB"
 
       # 构建前端
       - name: Build Frontend
