@@ -671,15 +671,7 @@ function createWindow() {
   const indexPath = path.join(__dirname, 'index.html');
   mainWindow.loadFile(indexPath);
 
-  // 窗口准备好后显示
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
-
-    if (process.argv.includes('--dev')) {
-      mainWindow.webContents.openDevTools();
-    }
-  });
-
+  // 窗口关闭处理
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -987,17 +979,174 @@ function setupIpcHandlers() {
       return { success: false, error: error.message };
     }
   });
+
+  // 调试信息
+  ipcMain.handle('get-backend-status', () => {
+    return {
+      isRunning: backendProcess !== null,
+      pid: backendProcess ? backendProcess.pid : null,
+      port: BACKEND_PORT
+    };
+  });
+
+  ipcMain.handle('get-app-paths', () => {
+    return {
+      appRoot: getAppRootDir(),
+      userData: getUserDataDir(),
+      resourcesPath: process.resourcesPath,
+      backendExecutable: getBackendExecutable(),
+      modelsPath: findModelsDir()
+    };
+  });
+
+  ipcMain.handle('open-dev-tools', () => {
+    if (mainWindow) {
+      mainWindow.webContents.openDevTools();
+    }
+  });
 }
 
 // ==================== 应用生命周期 ====================
 
-app.whenReady().then(async () => {
-  createWindow();
+// 创建启动窗口（显示加载状态）
+let splashWindow = null;
 
+function createSplashWindow() {
+  splashWindow = new BrowserWindow({
+    width: 400,
+    height: 300,
+    frame: false,
+    alwaysOnTop: true,
+    transparent: true,
+    backgroundColor: '#0a0a0a',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true
+    }
+  });
+
+  // 加载简单的启动页面
+  const splashHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body {
+          margin: 0;
+          padding: 0;
+          width: 400px;
+          height: 300px;
+          background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          color: #e5e5e5;
+        }
+        .logo {
+          font-size: 28px;
+          font-weight: 600;
+          margin-bottom: 20px;
+          background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+        .status {
+          font-size: 14px;
+          color: #a3a3a3;
+          margin-bottom: 30px;
+        }
+        .spinner {
+          width: 40px;
+          height: 40px;
+          border: 3px solid rgba(255,255,255,0.1);
+          border-top-color: #667eea;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        .progress {
+          margin-top: 20px;
+          font-size: 12px;
+          color: #666;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="logo">SoundBot</div>
+      <div class="status" id="status">正在启动服务...</div>
+      <div class="spinner"></div>
+      <div class="progress" id="progress">初始化中</div>
+    </body>
+    </html>
+  `;
+  
+  splashWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHtml)}`);
+  return splashWindow;
+}
+
+// 更新启动窗口状态
+function updateSplashStatus(status, progress) {
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    splashWindow.webContents.executeJavaScript(`
+      document.getElementById('status').textContent = '${status}';
+      document.getElementById('progress').textContent = '${progress}';
+    `).catch(() => {});
+  }
+}
+
+// 关闭启动窗口
+function closeSplashWindow() {
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    splashWindow.close();
+    splashWindow = null;
+  }
+}
+
+app.whenReady().then(async () => {
+  // 创建启动窗口
+  createSplashWindow();
+  
+  // 先启动后端
+  updateSplashStatus('正在启动后端服务...', '检查模型文件');
   const result = await ensureBackendStarted();
+  
   if (!result.success) {
     console.error('[App] Backend startup failed:', result.error);
+    updateSplashStatus('启动失败', result.error || '未知错误');
+    
+    // 显示错误对话框
+    dialog.showErrorBox(
+      '启动失败',
+      `无法启动后端服务：${result.error || '未知错误'}\n\n请检查：\n1. 模型文件是否正确放置\n2. 端口 8000 是否被占用\n3. 重新安装应用`
+    );
+    
+    closeSplashWindow();
+    app.quit();
+    return;
   }
+  
+  updateSplashStatus('服务已就绪', '正在加载界面...');
+  
+  // 后端启动成功后再创建主窗口
+  createWindow();
+  
+  // 等待主窗口准备好后关闭启动窗口
+  mainWindow.once('ready-to-show', () => {
+    closeSplashWindow();
+    mainWindow.show();
+    
+    // 通知前端后端已就绪
+    mainWindow.webContents.send('backend-ready', { success: true });
+    
+    if (process.argv.includes('--dev')) {
+      mainWindow.webContents.openDevTools();
+    }
+  });
 });
 
 app.on('window-all-closed', async () => {

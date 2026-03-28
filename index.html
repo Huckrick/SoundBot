@@ -499,28 +499,98 @@
             }
         }
 
+        // 后端状态轮询配置
+        let backendStatusCheckInterval = null;
+        const BACKEND_CHECK_INTERVAL = 2000; // 每2秒检查一次
+        const BACKEND_CHECK_MAX_RETRIES = 30; // 最多重试30次（60秒）
+        let backendCheckRetryCount = 0;
+
+        async function checkBackendHealth() {
+            try {
+                if (window.electronAPI && window.electronAPI.backendStatus) {
+                    const result = await window.electronAPI.backendStatus.waitUntilReady(5000);
+                    return result && result.success;
+                }
+                const response = await fetch(apiUrl('/api/v1/health'));
+                return response.ok;
+            } catch (error) {
+                return false;
+            }
+        }
+
         async function ensureBackendReady() {
             if (backendReady) return true;
 
             try {
-                if (window.electronAPI && window.electronAPI.backendStatus) {
-                    const result = await window.electronAPI.backendStatus.waitUntilReady(90000);
-                    if (result && result.success) {
-                        backendReady = true;
-                        return true;
-                    }
-
-                    throw new Error(result?.error || '后端未就绪');
+                // 首先尝试直接检查
+                const isReady = await checkBackendHealth();
+                if (isReady) {
+                    backendReady = true;
+                    onBackendReady();
+                    return true;
                 }
 
-                const response = await fetch(apiUrl('/api/v1/health'));
-                backendReady = response.ok;
-                return backendReady;
+                // 如果直接检查失败，开始轮询
+                console.log('[Frontend] 后端未就绪，开始轮询检查...');
+                
+                return new Promise((resolve) => {
+                    backendCheckRetryCount = 0;
+                    
+                    backendStatusCheckInterval = setInterval(async () => {
+                        backendCheckRetryCount++;
+                        console.log(`[Frontend] 检查后端状态 (${backendCheckRetryCount}/${BACKEND_CHECK_MAX_RETRIES})...`);
+                        
+                        const isReady = await checkBackendHealth();
+                        
+                        if (isReady) {
+                            clearInterval(backendStatusCheckInterval);
+                            backendStatusCheckInterval = null;
+                            backendReady = true;
+                            console.log('[Frontend] 后端已就绪！');
+                            onBackendReady();
+                            resolve(true);
+                        } else if (backendCheckRetryCount >= BACKEND_CHECK_MAX_RETRIES) {
+                            clearInterval(backendStatusCheckInterval);
+                            backendStatusCheckInterval = null;
+                            console.error('[Frontend] 后端启动超时');
+                            showNotification('后端启动超时，请重启应用', 'error');
+                            resolve(false);
+                        }
+                    }, BACKEND_CHECK_INTERVAL);
+                });
             } catch (error) {
                 console.error('[Frontend] 后端启动失败:', error);
                 showNotification('后端启动失败: ' + error.message, 'error');
                 return false;
             }
+        }
+
+        // 后端就绪后的回调
+        function onBackendReady() {
+            console.log('[Frontend] 执行后端就绪回调...');
+            
+            // 更新磁盘空间显示
+            updateDiskSpace();
+            
+            // 从数据库加载文件
+            loadFilesFromDatabase();
+            
+            // 显示成功通知
+            showNotification('服务已就绪', 'success');
+            
+            // 触发界面刷新
+            renderSoundList();
+        }
+
+        // 监听主进程发送的后端就绪事件
+        if (window.electronAPI && window.electronAPI.onBackendReady) {
+            window.electronAPI.onBackendReady((event, data) => {
+                console.log('[Frontend] 收到后端就绪事件:', data);
+                if (data && data.success) {
+                    backendReady = true;
+                    onBackendReady();
+                }
+            });
         }
 
         // 分类数据（动态生成）
@@ -5087,18 +5157,19 @@
             drawMainWaveform();
 
             await initializeRuntimeConfig();
-            const isBackendReady = await ensureBackendReady();
-            if (!isBackendReady) {
-                const diskSpaceText = document.getElementById('diskSpaceText');
-                if (diskSpaceText) {
-                    diskSpaceText.textContent = '后端未就绪';
+            
+            // 异步检查后端状态，不阻塞界面加载
+            ensureBackendReady().then(async (isReady) => {
+                if (isReady) {
+                    await loadCurrentProject();
+                    await loadUserFolders();
+                } else {
+                    const diskSpaceText = document.getElementById('diskSpaceText');
+                    if (diskSpaceText) {
+                        diskSpaceText.textContent = '后端未就绪';
+                    }
                 }
-                return;
-            }
-
-            await loadCurrentProject();
-            await loadFilesFromDatabase();
-            await loadUserFolders();
+            });
 
             playbackWsClientId = 'frontend-' + Date.now();
             connectPlaybackWebSocket(playbackWsClientId);

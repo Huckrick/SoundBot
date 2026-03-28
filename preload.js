@@ -70,6 +70,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('menu-import-file', callback);
   },
 
+  // 后端就绪事件监听
+  onBackendReady: (callback) => {
+    ipcRenderer.on('backend-ready', callback);
+  },
+
   // 移除事件监听器
   removeAllListeners: (channel) => {
     ipcRenderer.removeAllListeners(channel);
@@ -234,6 +239,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     check: () => ipcRenderer.invoke('check-resources'),
     // 打开下载页面
     openDownloadPage: () => ipcRenderer.invoke('open-download-page')
+  },
+
+  // 调试信息
+  debug: {
+    // 获取后端进程状态
+    getBackendStatus: () => ipcRenderer.invoke('get-backend-status'),
+    // 获取应用路径信息
+    getAppPaths: () => ipcRenderer.invoke('get-app-paths'),
+    // 打开开发者工具
+    openDevTools: () => ipcRenderer.invoke('open-dev-tools')
   }
 });
 
