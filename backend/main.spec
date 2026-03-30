@@ -527,27 +527,7 @@ hiddenimports = [
     'builtins',
 ]
 
-# 排除项 - 大幅减小体积
-excludes = [
-    # GUI 相关（后端不需要）
-    'matplotlib', 'matplotlib.pyplot', 'matplotlib.backends',
-    'PIL', 'PIL.Image', 'cv2', 'opencv',
-    'tkinter', 'Tkinter', '_tkinter',
-    'PyQt5', 'PyQt6', 'PySide2', 'PySide6', 'PyQt4',
-    'wx', 'wxPython', 'kivy', 'pyglet',
-    # 测试相关
-    'pytest', '_pytest', 'unittest', 'doctest',
-    # 文档相关
-    'sphinx', 'docutils',
-    # IPython
-    'IPython', 'ipykernel', 'ipywidgets',
-    # Jupyter
-    'jupyter', 'jupyter_client', 'jupyter_core', 'notebook',
-    # 其他大体积且不需要的包
-    'tensorboard', 'wandb', 'mlflow',
-]
-
-# 分析阶段
+# 分析阶段 - 完整构建，不排除任何依赖
 a = Analysis(
     [str(backend_dir / 'main.py')],
     pathex=[str(backend_dir)],
@@ -557,7 +537,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=excludes,
+    excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
