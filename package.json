@@ -124,8 +124,7 @@
     "extraResources": [
       {
         "from": "dist/backend/soundbot-backend",
-        "to": "backend/soundbot-backend",
-        "filter": ["**/*"]
+        "to": "backend/soundbot-backend"
       }
     ],
     "publish": null
