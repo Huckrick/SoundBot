@@ -182,21 +182,22 @@ jobs:
             ${{ runner.os }}-electron-
 
       - name: Install Python dependencies
-        shell: pwsh
+        shell: powershell
         run: |
           pip install pyinstaller
-          Get-Content backend/requirements.txt | Where-Object { $_ -notmatch 'uvloop' -and $_ -match '\S' } | Set-Content requirements-filtered.txt
+          $lines = Get-Content backend/requirements.txt | Where-Object { $_ -notmatch 'uvloop' -and $_ -match '\S' }
+          $lines | Set-Content requirements-filtered.txt
           pip install -r requirements-filtered.txt
           Remove-Item requirements-filtered.txt
 
       - name: Build PyInstaller backend
-        shell: pwsh
+        shell: powershell
         run: |
           cd backend
           pyinstaller main.spec --distpath ../dist/backend --workpath ../dist/build --noconfirm
 
       - name: Verify backend build
-        shell: pwsh
+        shell: powershell
         run: |
           Write-Host "=== Verifying backend build ==="
           $backendDir = "dist/backend/soundbot-backend"
@@ -213,9 +214,9 @@ jobs:
               exit 1
             }
 
-            $internalPath = Test-Path "$backendDir/_internal"
-            $libPath = Test-Path "$backendDir/lib"
-            if ($internalPath -or $libPath) {
+            $hasInternal = Test-Path "$backendDir/_internal"
+            $hasLib = Test-Path "$backendDir/lib"
+            if ($hasInternal -or $hasLib) {
               Write-Host "✓ Runtime directory exists"
             } else {
               Write-Host "✗ Runtime directory not found"
@@ -237,7 +238,7 @@ jobs:
           ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
 
       - name: Verify Electron build
-        shell: pwsh
+        shell: powershell
         run: |
           Write-Host "=== Verifying Electron build ==="
           Get-ChildItem dist-electron/
