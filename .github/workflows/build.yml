@@ -213,7 +213,9 @@ jobs:
               exit 1
             }
 
-            if (Test-Path "$backendDir/_internal" -or (Test-Path "$backendDir/lib")) {
+            $internalPath = Test-Path "$backendDir/_internal"
+            $libPath = Test-Path "$backendDir/lib"
+            if ($internalPath -or $libPath) {
               Write-Host "✓ Runtime directory exists"
             } else {
               Write-Host "✗ Runtime directory not found"
