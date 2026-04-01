@@ -200,22 +200,25 @@ jobs:
         shell: powershell
         run: |
           Write-Host "=== Verifying backend build ==="
-          $backendDir = "dist/backend/soundbot-backend"
+          $backendDir = 'dist/backend/soundbot-backend'
           if (Test-Path $backendDir) {
             Write-Host "✓ Backend directory exists"
             Get-ChildItem $backendDir
             $size = [math]::Round((Get-ChildItem $backendDir -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB, 2)
             Write-Host "Backend size: $size MB"
 
-            if (Test-Path "$backendDir/soundbot-backend.exe") {
+            $exePath = Join-Path $backendDir 'soundbot-backend.exe'
+            if (Test-Path $exePath) {
               Write-Host "✓ Backend executable exists"
             } else {
               Write-Host "✗ Backend executable not found"
               exit 1
             }
 
-            $hasInternal = Test-Path "$backendDir/_internal"
-            $hasLib = Test-Path "$backendDir/lib"
+            $internalDir = Join-Path $backendDir '_internal'
+            $libDir = Join-Path $backendDir 'lib'
+            $hasInternal = Test-Path $internalDir
+            $hasLib = Test-Path $libDir
             if ($hasInternal -or $hasLib) {
               Write-Host "✓ Runtime directory exists"
             } else {
