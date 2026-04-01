@@ -97,25 +97,25 @@ jobs:
         run: |
           echo "=== Verifying backend build ==="
           if [ -d "dist/backend/soundbot-backend" ]; then
-            echo "✓ Backend directory exists"
+            echo "[OK] Backend directory exists"
             ls -la dist/backend/soundbot-backend/
             du -sh dist/backend/soundbot-backend
 
             if [ -f "dist/backend/soundbot-backend/soundbot-backend" ]; then
-              echo "✓ Backend executable exists"
+              echo "[OK] Backend executable exists"
             else
-              echo "✗ Backend executable not found"
+              echo "[ERROR] Backend executable not found"
               exit 1
             fi
 
             if [ -d "dist/backend/soundbot-backend/_internal" ] || [ -d "dist/backend/soundbot-backend/lib" ]; then
-              echo "✓ Runtime directory exists"
+              echo "[OK] Runtime directory exists"
             else
-              echo "✗ Runtime directory not found"
+              echo "[ERROR] Runtime directory not found"
               exit 1
             fi
           else
-            echo "✗ Backend directory not found"
+            echo "[ERROR] Backend directory not found"
             ls -la dist/backend/
             exit 1
           fi
@@ -136,9 +136,9 @@ jobs:
           ls -lh dist-electron/
 
           if ls dist-electron/*.dmg 1> /dev/null 2>&1; then
-            echo "✓ DMG file created"
+            echo "[OK] DMG file created"
           else
-            echo "✗ DMG file not found"
+            echo "[ERROR] DMG file not found"
             exit 1
           fi
 
@@ -202,16 +202,16 @@ jobs:
           Write-Host "=== Verifying backend build ==="
           $backendDir = 'dist/backend/soundbot-backend'
           if (Test-Path $backendDir) {
-            Write-Host "✓ Backend directory exists"
+            Write-Host "[OK] Backend directory exists"
             Get-ChildItem $backendDir
             $size = [math]::Round((Get-ChildItem $backendDir -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB, 2)
             Write-Host "Backend size: $size MB"
 
             $exePath = Join-Path $backendDir 'soundbot-backend.exe'
             if (Test-Path $exePath) {
-              Write-Host "✓ Backend executable exists"
+              Write-Host "[OK] Backend executable exists"
             } else {
-              Write-Host "✗ Backend executable not found"
+              Write-Host "[ERROR] Backend executable not found"
               exit 1
             }
 
@@ -220,13 +220,13 @@ jobs:
             $hasInternal = Test-Path $internalDir
             $hasLib = Test-Path $libDir
             if ($hasInternal -or $hasLib) {
-              Write-Host "✓ Runtime directory exists"
+              Write-Host "[OK] Runtime directory exists"
             } else {
-              Write-Host "✗ Runtime directory not found"
+              Write-Host "[ERROR] Runtime directory not found"
               exit 1
             }
           } else {
-            Write-Host "✗ Backend directory not found"
+            Write-Host "[ERROR] Backend directory not found"
             exit 1
           }
 
@@ -248,9 +248,9 @@ jobs:
 
           $exeFiles = Get-ChildItem dist-electron/*.exe
           if ($exeFiles) {
-            Write-Host "✓ EXE file created"
+            Write-Host "[OK] EXE file created"
           } else {
-            Write-Host "✗ EXE file not found"
+            Write-Host "[ERROR] EXE file not found"
             exit 1
           }
 
