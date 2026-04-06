@@ -160,16 +160,95 @@ CORS_ORIGINS = [
 
 HF_ENDPOINT = os.getenv("HF_ENDPOINT", "https://hf-mirror.com")
 
-# 自动查找模型目录
+
+def find_models_dir_runtime() -> Path:
+    """
+    运行时动态查找模型目录（每次都重新评估环境变量）
+    
+    与 find_models_dir() 的区别：
+    - find_models_dir() 在模块导入时执行一次，路径固定
+    - find_models_dir_runtime() 每次调用都重新检查环境变量
+    
+    检索顺序:
+    1. 环境变量 SOUNDBOT_MODELS_PATH（最高优先级）
+    2. 可执行文件同级目录的 models/
+    3. 可执行文件上级目录的 models/
+    4. 用户数据目录的 models/
+    5. 开发环境项目根目录的 models/
+    
+    Returns:
+        模型目录路径（无论是否存在）
+    """
+    exe_dir = get_executable_dir()
+    user_data = get_user_data_dir()
+    
+    # 所有可能的路径（按优先级）
+    possible_paths = []
+    
+    # 1. 环境变量（最高优先级）- 每次都重新读取
+    env_path = os.getenv('SOUNDBOT_MODELS_PATH')
+    if env_path:
+        possible_paths.append(Path(env_path))
+    
+    # 2. 可执行文件同级目录
+    possible_paths.append(exe_dir / 'models')
+    
+    # 3. 可执行文件上级目录（Electron 资源目录结构）
+    possible_paths.append(exe_dir.parent / 'models')
+    possible_paths.append(exe_dir.parent.parent / 'models')
+    
+    # 4. 用户数据目录
+    possible_paths.append(user_data / 'models')
+    
+    # 5. 开发环境
+    if not getattr(sys, 'frozen', False):
+        dev_root = Path(__file__).parent.parent
+        possible_paths.append(dev_root / 'models')
+    
+    # 查找第一个包含 clap 子目录的路径
+    for models_path in possible_paths:
+        clap_dir = models_path / 'clap'
+        if clap_dir.exists() and clap_dir.is_dir():
+            return models_path
+    
+    # 如果没有找到，返回第一个路径（用于错误提示）
+    return possible_paths[0] if possible_paths else exe_dir / 'models'
+
+
+def get_clap_model_name() -> str:
+    """
+    运行时动态获取 CLAP 模型路径
+    
+    此函数在调用时实时查找模型目录，支持 SOUNDBOT_MODELS_PATH 环境变量
+    这是解决 PyInstaller 打包后路径问题的关键
+    
+    Returns:
+        模型路径字符串（本地路径或 HuggingFace 模型名）
+    """
+    # 每次都重新查找模型目录（绕过任何可能的缓存）
+    models_dir = find_models_dir_runtime()
+    clap_path = models_dir / 'clap'
+    
+    if clap_path.exists():
+        return str(clap_path)
+    else:
+        # 回退到 HuggingFace
+        return os.getenv("CLAP_MODEL", "laion/larger_clap_general")
+
+
+# 自动查找模型目录（模块导入时执行一次）
 MODELS_DIR = find_models_dir()
 CLAP_MODEL_PATH = MODELS_DIR / 'clap'
 
-# 确定 CLAP 模型名称/路径
+# 确定 CLAP 模型名称/路径（模块导入时执行一次，仅作为默认值）
 if CLAP_MODEL_PATH.exists():
     CLAP_MODEL_NAME = str(CLAP_MODEL_PATH)
 else:
     # 回退到 HuggingFace
     CLAP_MODEL_NAME = os.getenv("CLAP_MODEL", "laion/larger_clap_general")
+
+# 注意：在 PyInstaller 打包后的环境中，CLAP_MODEL_NAME 可能是错误的绝对路径
+# 应该使用 get_clap_model_name() 函数来获取正确的模型路径
 
 CLAP_DEVICE = os.getenv("CLAP_DEVICE", "auto")
 MODEL_LOAD_TIMEOUT = int(os.getenv("MODEL_LOAD_TIMEOUT", "120"))

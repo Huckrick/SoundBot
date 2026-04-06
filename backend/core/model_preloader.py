@@ -162,4 +162,4 @@ async def preload_models_on_startup():
     # 在后台启动预加载
     asyncio.create_task(preloader.preload_models())
     
-    logger.info(f"🚀 模型预加载任务已启动（后台运行，使用模型: {config.CLAP_MODEL_NAME}）")
+    logger.info(f"🚀 模型预加载任务已启动（后台运行，使用模型: {config.get_clap_model_name()}）")

@@ -102,8 +102,9 @@ class CLIPEmbedder:
         try:
             from transformers import ClapModel, ClapProcessor
 
-            model_path = config.CLAP_MODEL_NAME
-            logger.info(f"正在从 HuggingFace 下载模型: {model_path}")
+            # 使用运行时动态获取的模型路径（支持 PyInstaller 打包后的环境）
+            model_path = config.get_clap_model_name()
+            logger.info(f"正在加载模型: {model_path}")
 
             self.model = ClapModel.from_pretrained(
                 model_path,

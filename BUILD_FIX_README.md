@@ -193,6 +193,51 @@ pip install soundfile --force-reinstall
 
 ---
 
+## 模型路径问题修复（关键！）
+
+### 问题描述
+PyInstaller 打包后，模型路径解析出现严重问题：
+
+**根本原因**：
+1. `config.CLAP_MODEL_NAME` 在**模块导入时**就被计算为一个固定的绝对路径
+2. Electron 启动后端时设置 `SOUNDBOT_MODELS_PATH` 环境变量，但此时 `config.py` 早已导入完成
+3. 导致打包后的可执行文件在目标机器上使用了错误的模型路径
+
+### 解决方案
+
+**方案 A：延迟计算模型路径**（已实施）
+
+新增 `config.get_clap_model_name()` 函数，每次调用时实时查找：
+
+```python
+def get_clap_model_name() -> str:
+    """运行时动态获取 CLAP 模型路径"""
+    models_dir = find_models_dir_runtime()  # 每次都重新评估环境变量
+    clap_path = models_dir / 'clap'
+    
+    if clap_path.exists():
+        return str(clap_path)
+    else:
+        return os.getenv("CLAP_MODEL", "laion/larger_clap_general")
+```
+
+同时新增 `find_models_dir_runtime()` 函数，每次调用都重新读取 `SOUNDBOT_MODELS_PATH` 环境变量。
+
+### 验证方法
+
+```bash
+# 运行路径解析验证脚本
+python scripts/verify_model_path.py
+```
+
+该脚本会测试：
+1. 开发环境模式
+2. 环境变量覆盖模式
+3. PyInstaller 打包后模拟场景
+4. 关键模块导入链
+
+---
+
 ## 后续优化建议
 
 1. **代码签名**：为 Windows 可执行文件添加代码签名，避免杀毒软件误报
