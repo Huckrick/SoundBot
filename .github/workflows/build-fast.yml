@@ -2,7 +2,8 @@ name: Fast Build (Optimized)
 
 on:
   push:
-    branches: [main]
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 env:
