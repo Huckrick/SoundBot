@@ -3032,6 +3032,10 @@ async def get_ai_status():
 # ==================== 主入口 ====================
 
 if __name__ == "__main__":
+    # PyInstaller 打包后的 Windows 多进程支持
+    import multiprocessing
+    multiprocessing.freeze_support()
+    
     uvicorn.run(
         "main:app",
         host=config.HOST,

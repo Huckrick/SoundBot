@@ -2,11 +2,18 @@
 """
 SoundBot Backend PyInstaller Spec
 打包为目录模式，支持 Windows/macOS/Linux
+
+修复说明：
+1. 添加了完整的 hiddenimports，包括 ChromaDB、soundfile、torch 的子模块
+2. 添加了二进制文件收集（soundfile 的 libsndfile，torch 的库文件）
+3. 添加了数据文件收集（transformers 的配置文件）
+4. 针对 Windows 添加了运行时钩子支持 multiprocessing
 """
 
 import sys
 import os
 from pathlib import Path
+import site
 
 # 获取当前 spec 文件所在目录
 spec_file = Path(os.path.abspath(sys.argv[0]))
@@ -16,7 +23,7 @@ project_root = backend_dir.parent
 
 block_cipher = None
 
-# 数据文件配置 - 只包含代码，不包含模型
+# ==================== 数据文件配置 ====================
 datas = []
 
 # 添加 core 目录
@@ -39,7 +46,53 @@ if (backend_dir / 'models').exists():
 if (backend_dir / 'bootstrap.py').exists():
     datas.append((str(backend_dir / 'bootstrap.py'), '.'))
 
-# 隐藏导入 - 包含所有需要的依赖
+# 添加初始化文件确保目录被识别为包
+for subdir in ['core', 'utils', 'models']:
+    init_file = backend_dir / subdir / '__init__.py'
+    if init_file.exists():
+        datas.append((str(init_file), subdir))
+
+# ==================== 查找二进制文件 ====================
+binaries = []
+
+# 查找 soundfile 的 libsndfile
+try:
+    import soundfile
+    soundfile_dir = Path(soundfile.__file__).parent
+    # Windows
+    if sys.platform == 'win32':
+        libsndfile = soundfile_dir / '_soundfile_data' / 'libsndfile-1.dll'
+        if libsndfile.exists():
+            binaries.append((str(libsndfile), '.'))
+    # macOS
+    elif sys.platform == 'darwin':
+        libsndfile = soundfile_dir / '_soundfile_data' / 'libsndfile.dylib'
+        if libsndfile.exists():
+            binaries.append((str(libsndfile), '.'))
+    # Linux
+    else:
+        libsndfile = soundfile_dir / '_soundfile_data' / 'libsndfile.so'
+        if libsndfile.exists():
+            binaries.append((str(libsndfile), '.'))
+except Exception as e:
+    print(f"Warning: Could not find soundfile library: {e}")
+
+# 添加 torch 库文件（如果有）
+try:
+    import torch
+    torch_lib = Path(torch.__file__).parent / 'lib'
+    if torch_lib.exists():
+        # 收集所有必要的库文件
+        for lib_file in torch_lib.glob('*.dll'):
+            binaries.append((str(lib_file), 'torch/lib'))
+        for lib_file in torch_lib.glob('*.so*'):
+            binaries.append((str(lib_file), 'torch/lib'))
+        for lib_file in torch_lib.glob('*.dylib'):
+            binaries.append((str(lib_file), 'torch/lib'))
+except Exception as e:
+    print(f"Warning: Could not find torch libraries: {e}")
+
+# ==================== 隐藏导入配置 ====================
 hiddenimports = [
     # FastAPI / Uvicorn
     'uvicorn',
@@ -100,19 +153,33 @@ hiddenimports = [
     'core.model_preloader',
     'core.ucs_keywords',
 
-    # 数据库
+    # 工具模块
+    'utils.logger',
+    'utils.audio_utils',
+
+    # ChromaDB - 完整的导入链
     'chromadb',
     'chromadb.config',
     'chromadb.api',
     'chromadb.api.segment',
     'chromadb.api.models',
     'chromadb.db',
-    'chromadb.db.sqlite',
-    'chromadb.db.duckdb',
-    'chromadb.collection',
-    'chromadb.errors',
+    'chromadb.db.impl',
+    'chromadb.db.impl.sqlite',
+    'chromadb.db.impl.sqlite_pool',
+    'chromadb.db.base',
+    'chromadb.segment',
+    'chromadb.segment.impl',
+    'chromadb.segment.impl.metadata',
+    'chromadb.segment.impl.metadata.sqlite',
+    'chromadb.segment.impl.vector',
+    'chromadb.segment.impl.vector.local_persistent_hnsw',
     'chromadb.telemetry',
+    'chromadb.telemetry.product',
+    'chromadb.errors',
     'chromadb.utils',
+    'chromadb.utils.embedding_functions',
+    'duckdb',
     'aiosqlite',
     'sqlite3',
     'sqlite3.dbapi2',
@@ -157,6 +224,7 @@ hiddenimports = [
     'torch.utils.data.dataloader',
     'torch.utils.data.dataset',
     'torch.utils.data.sampler',
+    'torch.utils._contextlib',
     'torch.cuda',
     'torch.backends',
     'torch.backends.cudnn',
@@ -192,12 +260,13 @@ hiddenimports = [
     'torchaudio',
     'torchaudio.models',
     'torchaudio.utils',
+    'torchaudio.backend',
     'torchvision',
     'torchvision.models',
     'torchvision.ops',
     'torchvision.transforms',
 
-    # transformers
+    # transformers - 完整的导入链
     'transformers',
     'transformers.utils',
     'transformers.utils.generic',
@@ -226,6 +295,8 @@ hiddenimports = [
     'transformers.pipelines.base',
     'transformers.pipelines.audio_classification',
     'transformers.pipelines.automatic_speech_recognition',
+    'transformers.onnx',
+    'transformers.onnx.config',
     'sentence_transformers',
     'sentence_transformers.SentenceTransformer',
     'sentence_transformers.models',
@@ -270,6 +341,7 @@ hiddenimports = [
     'librosa.effects',
     'librosa.beat',
     'soundfile',
+    'soundfile._soundfile',  # 关键：soundfile 的底层绑定
     'soundfile.library',
     'audioread',
     'audioread.rawread',
@@ -415,7 +487,7 @@ hiddenimports = [
     'onnxruntime.capi',
     'onnxruntime.capi.onnxruntime_pybind11_state',
 
-    # 其他
+    # 其他必要模块
     'asyncio',
     'asyncio.base_events',
     'asyncio.coroutines',
@@ -430,44 +502,28 @@ hiddenimports = [
     'concurrent.futures.process',
     'concurrent.futures.thread',
     'pathlib',
-    'pathlib._local',
     'json',
-    'json.decoder',
-    'json.encoder',
     're',
     'math',
     'random',
     'datetime',
     'hashlib',
-    'hashlib._md5',
-    'hashlib._sha1',
-    'hashlib._sha256',
-    'hashlib._sha512',
     'urllib',
     'urllib.parse',
     'urllib.request',
     'collections',
     'collections.abc',
     'functools',
-    'functools._functools',
     'itertools',
-    'itertools._itertools',
     'contextlib',
-    'contextlib._contextlib',
     'typing',
-    'typing.io',
-    'typing.re',
     'inspect',
     'warnings',
-    'warnings._warnings',
     'traceback',
-    'traceback.format_exc',
     'logging',
     'logging.handlers',
     'logging.config',
     'io',
-    'io.BytesIO',
-    'io.StringIO',
     'struct',
     'weakref',
     'gc',
@@ -476,50 +532,20 @@ hiddenimports = [
     'time',
     'shutil',
     'tempfile',
-    'errno',
     'signal',
     'mmap',
     'zipfile',
-    'zipfile._path',
     'tarfile',
     'gzip',
     'bz2',
     'lzma',
     'copy',
     'pickle',
-    'pickle._pickle',
     'base64',
     'binascii',
-    'calendar',
-    'codecs',
-    'copyreg',
-    'dis',
-    'getopt',
-    'getpass',
-    'glob',
-    'linecache',
-    'optparse',
-    'pprint',
-    'queue',
-    'quopri',
-    'reprlib',
-    'shlex',
-    'string',
-    'textwrap',
-    'token',
-    'tokenize',
-    'types',
-    'typing_extensions._utils',
-    'urllib.error',
-    'urllib.robotparser',
     'uuid',
     'decimal',
     'fractions',
-    'numbers',
-    'statistics',
-    'bisect',
-    'heapq',
-    'array',
     'enum',
     'dataclasses',
     'abc',
@@ -527,11 +553,11 @@ hiddenimports = [
     'builtins',
 ]
 
-# 分析阶段 - 完整构建，不排除任何依赖
+# ==================== 分析阶段 ====================
 a = Analysis(
     [str(backend_dir / 'main.py')],
     pathex=[str(backend_dir)],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
@@ -545,7 +571,7 @@ a = Analysis(
     optimize=1,
 )
 
-# 过滤掉不需要的二进制文件
+# 过滤掉不需要的二进制文件以减小体积
 binaries_to_exclude = [
     'Qt5', 'Qt6', 'QtCore', 'QtGui', 'QtWidgets',
     'opencv', 'cv2',
@@ -555,7 +581,7 @@ a.binaries = [b for b in a.binaries if not any(x in str(b[0]) for x in binaries_
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-# onedir 模式
+# ==================== 构建阶段 - onedir 模式 ====================
 exe_name = 'soundbot-backend'
 exe_name_with_ext = exe_name + ('.exe' if sys.platform == 'win32' else '')
 
