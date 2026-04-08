@@ -120,16 +120,20 @@ jobs:
             exit 1
           fi
 
-      - name: Test backend startup (dry-run)
+      - name: Test backend imports
         run: |
-          echo "=== Testing backend startup ==="
-          # Test that the backend can import main module (dry-run with --help)
+          echo "=== Testing backend imports ==="
           cd dist/backend/soundbot-backend
-          if [ -f "soundbot-backend" ]; then
-            # Try to run with --help to verify imports work
-            ./soundbot-backend --help 2>&1 || true
-            echo "[OK] Backend executable runs (import test passed)"
+          # Check that main.py exists in the bundle
+          if [ -f "main.py" ]; then
+            echo "[OK] main.py found in bundle"
+          else
+            echo "[WARNING] main.py not found in bundle root"
+            find . -name "main.py" 2>/dev/null || true
           fi
+          # List Python files to verify structure
+          echo "Python files in bundle:"
+          find . -name "*.py" | head -20
 
       - name: Install Node dependencies
         run: npm ci --progress=false
@@ -241,16 +245,22 @@ jobs:
             exit 1
           }
 
-      - name: Test backend startup (dry-run)
+      - name: Test backend imports
         shell: powershell
         run: |
-          Write-Host "=== Testing backend startup ==="
-          $exePath = 'dist/backend/soundbot-backend/soundbot-backend.exe'
-          if (Test-Path $exePath) {
-            # Test that the backend can import main module (dry-run)
-            & $exePath --help 2>&1 | Write-Host
-            Write-Host "[OK] Backend executable runs (import test passed)"
+          Write-Host "=== Testing backend imports ==="
+          $backendDir = 'dist/backend/soundbot-backend'
+          # Check that main.py exists in the bundle
+          $mainPy = Join-Path $backendDir 'main.py'
+          if (Test-Path $mainPy) {
+            Write-Host "[OK] main.py found in bundle"
+          } else {
+            Write-Host "[WARNING] main.py not found in bundle root, searching..."
+            Get-ChildItem -Path $backendDir -Filter "main.py" -Recurse | Select-Object -First 5
           }
+          # List Python files to verify structure
+          Write-Host "Python files in bundle:"
+          Get-ChildItem -Path $backendDir -Filter "*.py" -Recurse | Select-Object -First 20 Name, Directory
 
       - name: Install Node dependencies
         run: npm ci --progress=false

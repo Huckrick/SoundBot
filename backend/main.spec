@@ -26,6 +26,10 @@ block_cipher = None
 # ==================== 数据文件配置 ====================
 datas = []
 
+# 添加 main.py (关键：uvicorn 需要能 import main)
+if (backend_dir / 'main.py').exists():
+    datas.append((str(backend_dir / 'main.py'), '.'))
+
 # 添加 core 目录
 if (backend_dir / 'core').exists():
     datas.append((str(backend_dir / 'core'), 'core'))
@@ -94,6 +98,32 @@ except Exception as e:
 
 # ==================== 隐藏导入配置 ====================
 hiddenimports = [
+    # 入口模块 (关键)
+    'main',
+    'config',
+    'bootstrap',
+
+    # 确保本地模块被打包
+    'core',
+    'core.database',
+    'core.embedder',
+    'core.indexer',
+    'core.scanner',
+    'core.searcher',
+    'core.search_engine',
+    'core.audio_cache',
+    'core.playback_manager',
+    'core.websocket_manager',
+    'core.model_preloader',
+    'core.llm_config_manager',
+    'core.llm_client',
+    'core.ai_chat_service',
+    'utils',
+    'utils.logger',
+    'utils.audio_utils',
+    'models',
+    'models.schemas',
+
     # FastAPI / Uvicorn
     'uvicorn',
     'uvicorn.logging',
