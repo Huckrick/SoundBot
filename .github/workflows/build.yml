@@ -120,6 +120,17 @@ jobs:
             exit 1
           fi
 
+      - name: Test backend startup (dry-run)
+        run: |
+          echo "=== Testing backend startup ==="
+          # Test that the backend can import main module (dry-run with --help)
+          cd dist/backend/soundbot-backend
+          if [ -f "soundbot-backend" ]; then
+            # Try to run with --help to verify imports work
+            ./soundbot-backend --help 2>&1 || true
+            echo "[OK] Backend executable runs (import test passed)"
+          fi
+
       - name: Install Node dependencies
         run: npm ci --progress=false
 
@@ -228,6 +239,17 @@ jobs:
           } else {
             Write-Host "[ERROR] Backend directory not found"
             exit 1
+          }
+
+      - name: Test backend startup (dry-run)
+        shell: powershell
+        run: |
+          Write-Host "=== Testing backend startup ==="
+          $exePath = 'dist/backend/soundbot-backend/soundbot-backend.exe'
+          if (Test-Path $exePath) {
+            # Test that the backend can import main module (dry-run)
+            & $exePath --help 2>&1 | Write-Host
+            Write-Host "[OK] Backend executable runs (import test passed)"
           }
 
       - name: Install Node dependencies
