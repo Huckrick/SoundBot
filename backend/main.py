@@ -3035,11 +3035,13 @@ if __name__ == "__main__":
     # PyInstaller 打包后的 Windows 多进程支持
     import multiprocessing
     multiprocessing.freeze_support()
-    
+
+    # 必须传 app 对象而非字符串 "main:app"
+    # 字符串形式会让 uvicorn 尝试 importlib.import_module("main")，
+    # 在 PyInstaller 冻结环境中会失败：Could not import module "main"
     uvicorn.run(
-        "main:app",
+        app,
         host=config.HOST,
         port=config.PORT,
-        reload=config.DEBUG,
         log_level="info"
     )

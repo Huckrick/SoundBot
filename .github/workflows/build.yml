@@ -120,20 +120,26 @@ jobs:
             exit 1
           fi
 
-      - name: Test backend imports
+      - name: Test backend startup
         run: |
-          echo "=== Testing backend imports ==="
+          echo "=== Testing backend can start ==="
           cd dist/backend/soundbot-backend
-          # Check that main.py exists in the bundle
-          if [ -f "main.py" ]; then
-            echo "[OK] main.py found in bundle"
-          else
-            echo "[WARNING] main.py not found in bundle root"
-            find . -name "main.py" 2>/dev/null || true
+          # 启动后端，运行 10 秒后终止
+          ./soundbot-backend > /tmp/backend_stdout.log 2>&1 &
+          BACKEND_PID=$!
+          sleep 10
+          kill $BACKEND_PID 2>/dev/null || true
+          wait $BACKEND_PID 2>/dev/null || true
+
+          echo "--- backend output ---"
+          cat /tmp/backend_stdout.log | tail -30
+
+          # 检查致命错误：uvicorn 无法导入 main 模块
+          if grep -q "Could not import module" /tmp/backend_stdout.log; then
+            echo "::error::Backend failed: Could not import module"
+            exit 1
           fi
-          # List Python files to verify structure
-          echo "Python files in bundle:"
-          find . -name "*.py" | head -20
+          echo "[OK] No fatal import errors detected"
 
       - name: Install Node dependencies
         run: npm ci --progress=false
@@ -245,22 +251,33 @@ jobs:
             exit 1
           }
 
-      - name: Test backend imports
+      - name: Test backend startup
         shell: powershell
         run: |
-          Write-Host "=== Testing backend imports ==="
-          $backendDir = 'dist/backend/soundbot-backend'
-          # Check that main.py exists in the bundle
-          $mainPy = Join-Path $backendDir 'main.py'
-          if (Test-Path $mainPy) {
-            Write-Host "[OK] main.py found in bundle"
-          } else {
-            Write-Host "[WARNING] main.py not found in bundle root, searching..."
-            Get-ChildItem -Path $backendDir -Filter "main.py" -Recurse | Select-Object -First 5
+          Write-Host "=== Testing backend can start ==="
+          $env:SOUNDBOT_PORT = "18000"
+          $exePath = Resolve-Path 'dist\backend\soundbot-backend\soundbot-backend.exe'
+          $proc = Start-Process -FilePath $exePath `
+            -RedirectStandardOutput backend_stdout.log `
+            -RedirectStandardError backend_stderr.log `
+            -PassThru
+          Start-Sleep -Seconds 10
+          if (!$proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
+
+          Write-Host "--- stdout ---"
+          if (Test-Path backend_stdout.log) { Get-Content backend_stdout.log | Select-Object -Last 30 }
+          Write-Host "--- stderr ---"
+          if (Test-Path backend_stderr.log) { Get-Content backend_stderr.log | Select-Object -Last 30 }
+
+          $allOutput = ""
+          if (Test-Path backend_stdout.log) { $allOutput += Get-Content backend_stdout.log -Raw }
+          if (Test-Path backend_stderr.log) { $allOutput += Get-Content backend_stderr.log -Raw }
+
+          if ($allOutput -match "Could not import module") {
+            Write-Host "::error::Backend failed: Could not import module"
+            exit 1
           }
-          # List Python files to verify structure
-          Write-Host "Python files in bundle:"
-          Get-ChildItem -Path $backendDir -Filter "*.py" -Recurse | Select-Object -First 20 Name, Directory
+          Write-Host "[OK] No fatal import errors detected"
 
       - name: Install Node dependencies
         run: npm ci --progress=false
