@@ -82,8 +82,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ~/Library/Caches/electron
-            ~/Library/Caches/electron-builder
+            ${{ github.workspace }}/.cache/electron
+            ${{ github.workspace }}/.cache/electron-builder
           key: ${{ runner.os }}-electron-${{ hashFiles('package.json') }}
           restore-keys: |
             ${{ runner.os }}-electron-
@@ -173,11 +173,12 @@ jobs:
         run: npm ci --progress=false
 
       - name: Build Electron (macOS)
-        run: npm run build:mac
+        run: npx electron-builder --mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
           ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
       - name: Verify Electron build
         run: |
@@ -224,8 +225,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ~/AppData/Local/electron
-            ~/AppData/Local/electron-builder
+            ${{ github.workspace }}/.cache/electron
+            ${{ github.workspace }}/.cache/electron-builder
           key: ${{ runner.os }}-electron-${{ hashFiles('package.json') }}
           restore-keys: |
             ${{ runner.os }}-electron-
@@ -340,7 +341,7 @@ jobs:
         run: npm ci --progress=false
 
       - name: Build Electron (Windows)
-        run: npm run build:win
+        run: npx electron-builder --win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
