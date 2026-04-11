@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag name (e.g. v0.1.2) — required for manual dispatch'
+        required: true
+        default: 'v0.1.2'
 
 env:
   PYTHON_VERSION: '3.12'
@@ -376,15 +381,33 @@ jobs:
           echo "=== Downloaded artifacts ==="
           find artifacts -type f -exec ls -lh {} \;
 
+      - name: Determine tag name
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "name=${{ github.event.inputs.tag_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ steps.tag.outputs.name }}
           files: |
             artifacts/models-package/*.zip
             artifacts/soundbot-macos/*.dmg
             artifacts/soundbot-windows/*.exe
           draft: true
-          prerelease: false
+          prerelease: true
           generate_release_notes: true
+          name: "SoundBot ${{ steps.tag.outputs.name }} Alpha"
+          body: |
+            ## SoundBot ${{ steps.tag.outputs.name }} Alpha
+
+            ### 修复内容
+            - 修复 Windows 后端启动失败（PortAudio DLL 未打包）
+            - 改善音频设备不可用时的错误处理
+            - 加强 CI 构建验证（实际测试健康端点）
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
