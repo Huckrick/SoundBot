@@ -1216,7 +1216,7 @@ def get_db_manager(db_path: Optional[str] = None) -> DatabaseManager:
         if db_path is None:
             # 延迟导入避免循环依赖
             import config
-            db_path = str(config.BASE_DIR / "db" / "soundmind.db")
+            db_path = str(config.get_db_path() / "soundmind.db")
         _db_manager = DatabaseManager(db_path)
     return _db_manager
 
