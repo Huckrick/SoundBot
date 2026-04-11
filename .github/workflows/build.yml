@@ -130,21 +130,22 @@ jobs:
           echo "=== Testing backend can start ==="
           export SOUNDBOT_PORT=18765
           export PYTHONIOENCODING=utf-8
+          export ENABLE_MODEL_PRELOAD=false
           cd dist/backend/soundbot-backend
           ./soundbot-backend > /tmp/backend_stdout.log 2>&1 &
           BACKEND_PID=$!
 
-          # 轮询健康端点，最多等待 60 秒
+          # 轮询健康端点，最多等待 120 秒（torch 冷启动可能较慢）
           STARTED=false
-          for i in $(seq 1 60); do
+          for i in $(seq 1 120); do
             if curl -sf http://127.0.0.1:18765/api/v1/health > /dev/null 2>&1; then
               STARTED=true
-              echo "[OK] Backend responded on attempt $i"
+              echo "[OK] Backend responded on attempt ${i}s"
               break
             fi
             # 检查进程是否已提前崩溃
             if ! kill -0 $BACKEND_PID 2>/dev/null; then
-              echo "::error::Backend process exited early"
+              echo "::error::Backend process exited early (crashed)"
               break
             fi
             sleep 1
@@ -153,8 +154,8 @@ jobs:
           kill $BACKEND_PID 2>/dev/null || true
           wait $BACKEND_PID 2>/dev/null || true
 
-          echo "--- backend output ---"
-          cat /tmp/backend_stdout.log | tail -50
+          echo "--- backend output (last 80 lines) ---"
+          tail -80 /tmp/backend_stdout.log
 
           # 检查各类致命错误
           if grep -qiE "Could not import module|ImportError|ModuleNotFoundError|DLL load failed|OSError.*PortAudio|cannot import name" /tmp/backend_stdout.log; then
@@ -163,7 +164,7 @@ jobs:
           fi
 
           if [ "$STARTED" != "true" ]; then
-            echo "::error::Backend failed to respond to health check within 60 seconds"
+            echo "::error::Backend failed to respond to /api/v1/health within 120 seconds"
             exit 1
           fi
           echo "[OK] Backend started and responded to health check"
@@ -284,6 +285,7 @@ jobs:
           Write-Host "=== Testing backend can start ==="
           $env:SOUNDBOT_PORT = "18765"
           $env:PYTHONIOENCODING = "utf-8"
+          $env:ENABLE_MODEL_PRELOAD = "false"
           $exePath = Resolve-Path 'dist\backend\soundbot-backend\soundbot-backend.exe'
           $proc = Start-Process -FilePath $exePath `
             -RedirectStandardOutput backend_stdout.log `
@@ -291,14 +293,14 @@ jobs:
             -WorkingDirectory (Split-Path $exePath) `
             -PassThru
 
-          # 轮询健康端点，最多等待 60 秒
+          # 轮询健康端点，最多等待 120 秒（torch 冷启动可能较慢）
           $started = $false
-          for ($i = 1; $i -le 60; $i++) {
+          for ($i = 1; $i -le 120; $i++) {
             try {
               $resp = Invoke-WebRequest -Uri 'http://127.0.0.1:18765/api/v1/health' -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
               if ($resp.StatusCode -eq 200) {
                 $started = $true
-                Write-Host "[OK] Backend responded on attempt $i"
+                Write-Host "[OK] Backend responded on attempt ${i}s"
                 break
               }
             } catch {}
@@ -311,12 +313,12 @@ jobs:
           }
 
           if (!$proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
-          Start-Sleep -Seconds 1
+          Start-Sleep -Seconds 2
 
-          Write-Host "--- stdout ---"
-          if (Test-Path backend_stdout.log) { Get-Content backend_stdout.log | Select-Object -Last 50 }
-          Write-Host "--- stderr ---"
-          if (Test-Path backend_stderr.log) { Get-Content backend_stderr.log | Select-Object -Last 50 }
+          Write-Host "--- stdout (last 80 lines) ---"
+          if (Test-Path backend_stdout.log) { Get-Content backend_stdout.log | Select-Object -Last 80 }
+          Write-Host "--- stderr (last 80 lines) ---"
+          if (Test-Path backend_stderr.log) { Get-Content backend_stderr.log | Select-Object -Last 80 }
 
           $allOutput = ""
           if (Test-Path backend_stdout.log) { $allOutput += Get-Content backend_stdout.log -Raw }
@@ -329,7 +331,7 @@ jobs:
           }
 
           if (-not $started) {
-            Write-Host "::error::Backend failed to respond to health check within 60 seconds"
+            Write-Host "::error::Backend failed to respond to /api/v1/health within 120 seconds"
             exit 1
           }
           Write-Host "[OK] Backend started and responded to health check"
@@ -394,20 +396,13 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.tag.outputs.name }}
+          name: "SoundBot ${{ steps.tag.outputs.name }} Alpha"
           files: |
             artifacts/models-package/*.zip
             artifacts/soundbot-macos/*.dmg
             artifacts/soundbot-windows/*.exe
           draft: true
           prerelease: true
-          generate_release_notes: true
-          name: "SoundBot ${{ steps.tag.outputs.name }} Alpha"
-          body: |
-            ## SoundBot ${{ steps.tag.outputs.name }} Alpha
-
-            ### 修复内容
-            - 修复 Windows 后端启动失败（PortAudio DLL 未打包）
-            - 改善音频设备不可用时的错误处理
-            - 加强 CI 构建验证（实际测试健康端点）
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
