@@ -47,6 +47,7 @@ _collect_all_packages = [
     'chromadb',              # 数据库迁移 SQL、配置文件
     'jieba',                 # 中文分词词典
     'soundfile',             # libsndfile 原生库
+    'sounddevice',           # PortAudio 原生库 (Windows: portaudio-x86_64.dll)
     'tokenizers',            # Rust 原生扩展
     'safetensors',           # Rust 原生扩展
     'sentence_transformers', # 模型配置和数据

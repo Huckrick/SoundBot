@@ -123,23 +123,45 @@ jobs:
       - name: Test backend startup
         run: |
           echo "=== Testing backend can start ==="
+          export SOUNDBOT_PORT=18765
+          export PYTHONIOENCODING=utf-8
           cd dist/backend/soundbot-backend
-          # 启动后端，运行 10 秒后终止
           ./soundbot-backend > /tmp/backend_stdout.log 2>&1 &
           BACKEND_PID=$!
-          sleep 10
+
+          # 轮询健康端点，最多等待 60 秒
+          STARTED=false
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:18765/api/v1/health > /dev/null 2>&1; then
+              STARTED=true
+              echo "[OK] Backend responded on attempt $i"
+              break
+            fi
+            # 检查进程是否已提前崩溃
+            if ! kill -0 $BACKEND_PID 2>/dev/null; then
+              echo "::error::Backend process exited early"
+              break
+            fi
+            sleep 1
+          done
+
           kill $BACKEND_PID 2>/dev/null || true
           wait $BACKEND_PID 2>/dev/null || true
 
           echo "--- backend output ---"
-          cat /tmp/backend_stdout.log | tail -30
+          cat /tmp/backend_stdout.log | tail -50
 
-          # 检查致命错误：uvicorn 无法导入 main 模块
-          if grep -q "Could not import module" /tmp/backend_stdout.log; then
-            echo "::error::Backend failed: Could not import module"
+          # 检查各类致命错误
+          if grep -qiE "Could not import module|ImportError|ModuleNotFoundError|DLL load failed|OSError.*PortAudio|cannot import name" /tmp/backend_stdout.log; then
+            echo "::error::Backend failed with import/library error"
             exit 1
           fi
-          echo "[OK] No fatal import errors detected"
+
+          if [ "$STARTED" != "true" ]; then
+            echo "::error::Backend failed to respond to health check within 60 seconds"
+            exit 1
+          fi
+          echo "[OK] Backend started and responded to health check"
 
       - name: Install Node dependencies
         run: npm ci --progress=false
@@ -255,29 +277,57 @@ jobs:
         shell: powershell
         run: |
           Write-Host "=== Testing backend can start ==="
-          $env:SOUNDBOT_PORT = "18000"
+          $env:SOUNDBOT_PORT = "18765"
+          $env:PYTHONIOENCODING = "utf-8"
           $exePath = Resolve-Path 'dist\backend\soundbot-backend\soundbot-backend.exe'
           $proc = Start-Process -FilePath $exePath `
             -RedirectStandardOutput backend_stdout.log `
             -RedirectStandardError backend_stderr.log `
+            -WorkingDirectory (Split-Path $exePath) `
             -PassThru
-          Start-Sleep -Seconds 10
+
+          # 轮询健康端点，最多等待 60 秒
+          $started = $false
+          for ($i = 1; $i -le 60; $i++) {
+            try {
+              $resp = Invoke-WebRequest -Uri 'http://127.0.0.1:18765/api/v1/health' -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
+              if ($resp.StatusCode -eq 200) {
+                $started = $true
+                Write-Host "[OK] Backend responded on attempt $i"
+                break
+              }
+            } catch {}
+
+            if ($proc.HasExited) {
+              Write-Host "::error::Backend process exited early with code $($proc.ExitCode)"
+              break
+            }
+            Start-Sleep -Seconds 1
+          }
+
           if (!$proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
+          Start-Sleep -Seconds 1
 
           Write-Host "--- stdout ---"
-          if (Test-Path backend_stdout.log) { Get-Content backend_stdout.log | Select-Object -Last 30 }
+          if (Test-Path backend_stdout.log) { Get-Content backend_stdout.log | Select-Object -Last 50 }
           Write-Host "--- stderr ---"
-          if (Test-Path backend_stderr.log) { Get-Content backend_stderr.log | Select-Object -Last 30 }
+          if (Test-Path backend_stderr.log) { Get-Content backend_stderr.log | Select-Object -Last 50 }
 
           $allOutput = ""
           if (Test-Path backend_stdout.log) { $allOutput += Get-Content backend_stdout.log -Raw }
           if (Test-Path backend_stderr.log) { $allOutput += Get-Content backend_stderr.log -Raw }
 
-          if ($allOutput -match "Could not import module") {
-            Write-Host "::error::Backend failed: Could not import module"
+          # 检查各类致命错误
+          if ($allOutput -match "Could not import module|ImportError|ModuleNotFoundError|DLL load failed|PortAudio|cannot import name") {
+            Write-Host "::error::Backend failed with import/library error"
             exit 1
           }
-          Write-Host "[OK] No fatal import errors detected"
+
+          if (-not $started) {
+            Write-Host "::error::Backend failed to respond to health check within 60 seconds"
+            exit 1
+          }
+          Write-Host "[OK] Backend started and responded to health check"
 
       - name: Install Node dependencies
         run: npm ci --progress=false

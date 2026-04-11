@@ -33,8 +33,18 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 import numpy as np
-import sounddevice as sd
 import soundfile as sf
+
+try:
+    import sounddevice as sd
+    _SOUNDDEVICE_AVAILABLE = True
+except Exception as _sd_import_error:
+    sd = None
+    _SOUNDDEVICE_AVAILABLE = False
+    import logging
+    logging.getLogger(__name__).warning(
+        f"sounddevice not available (audio playback disabled): {_sd_import_error}"
+    )
 
 from utils.logger import get_logger
 
@@ -86,7 +96,7 @@ class PlaybackManager:
 
     def __init__(self):
         self._lock = threading.RLock()
-        self._stream: Optional[sd.OutputStream] = None
+        self._stream: Optional[Any] = None
         self._playback_info = PlaybackInfo()
         self._stats = PlaybackStats()
         self._file_handle = None
@@ -103,6 +113,9 @@ class PlaybackManager:
 
     def _register_device_callback(self):
         """注册音频设备回调（用于监控）"""
+        if not _SOUNDDEVICE_AVAILABLE:
+            logger.warning("sounddevice 不可用，音频播放功能已禁用")
+            return
         try:
             devices = sd.query_devices()
             logger.info(f"音频设备信息: {devices}")
@@ -339,6 +352,8 @@ class PlaybackManager:
                 )
 
                 # 打开音频流
+                if not _SOUNDDEVICE_AVAILABLE:
+                    raise RuntimeError("sounddevice 不可用，无法播放音频（PortAudio 库缺失）")
                 self._stream = sd.OutputStream(
                     samplerate=sample_rate,
                     channels=channels,
