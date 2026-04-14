@@ -261,7 +261,7 @@ MAX_AUDIO_DURATION = 300  # 最大处理 5 分钟音频
 
 # ==================== 临时文件配置 ====================
 
-DEFAULT_TEMP_CLIP_DIR = get_temp_dir()
+DEFAULT_TEMP_CLIP_DIR = str(get_temp_dir())
 
 # 获取临时文件目录（支持用户自定义）
 def get_temp_clip_dir() -> str:

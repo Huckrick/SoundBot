@@ -106,10 +106,8 @@ class CLIPEmbedder:
             model_path = config.get_clap_model_name()
             logger.info(f"正在加载模型: {model_path}")
 
-            self.model = ClapModel.from_pretrained(
-                model_path,
-                device_map=self.device
-            )
+            self.model = ClapModel.from_pretrained(model_path)
+            self.model.to(self.device)
             self.processor = ClapProcessor.from_pretrained(model_path)
 
             self.model.eval()
