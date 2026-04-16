@@ -323,7 +323,7 @@ async function startBackend() {
     // 等待服务启动
     return new Promise((resolve) => {
       let retries = 0;
-      const maxRetries = 60; // 60秒超时
+      const maxRetries = 120; // 120秒超时（torch冷启动在Windows上可能较慢）
 
       const interval = setInterval(async () => {
         try {
@@ -350,7 +350,7 @@ async function startBackend() {
   }
 }
 
-async function waitForBackendHealth(timeoutMs = 60000) {
+async function waitForBackendHealth(timeoutMs = 120000) {
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMs) {

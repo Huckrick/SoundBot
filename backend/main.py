@@ -1732,7 +1732,7 @@ async def stream_audio_from_cache(file_path: str):
             content_disposition = f"attachment; filename*=UTF-8''{encoded_filename}"
         except:
             # 回退：使用纯 ASCII 文件名
-            safe_filename = file_path.split('/')[-1] if '/' in file_path else file_path
+            safe_filename = os.path.basename(file_path)
             safe_filename = ''.join(c if c.isalnum() or c in '._-' else '_' for c in safe_filename)
             if not safe_filename.endswith('.wav'):
                 safe_filename += '.wav'
@@ -1954,15 +1954,17 @@ async def delete_temp_file(file_path: str):
         file_path = unquote(file_path)
 
         # 安全检查：确保文件在临时目录内
-        abs_path = os.path.abspath(file_path)
-
-        if not abs_path.startswith(config.get_temp_clip_dir()):
+        abs_path = Path(file_path).resolve()
+        temp_dir_path = Path(config.get_temp_clip_dir()).resolve()
+        try:
+            abs_path.relative_to(temp_dir_path)
+        except ValueError:
             raise HTTPException(status_code=400, detail="只能删除临时目录中的文件")
 
         # 删除文件
-        if os.path.exists(abs_path):
-            os.remove(abs_path)
-            return {"success": True, "message": f"已删除临时文件: {os.path.basename(abs_path)}"}
+        if abs_path.exists():
+            abs_path.unlink()
+            return {"success": True, "message": f"已删除临时文件: {abs_path.name}"}
         else:
             return {"success": True, "message": "文件不存在"}
 
@@ -2142,8 +2144,10 @@ async def verify_clip(file_path: str = Query(..., description="临时文件路�
 
     decoded_path = urllib.parse.unquote(file_path)
     abs_path = Path(decoded_path).resolve()
-
-    if not str(abs_path).startswith(config.get_temp_clip_dir()):
+    temp_dir_path = Path(config.get_temp_clip_dir()).resolve()
+    try:
+        abs_path.relative_to(temp_dir_path)
+    except ValueError:
         raise HTTPException(status_code=400, detail="只能验证临时目录中的文件")
 
     exists = abs_path.exists() and abs_path.is_file()

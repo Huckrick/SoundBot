@@ -237,11 +237,11 @@ def get_clap_model_name() -> str:
 
 
 # 自动查找模型目录（模块导入时执行一次）
-MODELS_DIR = find_models_dir()
-CLAP_MODEL_PATH = MODELS_DIR / 'clap'
+MODELS_DIR = str(find_models_dir())
+CLAP_MODEL_PATH = str(Path(MODELS_DIR) / 'clap')
 
 # 确定 CLAP 模型名称/路径（模块导入时执行一次，仅作为默认值）
-if CLAP_MODEL_PATH.exists():
+if Path(CLAP_MODEL_PATH).exists():
     CLAP_MODEL_NAME = str(CLAP_MODEL_PATH)
 else:
     # 回退到 HuggingFace
