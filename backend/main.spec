@@ -213,6 +213,23 @@ hiddenimports += [
     'encodings.idna',
 ]
 
+# ==================== 过滤不必要的数据文件（减小体积 + 避免 EMFILE）====================
+# torch/include/ 包含数千个 ATen C++ 头文件，仅用于编译 PyTorch 扩展，
+# 运行时推理完全不需要。保留这些文件会导致 macOS 签名时 EMFILE: too many open files。
+# torch/share/  包含 CMake 配置文件，同样仅编译时用。
+# caffe2/proto/ 包含 .proto 源文件，运行时不需要。
+_build_only_extensions = ('.h', '.hpp', '.cmake', '.pc', '.prl', '.proto')
+_build_only_dest_prefixes = ('torch/include', 'torch/share', 'caffe2/proto')
+
+datas = [
+    (src, dest) for (src, dest) in datas
+    if not (
+        any(str(src).endswith(ext) for ext in _build_only_extensions)
+        or any(dest.replace('\\', '/').startswith(p) for p in _build_only_dest_prefixes)
+    )
+]
+print(f'[spec] After filtering build-only files: {len(datas)} datas remaining')
+
 # ==================== 分析阶段 ====================
 a = Analysis(
     [str(backend_dir / 'main.py')],

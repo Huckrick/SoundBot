@@ -173,7 +173,9 @@ jobs:
         run: npm ci --progress=false
 
       - name: Build Electron (macOS)
-        run: npx electron-builder --mac
+        run: |
+          ulimit -n 65536
+          npx electron-builder --mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
