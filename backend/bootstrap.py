@@ -64,7 +64,7 @@ def check_environment():
     }
     
     # 检查模型
-    if not CLAP_MODEL_PATH.exists():
+    if not Path(CLAP_MODEL_PATH).exists():
         errors.append({
             'type': 'missing_models',
             'message': f'AI 模型文件未找到: {CLAP_MODEL_PATH}',

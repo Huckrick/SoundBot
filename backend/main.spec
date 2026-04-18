@@ -53,6 +53,9 @@ _collect_all_packages = [
     'sentence_transformers', # 模型配置和数据
     'soxr',                  # 音频重采样原生库
     'onnxruntime',           # ONNX 推理引擎
+    'numba',                 # JIT 编译器（含原生 .nbi/.nbc 缓存文件）
+    'llvmlite',              # LLVM 绑定（含 libllvmlite 原生库）
+    'alembic',               # 数据库迁移框架（chromadb 依赖）
 ]
 
 # 需要收集子模块 + 数据文件的包（体量大，分开收集更可控）
@@ -61,8 +64,6 @@ _collect_submodules_and_data_packages = [
     'torch',                 # 深度学习框架
     'librosa',               # 音频分析数据文件
     'sklearn',               # 机器学习子模块
-    'numba',                 # JIT 编译器
-    'llvmlite',              # LLVM 绑定
 ]
 
 # 只需要收集子模块的包（纯 Python，PyInstaller 自动分析可能遗漏动态导入）

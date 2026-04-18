@@ -117,6 +117,18 @@ async def lifespan(app: FastAPI):
     logger.info(f"设备: {config.get_device()}")
     logger.info(f"数据库路径: {config.get_db_path()}")
 
+    # 环境检查：记录路径信息，模型缺失时提前打印明确错误
+    try:
+        from bootstrap import check_environment
+        env_result = check_environment()
+        logger.info(f"[Bootstrap] 路径检查: {env_result['paths']}")
+        if not env_result['ok']:
+            for err in env_result['errors']:
+                logger.error(f"[Bootstrap] {err['type']}: {err['message']}")
+                logger.error(f"[Bootstrap] 解决方案: {err['solution']}")
+    except Exception as _e:
+        logger.debug(f"[Bootstrap] 环境检查跳过: {_e}")
+
     # 初始化 SQLite 数据库
     db_manager = get_db_manager()
     file_count = db_manager.get_file_count()

@@ -15,14 +15,14 @@
     <script src="./wavesurfer.min.js"></script>
     <script src="./wavesurfer.regions.min.js"></script>
     
-    <!-- Google Fonts (保留 CDN，字体通常可以加载) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
     <!-- i18n 国际化模块 -->
     <script src="./assets/i18n.js"></script>
-    
+
     <style>
+        /* 使用系统字体栈，离线环境下也能正常显示 */
+        :root { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, Roboto, sans-serif; }
+        body { font-family: inherit; }
+
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #404040; border-radius: 4px; }

@@ -29,16 +29,14 @@ from pathlib import Path
 
 def get_executable_dir() -> Path:
     """
-    获取可执行文件所在目录
+    获取可执行文件所在目录（resolve() 确保符号链接被正确解析）
     - 开发环境: backend/ 目录
     - PyInstaller: 解压后的临时目录或单文件目录
     """
     if getattr(sys, 'frozen', False):
-        # PyInstaller 打包后的可执行文件
-        return Path(sys.executable).parent
+        return Path(sys.executable).resolve().parent
     else:
-        # 开发环境
-        return Path(__file__).parent
+        return Path(__file__).resolve().parent
 
 
 def get_user_data_dir() -> Path:
@@ -236,12 +234,12 @@ def get_clap_model_name() -> str:
         return os.getenv("CLAP_MODEL", "laion/larger_clap_general")
 
 
-# 自动查找模型目录（模块导入时执行一次）
-MODELS_DIR = find_models_dir()
-CLAP_MODEL_PATH = MODELS_DIR / 'clap'
+# 自动查找模型目录（使用运行时版本确保每次都读取最新环境变量）
+MODELS_DIR = str(find_models_dir_runtime())
+CLAP_MODEL_PATH = str(Path(MODELS_DIR) / 'clap')
 
 # 确定 CLAP 模型名称/路径（模块导入时执行一次，仅作为默认值）
-if CLAP_MODEL_PATH.exists():
+if Path(CLAP_MODEL_PATH).exists():
     CLAP_MODEL_NAME = str(CLAP_MODEL_PATH)
 else:
     # 回退到 HuggingFace
@@ -261,7 +259,7 @@ MAX_AUDIO_DURATION = 300  # 最大处理 5 分钟音频
 
 # ==================== 临时文件配置 ====================
 
-DEFAULT_TEMP_CLIP_DIR = get_temp_dir()
+DEFAULT_TEMP_CLIP_DIR = str(get_temp_dir())
 
 # 获取临时文件目录（支持用户自定义）
 def get_temp_clip_dir() -> str:
