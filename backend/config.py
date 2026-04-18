@@ -29,16 +29,14 @@ from pathlib import Path
 
 def get_executable_dir() -> Path:
     """
-    获取可执行文件所在目录
+    获取可执行文件所在目录（resolve() 确保符号链接被正确解析）
     - 开发环境: backend/ 目录
     - PyInstaller: 解压后的临时目录或单文件目录
     """
     if getattr(sys, 'frozen', False):
-        # PyInstaller 打包后的可执行文件
-        return Path(sys.executable).parent
+        return Path(sys.executable).resolve().parent
     else:
-        # 开发环境
-        return Path(__file__).parent
+        return Path(__file__).resolve().parent
 
 
 def get_user_data_dir() -> Path:
@@ -236,8 +234,8 @@ def get_clap_model_name() -> str:
         return os.getenv("CLAP_MODEL", "laion/larger_clap_general")
 
 
-# 自动查找模型目录（模块导入时执行一次）
-MODELS_DIR = str(find_models_dir())
+# 自动查找模型目录（使用运行时版本确保每次都读取最新环境变量）
+MODELS_DIR = str(find_models_dir_runtime())
 CLAP_MODEL_PATH = str(Path(MODELS_DIR) / 'clap')
 
 # 确定 CLAP 模型名称/路径（模块导入时执行一次，仅作为默认值）
