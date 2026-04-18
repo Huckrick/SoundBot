@@ -101,6 +101,7 @@ class HealthResponse(BaseModel):
     status: str = Field(..., description="服务状态")
     version: str = Field(..., description="版本号")
     device: str = Field(..., description="当前设备")
+    model_loaded: Optional[bool] = Field(None, description="AI 模型是否已加载完毕")
 
 
 class ErrorResponse(BaseModel):

@@ -323,7 +323,8 @@ async def health_check():
     return schemas.HealthResponse(
         status="healthy",
         version=config.APP_VERSION,
-        device=config.get_device()
+        device=config.get_device(),
+        model_loaded=is_embedder_available()
     )
 
 
@@ -3033,8 +3034,27 @@ async def get_ai_status():
 
 if __name__ == "__main__":
     # PyInstaller 打包后的 Windows 多进程支持
+    import sys
+    import socket
     import multiprocessing
     multiprocessing.freeze_support()
+
+    # 自动寻找可用端口（避免端口冲突）
+    _port = config.PORT
+    for _attempt in range(20):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as _s:
+                _s.bind((config.HOST, _port))
+                break
+        except OSError:
+            _port += 1
+    else:
+        print(f"[FATAL] No free port found in range {config.PORT}–{config.PORT + 19}", flush=True)
+        sys.exit(1)
+
+    if _port != config.PORT:
+        print(f"[SoundBot] Port {config.PORT} busy, using port {_port}", flush=True)
+    print(f"[SoundBot] BOUND_PORT={_port}", flush=True)
 
     # 必须传 app 对象而非字符串 "main:app"
     # 字符串形式会让 uvicorn 尝试 importlib.import_module("main")，
@@ -3042,6 +3062,6 @@ if __name__ == "__main__":
     uvicorn.run(
         app,
         host=config.HOST,
-        port=config.PORT,
+        port=_port,
         log_level="info"
     )

@@ -9,6 +9,7 @@ const { app, BrowserWindow, Menu, ipcMain, dialog, protocol, shell, Notification
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
+const net = require('net');
 
 // 自定义协议：用于在渲染进程中安全加载本地音频
 const AUDIO_PROTOCOL = 'soundmind-audio';
@@ -22,10 +23,10 @@ let mainWindow;
 let backendProcess = null;
 let backendStartupPromise = null;
 let ipcHandlersInitialized = false;
-const BACKEND_PORT = Number(process.env.SOUNDBOT_PORT || 8000);
-const BACKEND_ORIGIN = `http://127.0.0.1:${BACKEND_PORT}`;
-const BACKEND_WS_ORIGIN = `ws://127.0.0.1:${BACKEND_PORT}`;
-const API_BASE_URL = `${BACKEND_ORIGIN}/api/v1`;
+let backendPort = Number(process.env.SOUNDBOT_PORT || 8000);
+let backendOrigin = `http://127.0.0.1:${backendPort}`;
+let backendWsOrigin = `ws://127.0.0.1:${backendPort}`;
+let apiBaseUrl = `${backendOrigin}/api/v1`;
 
 // GitHub 仓库配置
 const GITHUB_REPO = 'Huckrick/SoundBot';
@@ -239,12 +240,37 @@ async function showModelMissingDialog(modelsPath) {
 }
 
 /**
+ * 查找可用端口（从 startPort 开始递增）
+ */
+function findFreePort(startPort) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once('error', () => resolve(findFreePort(startPort + 1)));
+    server.once('listening', () => {
+      const { port } = server.address();
+      server.close(() => resolve(port));
+    });
+    server.listen(startPort, '127.0.0.1');
+  });
+}
+
+/**
  * 启动后端服务
  */
 async function startBackend() {
   if (backendProcess) {
     console.log('[Backend] Backend service already running');
     return { success: true };
+  }
+
+  // 找可用端口，避免 "Address already in use" 错误
+  const freePort = await findFreePort(backendPort);
+  if (freePort !== backendPort) {
+    console.log(`[Backend] Port ${backendPort} busy, switching to ${freePort}`);
+    backendPort = freePort;
+    backendOrigin = `http://127.0.0.1:${backendPort}`;
+    backendWsOrigin = `ws://127.0.0.1:${backendPort}`;
+    apiBaseUrl = `${backendOrigin}/api/v1`;
   }
 
   // 检查模型
@@ -278,7 +304,7 @@ async function startBackend() {
   // 设置环境变量
   const env = {
     ...process.env,
-    SOUNDBOT_PORT: String(BACKEND_PORT),
+    SOUNDBOT_PORT: String(backendPort),
     SOUNDBOT_MODELS_PATH: modelStatus.path,
     PYTHONUNBUFFERED: '1',
     PYTHONIOENCODING: 'utf-8'
@@ -326,8 +352,16 @@ async function startBackend() {
       const maxRetries = 60; // 60秒超时
 
       const interval = setInterval(async () => {
+        // 快速失败：进程已提前退出
+        if (!backendProcess || backendProcess.exitCode !== null) {
+          clearInterval(interval);
+          const code = backendProcess ? backendProcess.exitCode : 'unknown';
+          console.error(`[Backend] ✗ Process exited before becoming healthy (code: ${code})`);
+          resolve({ success: false, error: `后端进程意外退出 (code: ${code})` });
+          return;
+        }
         try {
-          const res = await fetch(`${API_BASE_URL}/health`);
+          const res = await fetch(`${apiBaseUrl}/health`);
           if (res.ok) {
             clearInterval(interval);
             console.log('[Backend] ✓ Backend service started successfully');
@@ -355,7 +389,7 @@ async function waitForBackendHealth(timeoutMs = 60000) {
 
   while (Date.now() - startedAt < timeoutMs) {
     try {
-      const res = await fetch(`${API_BASE_URL}/health`);
+      const res = await fetch(`${apiBaseUrl}/health`);
       if (res.ok) {
         return { success: true };
       }
@@ -389,10 +423,10 @@ async function ensureBackendStarted() {
 
 function getRuntimeConfig() {
   return {
-    port: BACKEND_PORT,
-    apiBase: BACKEND_ORIGIN,
-    apiV1Base: API_BASE_URL,
-    wsBase: BACKEND_WS_ORIGIN
+    port: backendPort,
+    apiBase: backendOrigin,
+    apiV1Base: apiBaseUrl,
+    wsBase: backendWsOrigin
   };
 }
 
@@ -451,10 +485,10 @@ function createBackendRequest(action, data = {}) {
 
   switch (action) {
     case 'health':
-      return { url: `${API_BASE_URL}/health` };
+      return { url: `${apiBaseUrl}/health` };
     case 'scan':
       return {
-        url: `${API_BASE_URL}/scan`,
+        url: `${apiBaseUrl}/scan`,
         options: {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -466,7 +500,7 @@ function createBackendRequest(action, data = {}) {
       };
     case 'scan-only':
       return {
-        url: `${API_BASE_URL}/scan-only`,
+        url: `${apiBaseUrl}/scan-only`,
         options: {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -478,7 +512,7 @@ function createBackendRequest(action, data = {}) {
       };
     case 'import-async':
       return {
-        url: `${API_BASE_URL}/import/async?client_id=${encodeURIComponent(data.clientId || 'default')}`,
+        url: `${apiBaseUrl}/import/async?client_id=${encodeURIComponent(data.clientId || 'default')}`,
         options: {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -490,7 +524,7 @@ function createBackendRequest(action, data = {}) {
       };
     case 'search':
       return {
-        url: `${API_BASE_URL}/search`,
+        url: `${apiBaseUrl}/search`,
         options: {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -504,16 +538,16 @@ function createBackendRequest(action, data = {}) {
         }
       };
     case 'index-status':
-      return { url: `${API_BASE_URL}/index/status` };
+      return { url: `${apiBaseUrl}/index/status` };
     case 'indexed-files':
-      return { url: `${API_BASE_URL}/files` };
+      return { url: `${apiBaseUrl}/files` };
     case 'db-files':
-      return { url: `${API_BASE_URL}/db/files` };
+      return { url: `${apiBaseUrl}/db/files` };
     case 'db-file':
-      return { url: `${API_BASE_URL}/db/file/${encodedPath}` };
+      return { url: `${apiBaseUrl}/db/file/${encodedPath}` };
     case 'db-file-tags':
       return {
-        url: `${API_BASE_URL}/db/file/${encodeURIComponent(data.path)}/tags`,
+        url: `${apiBaseUrl}/db/file/${encodeURIComponent(data.path)}/tags`,
         options: {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -522,27 +556,27 @@ function createBackendRequest(action, data = {}) {
       };
     case 'db-file-delete':
       return {
-        url: `${API_BASE_URL}/db/file/${encodedPath}`,
+        url: `${apiBaseUrl}/db/file/${encodedPath}`,
         options: { method: 'DELETE' }
       };
     case 'db-stats':
-      return { url: `${API_BASE_URL}/db/stats` };
+      return { url: `${apiBaseUrl}/db/stats` };
     case 'audio-url':
-      return { localOnly: true, result: { success: true, url: `${API_BASE_URL}/audio/${encodedPath}` } };
+      return { localOnly: true, result: { success: true, url: `${apiBaseUrl}/audio/${encodedPath}` } };
     case 'waveform':
-      return { url: `${BACKEND_ORIGIN}/api/waveform?path=${encodedPath}` };
+      return { url: `${backendOrigin}/api/waveform?path=${encodedPath}` };
     case 'audio-preload':
       return {
-        url: `${API_BASE_URL}/audio/preload/${encodedPath}`,
+        url: `${apiBaseUrl}/audio/preload/${encodedPath}`,
         options: { method: 'POST' }
       };
     case 'audio-decoded':
-      return { url: `${API_BASE_URL}/audio/decoded/${encodedPath}` };
+      return { url: `${apiBaseUrl}/audio/decoded/${encodedPath}` };
     case 'audio-stream':
-      return { url: `${API_BASE_URL}/audio/stream/${encodedPath}`, responseType: 'binary' };
+      return { url: `${apiBaseUrl}/audio/stream/${encodedPath}`, responseType: 'binary' };
     case 'export-clip':
       return {
-        url: `${BACKEND_ORIGIN}/api/export/clip`,
+        url: `${backendOrigin}/api/export/clip`,
         options: {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -556,7 +590,7 @@ function createBackendRequest(action, data = {}) {
       };
     case 'audio-fade':
       return {
-        url: `${BACKEND_ORIGIN}/api/audio/fade`,
+        url: `${backendOrigin}/api/audio/fade`,
         options: {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -568,10 +602,10 @@ function createBackendRequest(action, data = {}) {
         }
       };
     case 'get-temp-dir':
-      return { url: `${API_BASE_URL}/config/temp-dir` };
+      return { url: `${apiBaseUrl}/config/temp-dir` };
     case 'set-temp-dir':
       return {
-        url: `${API_BASE_URL}/config/temp-dir`,
+        url: `${apiBaseUrl}/config/temp-dir`,
         options: {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -579,10 +613,10 @@ function createBackendRequest(action, data = {}) {
         }
       };
     case 'disk-space':
-      return { url: `${API_BASE_URL}/disk-space` };
+      return { url: `${apiBaseUrl}/disk-space` };
     case 'clear-temp-clips':
       return {
-        url: `${API_BASE_URL}/temp-clips/clear`,
+        url: `${apiBaseUrl}/temp-clips/clear`,
         options: { method: 'POST' }
       };
     default:
@@ -658,7 +692,7 @@ function createWindow() {
           "font-src 'self' https://fonts.gstatic.com; " +
           "img-src 'self' data: blob:; " +
           "media-src 'self' blob: soundmind-audio:; " +
-          `connect-src 'self' ${BACKEND_ORIGIN} ${BACKEND_WS_ORIGIN} ` +
+          `connect-src 'self' ${backendOrigin} ${backendWsOrigin} ` +
           "https://api.openai.com https://api.moonshot.cn https://api.anthropic.com " +
           "https://api.deepseek.com https://api.siliconflow.cn " +
           "https://generativelanguage.googleapis.com;"
@@ -985,7 +1019,7 @@ function setupIpcHandlers() {
     return {
       isRunning: backendProcess !== null,
       pid: backendProcess ? backendProcess.pid : null,
-      port: BACKEND_PORT
+      port: backendPort
     };
   });
 
