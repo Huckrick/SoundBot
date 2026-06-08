@@ -66,8 +66,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // 菜单事件监听
   onMenuEvent: (callback) => {
-    ipcRenderer.on('menu-new-project', callback);
-    ipcRenderer.on('menu-import-file', callback);
+    ipcRenderer.on('menu-new-project', (event, ...args) => callback(event, 'menu-new-project', ...args));
+    ipcRenderer.on('menu-import-file', (event, ...args) => callback(event, 'menu-import-file', ...args));
+    ipcRenderer.on('menu-import-folder', (event, ...args) => callback(event, 'menu-import-folder', ...args));
   },
 
   // 后端就绪事件监听

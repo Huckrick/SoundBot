@@ -882,6 +882,20 @@ function setupIpcHandlers() {
   });
 
   const supportedAudioExtensions = new Set(['.wav', '.mp3', '.flac', '.aiff', '.aif', '.ogg', '.m4a', '.aac', '.wma']);
+
+  function toImportFileInfo(filePath) {
+    const stats = fs.statSync(filePath);
+    const extension = path.extname(filePath).toLowerCase();
+
+    return {
+      path: filePath,
+      name: path.basename(filePath),
+      size: stats.size,
+      type: extension,
+      lastModified: stats.mtimeMs
+    };
+  }
+
   ipcMain.handle('file-import', async (event, action, payload) => {
     try {
       switch (action) {
@@ -893,17 +907,47 @@ function setupIpcHandlers() {
             ],
             ...payload
           });
-          return result;
+
+          if (result.canceled) {
+            return { success: false, canceled: true, filePaths: [] };
+          }
+
+          const files = (result.filePaths || [])
+            .filter((filePath) => supportedAudioExtensions.has(path.extname(filePath).toLowerCase()))
+            .filter((filePath) => fs.existsSync(filePath))
+            .map(toImportFileInfo);
+
+          return {
+            success: true,
+            canceled: false,
+            filePaths: result.filePaths || [],
+            files
+          };
         }
-        case 'select-folder':
-          return await dialog.showOpenDialog(mainWindow, {
+        case 'select-folder': {
+          const result = await dialog.showOpenDialog(mainWindow, {
             properties: ['openDirectory'],
             ...payload
           });
+
+          if (result.canceled) {
+            return { success: false, canceled: true, filePaths: [] };
+          }
+
+          const folder = (result.filePaths || [])[0] || '';
+          return {
+            success: Boolean(folder),
+            canceled: false,
+            filePaths: result.filePaths || [],
+            folder
+          };
+        }
         case 'handle-drop':
           return {
             success: true,
-            files: (payload || []).filter((filePath) => typeof filePath === 'string' && fs.existsSync(filePath))
+            files: (payload || [])
+              .filter((filePath) => typeof filePath === 'string' && fs.existsSync(filePath))
+              .map(toImportFileInfo)
           };
         case 'get-info': {
           if (!payload || !fs.existsSync(payload)) {

@@ -773,6 +773,12 @@
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
+
+        function getPathDisplayName(filePath) {
+            const normalized = String(filePath || '').replace(/[\\/]+$/, '');
+            const pathParts = normalized.split(/[\\/]+/);
+            return pathParts[pathParts.length - 1] || filePath;
+        }
         
         // 更新磁盘空间显示
         async function updateDiskSpaceDisplay() {
@@ -4058,8 +4064,7 @@
                     const result = await window.electronAPI.backendAPI.getTempDir();
                     if (result && result.temp_dir) {
                         // 显示路径的最后一部分
-                        const pathParts = result.temp_dir.split('/');
-                        const displayName = pathParts[pathParts.length - 1] || result.temp_dir;
+                        const displayName = getPathDisplayName(result.temp_dir);
                         tempDirText.textContent = displayName;
                         tempDirText.title = result.temp_dir; // 完整路径作为 tooltip
                         
@@ -4120,12 +4125,12 @@
                             const saveResult = await window.electronAPI.backendAPI.setTempDir(selectedPath);
                             if (saveResult && (saveResult.success !== false)) {
                                 // 更新显示
-                                const pathParts = selectedPath.split('/');
-                                const displayName = pathParts[pathParts.length - 1] || selectedPath;
+                                const displayName = getPathDisplayName(selectedPath);
                                 const tempDirText = document.getElementById('tempDirText');
                                 const permissionHint = document.getElementById('tempDirPermissionHint');
                                 tempDirText.textContent = displayName;
                                 tempDirText.title = selectedPath;
+                                updateDiskSpaceDisplay();
                                 
                                 // 显示或隐藏权限提示
                                 if (!isAppDir && window.electronAPI.platform === 'darwin') {
@@ -4170,13 +4175,13 @@
                     const saveResult = await window.electronAPI.backendAPI.setTempDir(defaultPath);
                     if (saveResult && (saveResult.success !== false)) {
                         // 更新显示
-                        const pathParts = defaultPath.split('/');
-                        const displayName = pathParts[pathParts.length - 1] || defaultPath;
+                        const displayName = getPathDisplayName(defaultPath);
                         const tempDirText = document.getElementById('tempDirText');
                         const permissionHint = document.getElementById('tempDirPermissionHint');
                         tempDirText.textContent = displayName;
                         tempDirText.title = defaultPath;
                         permissionHint.classList.add('hidden');
+                        updateDiskSpaceDisplay();
                         
                         showNotification(`已恢复默认路径: ${defaultPath}`, 'success');
                     } else {
@@ -6526,6 +6531,8 @@
                 window.electronAPI.onMenuEvent((event, action) => {
                     if (action === 'menu-import-file') {
                         document.querySelector('button:has(i[data-lucide="upload"])').click();
+                    } else if (action === 'menu-import-folder') {
+                        document.getElementById('importFolderBtn').click();
                     }
                 });
 

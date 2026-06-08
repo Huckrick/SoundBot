@@ -2207,17 +2207,16 @@ async def set_temp_dir(request: schemas.TempDirRequest):
     if not os.path.isdir(new_dir):
         raise HTTPException(status_code=400, detail="指定的路径不是目录")
     
-    # 保存到配置文件（使用应用目录而不是用户主目录）
-    config_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'config')
-    config_path = os.path.join(config_dir, "user_config.json")
+    # 保存到用户数据目录；config.get_temp_clip_dir() 也从这里读取
+    config_path = config.get_user_data_dir() / "user_config.json"
     
     try:
         # 确保配置目录存在
-        os.makedirs(config_dir, exist_ok=True)
+        config_path.parent.mkdir(parents=True, exist_ok=True)
         
         # 读取现有配置或创建新配置
-        if os.path.exists(config_path):
-            with open(config_path, 'r', encoding='utf-8') as f:
+        if config_path.exists():
+            with config_path.open('r', encoding='utf-8') as f:
                 current_config = json.load(f)
         else:
             current_config = {}
@@ -2226,7 +2225,7 @@ async def set_temp_dir(request: schemas.TempDirRequest):
         current_config['tempClipDir'] = new_dir
         
         # 保存配置
-        with open(config_path, 'w', encoding='utf-8') as f:
+        with config_path.open('w', encoding='utf-8') as f:
             json.dump(current_config, f, ensure_ascii=False, indent=2)
         
         logger.info(f"临时文件目录已更新: {new_dir}")
