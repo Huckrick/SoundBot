@@ -335,8 +335,10 @@ class OptimizedAudioSearcher(AudioSearcher):
             from core.database import get_db_manager
             db_manager = get_db_manager()
             
-            # 获取所有文件记录
-            all_records = db_manager.get_all_files()
+            # 获取当前工程的文件记录，避免关键词搜索跨工程串数据
+            import config
+            current_project_id = getattr(config, 'CURRENT_PROJECT_ID', 'default')
+            all_records = db_manager.get_files_by_project(current_project_id)
             
             # 转换为与 ChromaDB 元数据兼容的格式
             all_files = []

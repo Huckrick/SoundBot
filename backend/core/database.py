@@ -71,9 +71,10 @@ CREATE TABLE IF NOT EXISTS projects (
 -- 插入默认工程
 INSERT OR IGNORE INTO projects (id, name, description) VALUES ('default', '默认工程', '系统默认工程');
 
--- 音频文件表（添加 project_id 外键）
+-- 音频文件表
 CREATE TABLE IF NOT EXISTS files (
-    path TEXT PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    path TEXT NOT NULL,
     project_id TEXT DEFAULT 'default',
     filename TEXT NOT NULL,
     duration REAL DEFAULT 0,
@@ -84,10 +85,12 @@ CREATE TABLE IF NOT EXISTS files (
     tags TEXT DEFAULT '[]',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(project_id, path),
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_files_project ON files(project_id);
+CREATE INDEX IF NOT EXISTS idx_files_path ON files(path);
 CREATE INDEX IF NOT EXISTS idx_filename ON files(filename);
 CREATE INDEX IF NOT EXISTS idx_created_at ON files(created_at);
 CREATE INDEX IF NOT EXISTS idx_duration ON files(duration);
@@ -210,6 +213,7 @@ class DatabaseManager:
                     timeout=30.0
                 )
                 conn.row_factory = sqlite3.Row
+                conn.execute("PRAGMA foreign_keys=ON")
                 conn.execute("PRAGMA journal_mode=DELETE")
                 conn.execute("PRAGMA synchronous=NORMAL")
                 self._local.conn = conn
@@ -222,6 +226,7 @@ class DatabaseManager:
                     timeout=30.0
                 )
                 conn.row_factory = sqlite3.Row
+                conn.execute("PRAGMA foreign_keys=ON")
                 conn.execute("PRAGMA journal_mode=DELETE")
                 conn.execute("PRAGMA synchronous=NORMAL")
                 self._local.conn = conn
@@ -290,13 +295,17 @@ class DatabaseManager:
 
             # 1. 检查 files 表是否有 project_id 列
             cursor.execute("PRAGMA table_info(files)")
-            columns = [row[1] for row in cursor.fetchall()]
+            columns_info = cursor.fetchall()
+            columns = [row[1] for row in columns_info]
             _get_logger().debug(f"files 表列: {columns}")
 
             if 'project_id' not in columns:
                 _get_logger().info("迁移：添加 project_id 列到 files 表")
                 cursor.execute("ALTER TABLE files ADD COLUMN project_id TEXT DEFAULT 'default'")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_files_project ON files(project_id)")
+                cursor.execute("PRAGMA table_info(files)")
+                columns_info = cursor.fetchall()
+                columns = [row[1] for row in columns_info]
 
             # 2. 创建 projects 表（如果不存在）
             if not projects_table_exists:
@@ -320,6 +329,55 @@ class DatabaseManager:
                 VALUES ('default', '默认工程', '系统默认工程')
             """)
 
+            # 旧版本以 path 作为全局主键，会导致不同工程导入同一路径时互相覆盖。
+            # v0.1.3 起改为自增 id + UNIQUE(project_id, path)，保留升级用户的数据。
+            path_is_primary_key = any(row[1] == 'path' and row[5] for row in columns_info)
+            if 'id' not in columns or path_is_primary_key:
+                _get_logger().info("迁移：重建 files 表为工程内唯一文件结构")
+
+                def select_column(name: str, default_sql: str) -> str:
+                    return name if name in columns else default_sql
+
+                cursor.execute("ALTER TABLE files RENAME TO files_old")
+                cursor.execute("""
+                    CREATE TABLE files (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        path TEXT NOT NULL,
+                        project_id TEXT DEFAULT 'default',
+                        filename TEXT NOT NULL,
+                        duration REAL DEFAULT 0,
+                        sample_rate INTEGER DEFAULT 0,
+                        channels INTEGER DEFAULT 0,
+                        file_size INTEGER DEFAULT 0,
+                        peaks_json TEXT,
+                        tags TEXT DEFAULT '[]',
+                        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(project_id, path),
+                        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+                    )
+                """)
+                cursor.execute(f"""
+                    INSERT OR IGNORE INTO files
+                    (path, project_id, filename, duration, sample_rate, channels,
+                     file_size, peaks_json, tags, created_at, updated_at)
+                    SELECT
+                        path,
+                        COALESCE({select_column('project_id', "'default'")}, 'default'),
+                        {select_column('filename', "path")},
+                        {select_column('duration', "0")},
+                        {select_column('sample_rate', "0")},
+                        {select_column('channels', "0")},
+                        {select_column('file_size', "0")},
+                        {select_column('peaks_json', "NULL")},
+                        COALESCE({select_column('tags', "'[]'")}, '[]'),
+                        COALESCE({select_column('created_at', "CURRENT_TIMESTAMP")}, CURRENT_TIMESTAMP),
+                        COALESCE({select_column('updated_at', "CURRENT_TIMESTAMP")}, CURRENT_TIMESTAMP)
+                    FROM files_old
+                    WHERE path IS NOT NULL
+                """)
+                cursor.execute("DROP TABLE files_old")
+
             # 3. 创建 recent_projects 表（如果不存在）
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='recent_projects'")
             if cursor.fetchone() is None:
@@ -333,9 +391,12 @@ class DatabaseManager:
                 """)
 
             # 4. 创建缺失的索引
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_files_project'")
-            if cursor.fetchone() is None:
-                cursor.execute("CREATE INDEX IF NOT EXISTS idx_files_project ON files(project_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_files_project ON files(project_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_files_path ON files(path)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_filename ON files(filename)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_created_at ON files(created_at)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_duration ON files(duration)")
+            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_files_project_path_unique ON files(project_id, path)")
 
             # 5. 创建 user_folders 表（如果不存在）
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user_folders'")
@@ -415,7 +476,7 @@ class DatabaseManager:
 
     def add_file(self, record: AudioFileRecord, project_id: str = 'default') -> bool:
         """
-        添加或更新文件记录（INSERT OR REPLACE）
+        添加或更新文件记录（按工程内路径去重）
 
         Args:
             record: 音频文件记录
@@ -427,10 +488,19 @@ class DatabaseManager:
         try:
             with self.get_cursor() as cursor:
                 cursor.execute("""
-                    INSERT OR REPLACE INTO files 
+                    INSERT INTO files
                     (path, project_id, filename, duration, sample_rate, channels, 
                      file_size, peaks_json, tags, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(project_id, path) DO UPDATE SET
+                        filename = excluded.filename,
+                        duration = excluded.duration,
+                        sample_rate = excluded.sample_rate,
+                        channels = excluded.channels,
+                        file_size = excluded.file_size,
+                        peaks_json = excluded.peaks_json,
+                        tags = excluded.tags,
+                        updated_at = excluded.updated_at
                 """, (
                     record.path,
                     project_id,
@@ -487,7 +557,7 @@ class DatabaseManager:
         )
         return self.add_file(record)
 
-    def get_file(self, path: str) -> Optional[AudioFileRecord]:
+    def get_file(self, path: str, project_id: str = None) -> Optional[AudioFileRecord]:
         """
         获取单个文件记录
 
@@ -498,7 +568,10 @@ class DatabaseManager:
             音频文件记录，如果不存在则返回 None
         """
         with self.get_cursor() as cursor:
-            cursor.execute("SELECT * FROM files WHERE path = ?", (path,))
+            if project_id:
+                cursor.execute("SELECT * FROM files WHERE path = ? AND project_id = ?", (path, project_id))
+            else:
+                cursor.execute("SELECT * FROM files WHERE path = ?", (path,))
             row = cursor.fetchone()
             if row:
                 return self._row_to_record(row)
@@ -555,7 +628,7 @@ class DatabaseManager:
                 cursor.execute("SELECT 1 FROM files WHERE path = ?", (path,))
             return cursor.fetchone() is not None
 
-    def update_peaks(self, path: str, peaks: List[float]) -> bool:
+    def update_peaks(self, path: str, peaks: List[float], project_id: str = None) -> bool:
         """
         更新波形峰值数据
 
@@ -569,16 +642,22 @@ class DatabaseManager:
         try:
             peaks_json = json.dumps(peaks)
             with self.get_cursor() as cursor:
-                cursor.execute("""
-                    UPDATE files SET peaks_json = ?, updated_at = ?
-                    WHERE path = ?
-                """, (peaks_json, datetime.now().isoformat(), path))
+                if project_id:
+                    cursor.execute("""
+                        UPDATE files SET peaks_json = ?, updated_at = ?
+                        WHERE path = ? AND project_id = ?
+                    """, (peaks_json, datetime.now().isoformat(), path, project_id))
+                else:
+                    cursor.execute("""
+                        UPDATE files SET peaks_json = ?, updated_at = ?
+                        WHERE path = ?
+                    """, (peaks_json, datetime.now().isoformat(), path))
             return cursor.rowcount > 0
         except Exception as e:
             _get_logger().error(f"更新波形失败 {path}: {e}")
             return False
 
-    def update_tags(self, path: str, tags: List[str]) -> bool:
+    def update_tags(self, path: str, tags: List[str], project_id: str = None) -> bool:
         """
         更新文件标签
 
@@ -592,16 +671,22 @@ class DatabaseManager:
         try:
             tags_json = json.dumps(tags)
             with self.get_cursor() as cursor:
-                cursor.execute("""
-                    UPDATE files SET tags = ?, updated_at = ?
-                    WHERE path = ?
-                """, (tags_json, datetime.now().isoformat(), path))
+                if project_id:
+                    cursor.execute("""
+                        UPDATE files SET tags = ?, updated_at = ?
+                        WHERE path = ? AND project_id = ?
+                    """, (tags_json, datetime.now().isoformat(), path, project_id))
+                else:
+                    cursor.execute("""
+                        UPDATE files SET tags = ?, updated_at = ?
+                        WHERE path = ?
+                    """, (tags_json, datetime.now().isoformat(), path))
             return cursor.rowcount > 0
         except Exception as e:
             _get_logger().error(f"更新标签失败 {path}: {e}")
             return False
 
-    def delete_file(self, path: str) -> bool:
+    def delete_file(self, path: str, project_id: str = None) -> bool:
         """
         删除文件记录
 
@@ -612,7 +697,10 @@ class DatabaseManager:
             是否成功删除
         """
         with self.get_cursor() as cursor:
-            cursor.execute("DELETE FROM files WHERE path = ?", (path,))
+            if project_id:
+                cursor.execute("DELETE FROM files WHERE path = ? AND project_id = ?", (path, project_id))
+            else:
+                cursor.execute("DELETE FROM files WHERE path = ?", (path,))
             return cursor.rowcount > 0
 
     def search_files(self, keyword: str) -> List[AudioFileRecord]:
@@ -671,7 +759,7 @@ class DatabaseManager:
             _get_logger().error(f"清空数据库失败: {e}")
             return False
 
-    def get_files_by_folder(self, folder_path: str) -> List[AudioFileRecord]:
+    def get_files_by_folder(self, folder_path: str, project_id: str = None) -> List[AudioFileRecord]:
         """
         获取指定文件夹下的所有文件
 
@@ -682,14 +770,21 @@ class DatabaseManager:
             文件列表
         """
         with self.get_cursor() as cursor:
-            cursor.execute("""
-                SELECT * FROM files 
-                WHERE path LIKE ?
-                ORDER BY filename
-            """, (f'{folder_path}%',))
+            if project_id:
+                cursor.execute("""
+                    SELECT * FROM files
+                    WHERE path LIKE ? AND project_id = ?
+                    ORDER BY filename
+                """, (f'{folder_path}%', project_id))
+            else:
+                cursor.execute("""
+                    SELECT * FROM files
+                    WHERE path LIKE ?
+                    ORDER BY filename
+                """, (f'{folder_path}%',))
             return [self._row_to_record(row) for row in cursor.fetchall()]
 
-    def remove_files_by_folder(self, folder_path: str) -> int:
+    def remove_files_by_folder(self, folder_path: str, project_id: str = None) -> int:
         """
         删除指定文件夹下的所有文件记录
 
@@ -700,9 +795,14 @@ class DatabaseManager:
             删除的文件数量
         """
         with self.get_cursor() as cursor:
-            cursor.execute("""
-                DELETE FROM files WHERE path LIKE ?
-            """, (f'{folder_path}%',))
+            if project_id:
+                cursor.execute("""
+                    DELETE FROM files WHERE path LIKE ? AND project_id = ?
+                """, (f'{folder_path}%', project_id))
+            else:
+                cursor.execute("""
+                    DELETE FROM files WHERE path LIKE ?
+                """, (f'{folder_path}%',))
             return cursor.rowcount
 
     # ========== 工程管理方法 ==========
@@ -831,6 +931,10 @@ class DatabaseManager:
         """
         try:
             with self.get_cursor() as cursor:
+                cursor.execute("DELETE FROM files WHERE project_id = ?", (project_id,))
+                cursor.execute("DELETE FROM imported_folder_mappings WHERE project_id = ?", (project_id,))
+                cursor.execute("DELETE FROM user_folders WHERE project_id = ?", (project_id,))
+                cursor.execute("DELETE FROM recent_projects WHERE project_id = ?", (project_id,))
                 cursor.execute("DELETE FROM projects WHERE id = ?", (project_id,))
             return True
         except Exception as e:
@@ -940,10 +1044,19 @@ class DatabaseManager:
         try:
             with self.get_cursor() as cursor:
                 cursor.execute("""
-                    INSERT OR REPLACE INTO files
+                    INSERT INTO files
                     (path, project_id, filename, duration, sample_rate, channels,
                      file_size, peaks_json, tags, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(project_id, path) DO UPDATE SET
+                        filename = excluded.filename,
+                        duration = excluded.duration,
+                        sample_rate = excluded.sample_rate,
+                        channels = excluded.channels,
+                        file_size = excluded.file_size,
+                        peaks_json = excluded.peaks_json,
+                        tags = excluded.tags,
+                        updated_at = excluded.updated_at
                 """, (
                     record.path,
                     project_id,

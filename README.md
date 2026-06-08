@@ -1,7 +1,7 @@
 # 🎵 SoundBot - AI 音效管理器 / AI Sound Effect Manager
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Version](https://img.shields.io/badge/version-0.1.2-orange.svg)](https://github.com/Huckrick/SoundBot)
+[![Version](https://img.shields.io/badge/version-0.1.3-orange.svg)](https://github.com/Huckrick/SoundBot)
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![Electron](https://img.shields.io/badge/electron-28.x-9feaf9.svg)](https://www.electronjs.org/)
 
@@ -12,7 +12,13 @@
 
 ## 📥 下载 / Download
 
-**最新版本 / Latest Release**: [v0.1.2](https://github.com/Huckrick/SoundBot/releases/tag/v0.1.2)
+**最新版本 / Latest Release**: [v0.1.3](https://github.com/Huckrick/SoundBot/releases/tag/v0.1.3)
+
+### v0.1.3 修复版 / Stability Update
+
+v0.1.3 重点修复 Windows/macOS 打包后的导入、工程隔离、磁盘空间显示和配置持久化问题。升级应用即可，AI 模型包无需重新下载，除非 release 中另行说明。
+
+v0.1.3 focuses on packaged-app import, project isolation, disk space display, and configuration persistence fixes. Upgrade the app package directly. The AI model package does not need to be downloaded again unless the release notes explicitly say otherwise.
 
 ### 🆕 新架构：一体化安装包 / New Architecture: All-in-One Installer
 
@@ -24,8 +30,8 @@ Starting from v0.1.2, SoundBot adopts a **PyInstaller all-in-one architecture**.
 
 | 平台 / Platform | 下载链接 / Download | 大小 / Size | 说明 / Description |
 |----------------|--------------------|-------------|-------------------|
-| **macOS (Universal)** | [📥 SoundBot-0.1.2.dmg](https://github.com/Huckrick/SoundBot/releases/download/v0.1.2/SoundBot-0.1.2.dmg) | ~300-500MB | 支持 Intel 和 Apple Silicon / Supports Intel & Apple Silicon |
-| **Windows (x64)** | [📥 SoundBot-Setup-0.1.2.exe](https://github.com/Huckrick/SoundBot/releases/download/v0.1.2/SoundBot-Setup-0.1.2.exe) | ~300-500MB | Windows 10/11 64位 / Windows 10/11 64-bit |
+| **macOS (Universal)** | [📥 SoundBot-0.1.3.dmg](https://github.com/Huckrick/SoundBot/releases/download/v0.1.3/SoundBot-0.1.3.dmg) | ~300-500MB | 支持 Intel 和 Apple Silicon / Supports Intel & Apple Silicon |
+| **Windows (x64)** | [📥 SoundBot-Setup-0.1.3.exe](https://github.com/Huckrick/SoundBot/releases/download/v0.1.3/SoundBot-Setup-0.1.3.exe) | ~300-500MB | Windows 10/11 64位 / Windows 10/11 64-bit |
 
 ### AI 模型包 / AI Model Package
 
@@ -33,7 +39,7 @@ Starting from v0.1.2, SoundBot adopts a **PyInstaller all-in-one architecture**.
 
 | 资源 / Resource | 下载链接 / Download | 大小 / Size | 说明 / Description |
 |----------------|--------------------|-------------|-------------------|
-| **AI 模型 / Models** | [📦 models.zip](https://github.com/Huckrick/SoundBot/releases/download/v0.1.2/models.zip) | ~500MB-1GB | **所有平台通用 / All platforms** |
+| **AI 模型 / Models** | [📦 models.zip](https://github.com/Huckrick/SoundBot/releases/download/v0.1.3/models.zip) | ~500MB-1GB | **所有平台通用 / All platforms** |
 
 ### 界面预览 / Screenshot
 
@@ -49,7 +55,7 @@ Starting from v0.1.2, SoundBot adopts a **PyInstaller all-in-one architecture**.
 #### macOS
 
 1. **下载应用包** / Download app package
-   - 下载 `SoundBot-0.1.2.dmg` / Download `SoundBot-0.1.2.dmg`
+   - 下载 `SoundBot-0.1.3.dmg` / Download `SoundBot-0.1.3.dmg`
 
 2. **安装应用** / Install app
    - 打开 `.dmg` 文件，将 SoundBot 拖到 Applications 文件夹 / Open `.dmg` and drag SoundBot to Applications folder
@@ -83,7 +89,7 @@ Starting from v0.1.2, SoundBot adopts a **PyInstaller all-in-one architecture**.
 #### Windows
 
 1. **下载应用包** / Download app package
-   - 下载 `SoundBot-Setup-0.1.2.exe` / Download `SoundBot-Setup-0.1.2.exe`
+   - 下载 `SoundBot-Setup-0.1.3.exe` / Download `SoundBot-Setup-0.1.3.exe`
 
 2. **安装应用** / Install app
    - 运行 `.exe` 安装程序，按向导完成安装 / Run `.exe` installer and follow wizard
@@ -124,6 +130,24 @@ models/
 - 如果新版本需要更新模型，会单独更新 `models.zip`
 - If new version requires model update, `models.zip` will be updated separately
 - 下载后覆盖解压到原位置即可 / Download and extract to original location to overwrite
+
+***
+
+## 🧾 更新日志 / Changelog
+
+### v0.1.3
+
+- 修复打包后导入音频文件、导入文件夹、工程临时目录选择的对话框调用问题。
+- 修复 Windows 路径分隔符导致文件夹筛选、父目录识别和导入结果显示异常的问题。
+- 修复启动时恢复上次工程只更新界面、不切换后端工程的问题。
+- 修复 SQLite 文件记录以路径全局唯一导致不同工程互相覆盖的问题，并加入自动数据库迁移。
+- 修复关键词搜索可能跨工程读取文件的问题。
+- 修复工程专属临时目录未被磁盘空间检测和导出临时文件实际使用的问题。
+- 修复 AI 配置在打包应用中写入资源目录的问题，现在会保存到用户数据目录。
+- 修复 LM Studio、Ollama、本地 Embedding 服务地址被安全校验误拦截的问题。
+- 修复立体声/多声道音频淡入淡出处理时的数组维度错误。
+- 补齐主进程 IPC 处理器，减少渲染进程调用未注册通道导致的运行时错误。
+- 加强工程名、文件夹名、文件名和 AI 消息的界面转义，避免特殊字符破坏界面。
 
 ***
 

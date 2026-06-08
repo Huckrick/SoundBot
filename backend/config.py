@@ -135,7 +135,7 @@ def get_chroma_db_path(project_id: str = "default") -> Path:
 # ==================== 项目基础配置 ====================
 
 APP_NAME = "SoundBot"
-APP_VERSION = "0.1.2"
+APP_VERSION = "0.1.3"
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
 # ==================== 服务器配置 ====================
@@ -260,14 +260,18 @@ MAX_AUDIO_DURATION = 300  # 最大处理 5 分钟音频
 # ==================== 临时文件配置 ====================
 
 DEFAULT_TEMP_CLIP_DIR = str(get_temp_dir())
+PROJECT_TEMP_CLIP_DIR = None
 
 # 获取临时文件目录（支持用户自定义）
 def get_temp_clip_dir() -> str:
     """
     获取临时文件存放目录
-    优先从用户配置读取，否则使用默认路径
+    优先使用当前工程目录，其次读取用户配置，否则使用默认路径
     """
     import json
+
+    if PROJECT_TEMP_CLIP_DIR and Path(PROJECT_TEMP_CLIP_DIR).exists():
+        return str(PROJECT_TEMP_CLIP_DIR)
     
     config_path = get_user_data_dir() / 'user_config.json'
     if config_path.exists():
@@ -281,6 +285,19 @@ def get_temp_clip_dir() -> str:
             pass
     
     return str(DEFAULT_TEMP_CLIP_DIR)
+
+
+def set_project_temp_clip_dir(temp_dir: str = None) -> str:
+    """设置当前工程的临时文件目录覆盖值。"""
+    global PROJECT_TEMP_CLIP_DIR, TEMP_CLIP_DIR
+
+    if temp_dir and Path(temp_dir).exists():
+        PROJECT_TEMP_CLIP_DIR = str(Path(temp_dir))
+    else:
+        PROJECT_TEMP_CLIP_DIR = None
+
+    TEMP_CLIP_DIR = get_temp_clip_dir()
+    return TEMP_CLIP_DIR
 
 TEMP_CLIP_DIR = get_temp_clip_dir()
 

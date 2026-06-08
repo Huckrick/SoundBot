@@ -27,6 +27,8 @@ let backendPort = Number(process.env.SOUNDBOT_PORT || 8000);
 let backendOrigin = `http://127.0.0.1:${backendPort}`;
 let backendWsOrigin = `ws://127.0.0.1:${backendPort}`;
 let apiBaseUrl = `${backendOrigin}/api/v1`;
+let appSettingsCache = null;
+const registeredShortcuts = new Set();
 
 // GitHub 仓库配置
 const GITHUB_REPO = 'Huckrick/SoundBot';
@@ -60,6 +62,35 @@ function getAppRootDir() {
  */
 function getUserDataDir() {
   return app.getPath('userData');
+}
+
+function getAppSettingsPath() {
+  return path.join(getUserDataDir(), 'app_settings.json');
+}
+
+function readAppSettings() {
+  if (appSettingsCache) {
+    return appSettingsCache;
+  }
+
+  try {
+    const settingsPath = getAppSettingsPath();
+    if (fs.existsSync(settingsPath)) {
+      appSettingsCache = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+      return appSettingsCache;
+    }
+  } catch (error) {
+    console.warn('[Settings] Failed to read app settings:', error);
+  }
+
+  appSettingsCache = {};
+  return appSettingsCache;
+}
+
+function writeAppSettings(settings) {
+  appSettingsCache = settings || {};
+  fs.mkdirSync(getUserDataDir(), { recursive: true });
+  fs.writeFileSync(getAppSettingsPath(), JSON.stringify(appSettingsCache, null, 2), 'utf-8');
 }
 
 /**
@@ -881,6 +912,161 @@ function setupIpcHandlers() {
     return { success: true };
   });
 
+  ipcMain.handle('app-settings', async (event, { action, key, value } = {}) => {
+    try {
+      const settings = readAppSettings();
+
+      switch (action) {
+        case 'get':
+          return { success: true, value: key ? settings[key] : undefined };
+        case 'set':
+          settings[key] = value;
+          writeAppSettings(settings);
+          return { success: true };
+        case 'getAll':
+          return { success: true, settings };
+        default:
+          return { success: false, error: `未知设置操作: ${action}` };
+      }
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('theme-manager', async (event, action, theme) => {
+    try {
+      const settings = readAppSettings();
+      const currentTheme = settings.theme || 'system';
+
+      if (action === 'get') {
+        return { success: true, theme: currentTheme };
+      }
+
+      if (action === 'set') {
+        settings.theme = theme || 'system';
+        writeAppSettings(settings);
+        return { success: true, theme: settings.theme };
+      }
+
+      if (action === 'toggle') {
+        settings.theme = currentTheme === 'dark' ? 'light' : 'dark';
+        writeAppSettings(settings);
+        return { success: true, theme: settings.theme };
+      }
+
+      return { success: false, error: `未知主题操作: ${action}` };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('shortcuts-register', async (event, accelerator) => {
+    try {
+      if (!accelerator || typeof accelerator !== 'string') {
+        return { success: false, error: '无效的快捷键' };
+      }
+
+      if (registeredShortcuts.has(accelerator)) {
+        return { success: true, id: accelerator };
+      }
+
+      const registered = globalShortcut.register(accelerator, () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send(`shortcut-${accelerator}`);
+        }
+      });
+
+      if (!registered) {
+        return { success: false, error: '快捷键注册失败' };
+      }
+
+      registeredShortcuts.add(accelerator);
+      return { success: true, id: accelerator };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('shortcuts-unregister', async (event, id) => {
+    try {
+      if (id && registeredShortcuts.has(id)) {
+        globalShortcut.unregister(id);
+        registeredShortcuts.delete(id);
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('file-operation', async (event, action, payload = {}) => {
+    try {
+      switch (action) {
+        case 'open': {
+          const result = await dialog.showOpenDialog(mainWindow, payload || {});
+          return { success: !result.canceled, canceled: result.canceled, filePaths: result.filePaths || [] };
+        }
+        case 'save': {
+          const result = await dialog.showSaveDialog(mainWindow, payload.options || {});
+          if (result.canceled || !result.filePath) {
+            return { success: false, canceled: true };
+          }
+
+          const data = typeof payload.data === 'string' ? payload.data : JSON.stringify(payload.data ?? {}, null, 2);
+          fs.writeFileSync(result.filePath, data, 'utf-8');
+          return { success: true, filePath: result.filePath };
+        }
+        case 'import': {
+          const result = await dialog.showOpenDialog(mainWindow, {
+            properties: ['openFile', 'multiSelections'],
+            ...(payload || {})
+          });
+          return { success: !result.canceled, canceled: result.canceled, filePaths: result.filePaths || [] };
+        }
+        case 'export': {
+          const result = await dialog.showSaveDialog(mainWindow, payload.options || {});
+          if (result.canceled || !result.filePath) {
+            return { success: false, canceled: true };
+          }
+
+          fs.writeFileSync(result.filePath, JSON.stringify(payload.data ?? {}, null, 2), 'utf-8');
+          return { success: true, filePath: result.filePath };
+        }
+        default:
+          return { success: false, error: `未知文件操作: ${action}` };
+      }
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('audio-processing', async (event, action, payload) => {
+    try {
+      if (action === 'metadata') {
+        if (!payload || !fs.existsSync(payload)) {
+          return { success: false, error: '文件不存在' };
+        }
+        const stats = fs.statSync(payload);
+        return {
+          success: true,
+          path: payload,
+          filename: path.basename(payload),
+          size: stats.size,
+          extension: path.extname(payload).toLowerCase(),
+          modifiedAt: stats.mtimeMs
+        };
+      }
+
+      return { success: false, error: `音频操作暂未实现: ${action}` };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('project-manager', async (event, action) => {
+    return { success: false, error: `项目管理操作请使用内置工程 API: ${action}` };
+  });
+
   const supportedAudioExtensions = new Set(['.wav', '.mp3', '.flac', '.aiff', '.aif', '.ogg', '.m4a', '.aac', '.wma']);
 
   function toImportFileInfo(filePath) {
@@ -1246,6 +1432,7 @@ app.on('activate', () => {
 
 app.on('before-quit', async (event) => {
   event.preventDefault();
+  globalShortcut.unregisterAll();
   await stopBackend();
   app.exit(0);
 });

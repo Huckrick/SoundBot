@@ -36,13 +36,14 @@ import config
 from utils.logger import get_logger
 
 
-def validate_url(url: str, allowed_schemes: List[str] = None) -> bool:
+def validate_url(url: str, allowed_schemes: List[str] = None, allow_local: bool = False) -> bool:
     """
     验证 URL 是否安全，防止 SSRF 攻击
     
     Args:
         url: 要验证的 URL
         allowed_schemes: 允许的协议列表，默认为 ['http', 'https']
+        allow_local: 是否允许本机/内网地址。本地 LLM/Embedding 服务需要开启。
         
     Returns:
         bool: URL 是否安全
@@ -64,7 +65,7 @@ def validate_url(url: str, allowed_schemes: List[str] = None) -> bool:
         if not parsed.hostname:
             return False
         
-        # 禁止访问内网地址
+        # 默认禁止访问内网地址；本地模型服务会显式放开。
         hostname = parsed.hostname.lower()
         
         # 检查是否是 IP 地址
@@ -76,23 +77,23 @@ def validate_url(url: str, allowed_schemes: List[str] = None) -> bool:
             second_octet = int(ip_parts[1])
             
             # 10.0.0.0/8
-            if first_octet == 10:
+            if first_octet == 10 and not allow_local:
                 return False
             # 172.16.0.0/12
-            if first_octet == 172 and 16 <= second_octet <= 31:
+            if first_octet == 172 and 16 <= second_octet <= 31 and not allow_local:
                 return False
             # 192.168.0.0/16
-            if first_octet == 192 and second_octet == 168:
+            if first_octet == 192 and second_octet == 168 and not allow_local:
                 return False
             # 127.0.0.0/8 (localhost)
-            if first_octet == 127:
+            if first_octet == 127 and not allow_local:
                 return False
             # 0.0.0.0
             if hostname == '0.0.0.0':
                 return False
         
         # 禁止 localhost 域名
-        if hostname in ['localhost', '127.0.0.1', '::1']:
+        if hostname in ['localhost', '127.0.0.1', '::1'] and not allow_local:
             return False
         
         return True
@@ -400,8 +401,9 @@ class LLMConfigManager:
             return
         
         self._initialized = True
-        self._config_dir = Path(__file__).parent.parent.parent / "config"
+        self._config_dir = config.get_user_data_dir()
         self._config_path = self._config_dir / "ai_config.json"
+        self._default_config_path = Path(__file__).resolve().parent.parent.parent / "config" / "ai_config.json"
         
         # 确保配置目录存在
         self._config_dir.mkdir(parents=True, exist_ok=True)
@@ -421,6 +423,16 @@ class LLMConfigManager:
                     return self._merge_config(DEFAULT_CONFIG, loaded)
             except Exception as e:
                 logger.warning(f"加载配置文件失败: {e}，使用默认配置")
+
+        if self._default_config_path.exists():
+            try:
+                with open(self._default_config_path, 'r', encoding='utf-8') as f:
+                    loaded = json.load(f)
+                merged = self._merge_config(DEFAULT_CONFIG, loaded)
+                self._save_config(merged)
+                return merged
+            except Exception as e:
+                logger.warning(f"加载默认 AI 配置失败: {e}，使用内置默认配置")
         
         # 创建默认配置文件
         self._save_config(DEFAULT_CONFIG)
@@ -587,7 +599,8 @@ class LLMConfigManager:
             return {"success": False, "message": "API 地址不能为空", "models": []}
         
         # 验证 URL 安全性，防止 SSRF 攻击
-        if not validate_url(base_url):
+        allow_local = provider in [LLMProvider.LM_STUDIO, LLMProvider.OLLAMA]
+        if not validate_url(base_url, allow_local=allow_local):
             return {"success": False, "message": "API 地址不安全，请使用有效的 HTTP/HTTPS 地址", "models": []}
         
         try:
@@ -713,6 +726,10 @@ class LLMConfigManager:
         
         if not base_url:
             return {"success": False, "message": "API 地址不能为空"}
+
+        allow_local = provider == EmbeddingProvider.LOCAL
+        if not validate_url(base_url, allow_local=allow_local):
+            return {"success": False, "message": "API 地址不安全，请使用有效的 HTTP/HTTPS 地址"}
         
         try:
             headers = {

@@ -1,6 +1,6 @@
 {
   "name": "soundbot",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "SoundBot - AI 音效管理器桌面版 (PyInstaller 一体化版本)",
   "main": "main.js",
   "scripts": {

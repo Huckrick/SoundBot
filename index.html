@@ -479,6 +479,7 @@
         let API_BASE = 'http://127.0.0.1:8000';
         let WS_BASE = 'ws://127.0.0.1:8000';
         let backendReady = false;
+        let backendReadyHandled = false;
 
         function apiUrl(path) {
             return `${API_BASE}${path}`;
@@ -486,6 +487,23 @@
 
         function wsUrl(path) {
             return `${WS_BASE}${path}`;
+        }
+
+        function normalizePathForCompare(filePath) {
+            return String(filePath || '').replace(/\\/g, '/').replace(/\/+$/, '');
+        }
+
+        function isSameOrChildPath(candidatePath, parentPath) {
+            const candidate = normalizePathForCompare(candidatePath);
+            const parent = normalizePathForCompare(parentPath);
+            if (!parent) return Boolean(candidate);
+            return candidate === parent || candidate.startsWith(parent + '/');
+        }
+
+        function getParentPath(filePath) {
+            const normalized = normalizePathForCompare(filePath);
+            const index = normalized.lastIndexOf('/');
+            return index >= 0 ? normalized.substring(0, index) : '';
         }
 
         async function initializeRuntimeConfig() {
@@ -567,19 +585,16 @@
 
         // 后端就绪后的回调
         function onBackendReady() {
+            if (backendReadyHandled) return;
+            backendReadyHandled = true;
+
             console.log('[Frontend] 执行后端就绪回调...');
             
             // 更新磁盘空间显示
-            updateDiskSpace();
-            
-            // 从数据库加载文件
-            loadFilesFromDatabase();
+            updateDiskSpaceDisplay();
             
             // 显示成功通知
             showNotification('服务已就绪', 'success');
-            
-            // 触发界面刷新
-            renderSoundList();
         }
 
         // 监听主进程发送的后端就绪事件
@@ -1680,7 +1695,7 @@
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-200 ${expanded ? 'rotate-90' : ''}"><polyline points="9 18 15 12 9 6"></polyline></svg>
                     </span>
                     <i data-lucide="folder" class="w-4 h-4 opacity-70" style="color: ${folderColor};"></i>
-                    <span class="text-sm flex-1 truncate">${folder.name}</span>
+                    <span class="text-sm flex-1 truncate">${escapeHtml(folder.name)}</span>
                     <span class="text-xs opacity-50">${folder.total_file_count || 0}</span>
                 </div>
             `;
@@ -1706,7 +1721,7 @@
                 // 筛选该用户文件夹下的所有文件
                 const folderPaths = childFolders.map(f => f.path);
                 const filtered = soundData.filter(s => {
-                    return folderPaths.some(fp => s.folderPath === fp || s.folderPath.startsWith(fp + '/'));
+                    return folderPaths.some(fp => isSameOrChildPath(s.folderPath, fp));
                 });
                 renderSoundList('', filtered);
             });
@@ -1833,7 +1848,7 @@
                         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-200 ${expanded ? 'rotate-90' : ''}"><polyline points="9 18 15 12 9 6"></polyline></svg>
                     </span>
                     <i data-lucide="folder-open" class="w-3 h-3 opacity-60"></i>
-                    <span class="text-xs flex-1 truncate">${folder.name}</span>
+                    <span class="text-xs flex-1 truncate">${escapeHtml(folder.name)}</span>
                     ${folder.count !== undefined ? `<span class="text-[10px] opacity-40">${folder.count}</span>` : ''}
                 </div>
             `;
@@ -1856,11 +1871,8 @@
                 div.classList.add('active');
 
                 // 使用相对路径筛选（包含所有子层级）
-                const folderPrefix = folder.path ? folder.path + '/' : '';
                 const filtered = soundData.filter(s => {
-                    if (s.folderPath === folder.path) return true;
-                    if (s.folderPath && s.folderPath.startsWith(folderPrefix)) return true;
-                    return false;
+                    return isSameOrChildPath(s.folderPath, folder.path);
                 });
                 renderSoundList('', filtered);
             });
@@ -1893,7 +1905,7 @@
                     fileDiv.innerHTML = `
                         <div class="flex items-center gap-1 py-0.5 px-1 rounded-md hover:bg-white/5">
                             <i data-lucide="music" class="w-3 h-3 opacity-40"></i>
-                            <span class="text-[10px] flex-1 truncate opacity-70">${file.filename}</span>
+                            <span class="text-[10px] flex-1 truncate opacity-70">${escapeHtml(file.filename)}</span>
                         </div>
                     `;
                     fileDiv.addEventListener('click', (e) => {
@@ -1940,7 +1952,7 @@
                 item.className = 'w-full px-3 py-2 text-sm text-left hover:bg-white/5 flex items-center gap-2 transition-colors';
                 item.innerHTML = `
                     <div class="w-3 h-3 rounded-full" style="background-color: ${f.color || '#3b82f6'};"></div>
-                    <span class="truncate">${f.name}</span>
+                    <span class="truncate">${escapeHtml(f.name)}</span>
                 `;
                 item.addEventListener('click', () => {
                     updateFolderMapping(folder.fullPath, f.id);
@@ -1980,7 +1992,7 @@
                 div.innerHTML = `
                     <div class="flex items-center gap-2 py-2 px-2 rounded-md">
                         <i data-lucide="tag" class="w-4 h-4 opacity-70"></i>
-                        <span class="text-sm flex-1">${cat.name}</span>
+                        <span class="text-sm flex-1">${escapeHtml(cat.name)}</span>
                         <span class="text-xs opacity-50">${cat.count}</span>
                     </div>
                 `;
@@ -2108,7 +2120,7 @@
                     <div class="w-12 flex justify-center">
                         <div class="w-8 h-8 rounded border flex items-center justify-center overflow-hidden" style="border-color: var(--border-color);">
                             ${hasCover ? `
-                                <img src="${coverUrl}" class="w-full h-full object-cover" alt="cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                <img src="${escapeHtml(coverUrl)}" class="w-full h-full object-cover" alt="cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                                 <i data-lucide="${iconName}" class="w-4 h-4 opacity-70 hidden"></i>
                             ` : `
                                 <i data-lucide="${iconName}" class="w-4 h-4 opacity-70"></i>
@@ -2119,7 +2131,7 @@
                         <canvas class="mini-waveform w-28 h-8" data-id="${sound.id}"></canvas>
                     </div>
                     <div class="flex-1 min-w-0 flex items-center gap-2">
-                        <span class="text-sm truncate">${sound.name}</span>
+                        <span class="text-sm truncate">${escapeHtml(sound.name)}</span>
                         ${isCurrent && isPlaying ? `
                             <div class="playing-indicator">
                                 <span></span><span></span><span></span><span></span>
@@ -3267,7 +3279,7 @@
                         </div>
                         <div class="flex-1">
                             <div class="rounded-2xl rounded-tl-sm px-3 py-2 text-xs" style="background-color: var(--bg-tertiary);">
-                                ${html}
+                                ${escapeHtml(html)}
                             </div>
                         </div>
                     </div>
@@ -4314,13 +4326,13 @@
             try {
                 let selectedPath = null;
 
-                if (window.electronAPI && window.electronAPI.dialogOpen) {
-                    const result = await window.electronAPI.dialogOpen({
+                if (window.electronAPI && window.electronAPI.dialogs) {
+                    const result = await window.electronAPI.dialogs.showOpenDialog({
                         properties: ['openDirectory'],
                         title: '选择工程临时文件目录'
                     });
-                    if (result && result.length > 0) {
-                        selectedPath = result[0];
+                    if (result && !result.canceled && result.filePaths && result.filePaths.length > 0) {
+                        selectedPath = result.filePaths[0];
                     }
                 } else {
                     // 浏览器环境使用 input
@@ -4434,13 +4446,13 @@
                             <div class="flex items-center gap-3 flex-1">
                                 <i data-lucide="folder" class="w-5 h-5 opacity-70"></i>
                                 <div class="flex-1 min-w-0">
-                                    <div class="font-medium text-sm truncate">${project.name}</div>
-                                    <div class="text-xs opacity-60 truncate">${project.description || '无描述'} · ${project.file_count || 0} 个文件</div>
+                                    <div class="font-medium text-sm truncate">${escapeHtml(project.name)}</div>
+                                    <div class="text-xs opacity-60 truncate">${escapeHtml(project.description || '无描述')} · ${project.file_count || 0} 个文件</div>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
                                 ${isCurrent ? '<span class="text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-600 dark:text-green-400">当前</span>' : ''}
-                                <button class="delete-project-btn p-1.5 rounded-md hover:bg-red-500/20 hover:text-red-500 transition-colors" data-project-id="${project.id}" data-project-name="${project.name}" title="删除工程">
+                                <button class="delete-project-btn p-1.5 rounded-md hover:bg-red-500/20 hover:text-red-500 transition-colors" data-project-id="${escapeHtml(project.id)}" data-project-name="${escapeHtml(project.name)}" title="删除工程">
                                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                                 </button>
                             </div>
@@ -4484,7 +4496,7 @@
                 container.innerHTML = `
                     <div class="text-center py-8 opacity-50">
                         <i data-lucide="alert-circle" class="w-8 h-8 mx-auto mb-2"></i>
-                        <p class="text-sm">加载失败: ${error.message}</p>
+                        <p class="text-sm">加载失败: ${escapeHtml(error.message)}</p>
                     </div>
                 `;
                 lucide.createIcons();
@@ -4526,9 +4538,12 @@
         }
 
         // 切换到指定工程
-        async function switchProject(projectId, projectName) {
+        async function switchProject(projectId, projectName, options = {}) {
+            const { silent = false, persist = true } = options;
             try {
-                showNotification(`正在切换到工程 "${projectName}"...`, 'info');
+                if (!silent) {
+                    showNotification(`正在切换到工程 "${projectName}"...`, 'info');
+                }
 
                 const response = await fetch(apiUrl(`/api/v1/projects/${projectId}/switch`), {
                     method: 'POST',
@@ -4538,14 +4553,16 @@
                 const result = await response.json();
 
                 if (result && result.success) {
+                    const resolvedProjectName = result.project_name || projectName;
+
                     // 更新当前工程信息
                     currentProject = {
                         id: projectId,
-                        name: projectName
+                        name: resolvedProjectName
                     };
 
                     // 更新UI显示
-                    document.getElementById('currentProjectName').textContent = projectName;
+                    document.getElementById('currentProjectName').textContent = resolvedProjectName;
 
                     // 清空当前数据
                     soundData = [];
@@ -4562,16 +4579,28 @@
                     updateCategoryData();
                     renderSoundList();
 
-                    showNotification(`已切换到工程 "${projectName}"`, 'success');
+                    if (!silent) {
+                        showNotification(`已切换到工程 "${resolvedProjectName}"`, 'success');
+                    }
 
                     // 保存到本地存储
-                    localStorage.setItem('soundmind_current_project', JSON.stringify(currentProject));
+                    if (persist) {
+                        localStorage.setItem('soundmind_current_project', JSON.stringify(currentProject));
+                    }
+
+                    return true;
                 } else {
-                    showNotification('切换工程失败: ' + (result.detail || '未知错误'), 'error');
+                    if (!silent) {
+                        showNotification('切换工程失败: ' + (result.detail || '未知错误'), 'error');
+                    }
+                    return false;
                 }
             } catch (error) {
                 console.error('切换工程失败:', error);
-                showNotification('切换工程失败: ' + error.message, 'error');
+                if (!silent) {
+                    showNotification('切换工程失败: ' + error.message, 'error');
+                }
+                return false;
             }
         }
 
@@ -4585,18 +4614,23 @@
                     // 验证工程是否存在
                     const response = await fetch(apiUrl(`/api/v1/projects/${savedProject.id}`));
                     if (response.ok) {
-                        currentProject = savedProject;
-                        document.getElementById('currentProjectName').textContent = currentProject.name;
-                        return;
+                        const project = await response.json();
+                        const projectName = project.name || savedProject.name || '默认工程';
+                        const switched = await switchProject(savedProject.id, projectName, { silent: true });
+                        if (switched) {
+                            return true;
+                        }
                     }
                 } catch (error) {
                     console.error('加载保存的工程失败:', error);
                 }
+                localStorage.removeItem('soundmind_current_project');
             }
 
             // 默认使用 default 工程
             currentProject = { id: 'default', name: '默认工程' };
             document.getElementById('currentProjectName').textContent = currentProject.name;
+            return false;
         }
 
         // ==================== 首次启动设置弹窗 ====================
@@ -5103,7 +5137,7 @@
                         peaks: file.peaks, // 直接从数据库获取波形
                         tags: file.tags || [],
                         createdAt: file.created_at,
-                        folderPath: file.path.substring(0, file.path.lastIndexOf('/'))
+                        folderPath: getParentPath(file.path)
                     }));
                     const mapTime = Date.now() - mapStart;
                     console.log('[DEBUG] 映射 soundData 耗时:', mapTime, 'ms');
@@ -5166,8 +5200,14 @@
             // 异步检查后端状态，不阻塞界面加载
             ensureBackendReady().then(async (isReady) => {
                 if (isReady) {
-                    await loadCurrentProject();
-                    await loadUserFolders();
+                    const projectLoaded = await loadCurrentProject();
+                    if (!projectLoaded) {
+                        await loadFilesFromDatabase();
+                        await loadUserFolders();
+                        renderFolderTree();
+                        updateCategoryData();
+                        renderSoundList();
+                    }
                 } else {
                     const diskSpaceText = document.getElementById('diskSpaceText');
                     if (diskSpaceText) {

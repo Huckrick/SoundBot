@@ -1077,7 +1077,8 @@ async def get_db_file(path: str):
     file_path = urllib.parse.unquote(path)
 
     db_manager = get_db_manager()
-    record = db_manager.get_file(file_path)
+    current_project_id = getattr(config, 'CURRENT_PROJECT_ID', 'default')
+    record = db_manager.get_file(file_path, current_project_id)
 
     if not record:
         raise HTTPException(status_code=404, detail="文件不存在")
@@ -1107,7 +1108,8 @@ async def update_file_tags(path: str, tags: List[str] = Body(...)):
     file_path = urllib.parse.unquote(path)
 
     db_manager = get_db_manager()
-    success = db_manager.update_tags(file_path, tags)
+    current_project_id = getattr(config, 'CURRENT_PROJECT_ID', 'default')
+    success = db_manager.update_tags(file_path, tags, current_project_id)
 
     if not success:
         raise HTTPException(status_code=404, detail="文件不存在")
@@ -1126,7 +1128,8 @@ async def delete_db_file(path: str):
     file_path = urllib.parse.unquote(path)
 
     db_manager = get_db_manager()
-    success = db_manager.delete_file(file_path)
+    current_project_id = getattr(config, 'CURRENT_PROJECT_ID', 'default')
+    success = db_manager.delete_file(file_path, current_project_id)
 
     if not success:
         raise HTTPException(status_code=404, detail="文件不存在")
@@ -1449,7 +1452,8 @@ async def get_waveform(path: str = Query(..., description="音频文件路径"))
     try:
         # 首先尝试从数据库获取缓存的波形数据
         db_manager = get_db_manager()
-        record = db_manager.get_file(file_path)
+        current_project_id = getattr(config, 'CURRENT_PROJECT_ID', 'default')
+        record = db_manager.get_file(file_path, current_project_id)
 
         if record and record.peaks_json:
             # 使用缓存的波形数据
@@ -1496,7 +1500,7 @@ async def get_waveform(path: str = Query(..., description="音频文件路径"))
 
         # 保存到数据库缓存
         if record:
-            db_manager.update_peaks(file_path, peaks)
+            db_manager.update_peaks(file_path, peaks, current_project_id)
             logger.debug(f"波形数据已缓存到数据库: {file_path}")
 
         return {
@@ -2021,8 +2025,7 @@ async def audio_fade(request: schemas.FadeRequest):
             if audio.ndim == 1:
                 audio[:fade_in_samples] = audio[:fade_in_samples] * fade_in_curve
             else:
-                for ch in range(audio.shape[1]):
-                    audio[:fade_in_samples, ch] = audio[:fade_in_samples, ch] * fade_in_curve.reshape(-1, 1)
+                audio[:fade_in_samples] = audio[:fade_in_samples] * fade_in_curve[:, None]
         
         # 淡出：线性增益从 1 到 0
         if fade_out_samples > 0:
@@ -2031,8 +2034,7 @@ async def audio_fade(request: schemas.FadeRequest):
             if audio.ndim == 1:
                 audio[start_idx:] = audio[start_idx:] * fade_out_curve
             else:
-                for ch in range(audio.shape[1]):
-                    audio[start_idx:, ch] = audio[start_idx:, ch] * fade_out_curve.reshape(-1, 1)
+                audio[start_idx:] = audio[start_idx:] * fade_out_curve[:, None]
         
         # 生成输出路径
         if request.output:
@@ -2110,8 +2112,7 @@ async def export_clip_with_fade(request: schemas.ClipWithFadeRequest):
             if clipped_audio.ndim == 1:
                 clipped_audio[:fade_in_samples] = clipped_audio[:fade_in_samples] * fade_in_curve
             else:
-                for ch in range(clipped_audio.shape[1]):
-                    clipped_audio[:fade_in_samples, ch] = clipped_audio[:fade_in_samples, ch] * fade_in_curve.reshape(-1, 1)
+                clipped_audio[:fade_in_samples] = clipped_audio[:fade_in_samples] * fade_in_curve[:, None]
 
         if fade_out_samples > 0:
             fade_out_curve = np.linspace(1, 0, fade_out_samples)
@@ -2119,8 +2120,7 @@ async def export_clip_with_fade(request: schemas.ClipWithFadeRequest):
             if clipped_audio.ndim == 1:
                 clipped_audio[start_idx:] = clipped_audio[start_idx:] * fade_out_curve
             else:
-                for ch in range(clipped_audio.shape[1]):
-                    clipped_audio[start_idx:, ch] = clipped_audio[start_idx:, ch] * fade_out_curve.reshape(-1, 1)
+                clipped_audio[start_idx:] = clipped_audio[start_idx:] * fade_out_curve[:, None]
 
         if request.temp_file:
             temp_name = f"clip_fade_{int(time.time())}_{uuid.uuid4().hex[:8]}{source_file.suffix}"
@@ -2227,6 +2227,8 @@ async def set_temp_dir(request: schemas.TempDirRequest):
         # 保存配置
         with config_path.open('w', encoding='utf-8') as f:
             json.dump(current_config, f, ensure_ascii=False, indent=2)
+
+        config.TEMP_CLIP_DIR = config.get_temp_clip_dir()
         
         logger.info(f"临时文件目录已更新: {new_dir}")
         
@@ -2446,6 +2448,10 @@ async def update_project(project_id: str, request: schemas.UpdateProjectRequest)
         if not success:
             raise HTTPException(status_code=400, detail="更新工程失败")
 
+        if getattr(config, 'CURRENT_PROJECT_ID', 'default') == project_id:
+            active_temp_dir = request.temp_dir if request.temp_dir is not None else existing.get('temp_dir')
+            config.set_project_temp_clip_dir(active_temp_dir)
+
         return {
             "success": True,
             "message": "工程更新成功"
@@ -2490,6 +2496,7 @@ async def delete_project(project_id: str):
 
             # 先切换到默认工程
             config.CURRENT_PROJECT_ID = 'default'
+            config.set_project_temp_clip_dir(None)
             logger.info("已切换到默认工程")
 
             # 清理音频缓存
@@ -2571,9 +2578,9 @@ async def switch_project(project_id: str):
         # 更新全局配置中的当前工程
         config.CURRENT_PROJECT_ID = project_id
 
-        # 如果有工程特定的临时目录，更新配置
-        if project.get('temp_dir'):
-            config.TEMP_CLIP_DIR = project['temp_dir']
+        # 切换工程特定的临时目录。为空时回退到用户全局配置或默认目录。
+        active_temp_dir = config.set_project_temp_clip_dir(project.get('temp_dir'))
+        logger.info(f"当前临时文件目录: {active_temp_dir}")
 
         # 获取该工程的向量数据库信息
         from core.indexer import get_indexer
