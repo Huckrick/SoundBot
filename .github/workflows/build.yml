@@ -422,7 +422,7 @@ jobs:
             artifacts/models-package/*.zip
             artifacts/soundbot-macos/*.dmg
             artifacts/soundbot-windows/*.exe
-          draft: true
+          draft: false
           prerelease: true
           fail_on_unmatched_files: true
         env:
