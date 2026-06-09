@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release tag name (e.g. v0.1.3) — required for manual dispatch'
+        description: 'Release tag name (e.g. v0.1.4) — required for manual dispatch'
         required: true
-        default: 'v0.1.3'
+        default: 'v0.1.4'
 
 env:
   PYTHON_VERSION: '3.12'
@@ -400,6 +400,24 @@ jobs:
         with:
           tag_name: ${{ steps.tag.outputs.name }}
           name: "SoundBot ${{ steps.tag.outputs.name }} Alpha"
+          body: |
+            ## 中文更新日志
+
+            - 修复从数据库加载音频后波形字段未映射到前端绘制字段，导致波形不能立即正确显示的问题。
+            - 优化波形补载策略，只对当前可见列表项请求缺失波形，避免启动后批量扫描整个音频库。
+            - 优化播放链路，默认使用本地安全协议直读音频，避免通过 IPC 或后端转 WAV 搬运整文件。
+            - 修复后端健康检查触发 CLAP 模型同步加载的问题，减少 Windows 启动等待时间。
+            - 优化后端完整性检查，移除启动时递归统计 PyInstaller 目录大小的耗时操作。
+            - 保持 WAV 导出、片段裁切、淡入淡出和拖拽导出链路使用原始文件路径，避免播放优化影响导出功能。
+
+            ## English Changelog
+
+            - Fixed waveform field mapping from the database to the frontend renderer so cached waveforms display immediately.
+            - Limited missing-waveform loading to currently visible list items to avoid scanning the full library on startup.
+            - Optimized playback to use a local secure audio protocol by default, avoiding whole-file IPC transfers and backend WAV transcoding.
+            - Fixed the health check triggering synchronous CLAP model loading, reducing startup wait time on Windows.
+            - Optimized backend integrity checks by removing the recursive PyInstaller directory size scan at startup.
+            - Kept WAV export, clip extraction, fade processing, and drag export on original file paths so playback optimization does not affect export features.
           files: |
             artifacts/models-package/*.zip
             artifacts/soundbot-macos/*.dmg

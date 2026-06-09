@@ -82,7 +82,7 @@ import config
 from models import schemas
 from core.indexer import get_indexer, AudioIndexer, reset_indexer
 from core.searcher import get_searcher, AudioSearcher, reset_searcher
-from core.embedder import get_embedder, reset_embedder, is_embedder_available
+from core.embedder import get_embedder, reset_embedder, is_embedder_available, is_embedder_loaded
 from core.database import get_db_manager, reset_db_manager, AudioFileRecord
 from core.websocket_manager import (
     get_ws_manager,
@@ -336,7 +336,7 @@ async def health_check():
         status="healthy",
         version=config.APP_VERSION,
         device=config.get_device(),
-        model_loaded=is_embedder_available()
+        model_loaded=is_embedder_loaded()
     )
 
 

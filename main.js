@@ -29,6 +29,7 @@ let backendWsOrigin = `ws://127.0.0.1:${backendPort}`;
 let apiBaseUrl = `${backendOrigin}/api/v1`;
 let appSettingsCache = null;
 const registeredShortcuts = new Set();
+let audioProtocolRegistered = false;
 
 // GitHub 仓库配置
 const GITHUB_REPO = 'Huckrick/SoundBot';
@@ -93,6 +94,38 @@ function writeAppSettings(settings) {
   fs.writeFileSync(getAppSettingsPath(), JSON.stringify(appSettingsCache, null, 2), 'utf-8');
 }
 
+function registerAudioProtocol() {
+  if (audioProtocolRegistered) return;
+
+  protocol.registerFileProtocol(AUDIO_PROTOCOL, (request, callback) => {
+    try {
+      const parsed = new URL(request.url);
+      const encodedPath = parsed.pathname.startsWith('/')
+        ? parsed.pathname.slice(1)
+        : parsed.pathname;
+      const filePath = decodeURIComponent(encodedPath);
+
+      if (!filePath || !path.isAbsolute(filePath) || !fs.existsSync(filePath)) {
+        callback({ error: -6 });
+        return;
+      }
+
+      const stats = fs.statSync(filePath);
+      if (!stats.isFile()) {
+        callback({ error: -6 });
+        return;
+      }
+
+      callback({ path: filePath });
+    } catch (error) {
+      console.error('[AudioProtocol] Failed to resolve audio URL:', error);
+      callback({ error: -2 });
+    }
+  });
+
+  audioProtocolRegistered = true;
+}
+
 /**
  * 获取后端可执行文件路径
  * onedir 模式：resources/backend/soundbot-backend/soundbot-backend
@@ -136,6 +169,10 @@ function getBackendExecutable() {
 function verifyBackendIntegrity(backendDir) {
   console.log(`[Backend] Verifying backend integrity: ${backendDir}`);
 
+  const exeName = process.platform === 'win32'
+    ? 'soundbot-backend.exe'
+    : 'soundbot-backend';
+
   const requiredItems = [
     'soundbot-backend',
     'soundbot-backend.exe',
@@ -154,32 +191,18 @@ function verifyBackendIntegrity(backendDir) {
     }
   }
 
-  if (foundItems.length < 2) {
-    console.error('[Backend] ✗ Too few required items found in backend directory');
+  const executablePath = path.join(backendDir, exeName);
+  const executableFound = fs.existsSync(executablePath) && fs.statSync(executablePath).isFile();
+  const runtimeFound = foundItems.some((item) => ['_internal', 'lib', 'base_library.zip'].includes(item));
+
+  if (!executableFound || !runtimeFound) {
+    console.error('[Backend] ✗ Backend executable or runtime files are missing');
     return false;
   }
 
-  // 检查目录大小
-  const getDirSize = (dir) => {
-    let size = 0;
-    const files = fs.readdirSync(dir);
-    for (const file of files) {
-      const filePath = path.join(dir, file);
-      const stats = fs.statSync(filePath);
-      if (stats.isDirectory()) {
-        size += getDirSize(filePath);
-      } else {
-        size += stats.size;
-      }
-    }
-    return size;
-  };
-
-  const totalSize = getDirSize(backendDir);
-  console.log(`[Backend] Total backend size: ${(totalSize / 1024 / 1024).toFixed(1)} MB`);
-
-  if (totalSize < 50 * 1024 * 1024) {
-    console.error('[Backend] ✗ Backend size is too small, may be incomplete');
+  const executableSize = fs.statSync(executablePath).size;
+  if (executableSize < 100 * 1024) {
+    console.error('[Backend] ✗ Backend executable is unexpectedly small');
     return false;
   }
 
@@ -722,7 +745,7 @@ function createWindow() {
           "style-src 'self' 'unsafe-inline'; " +
           "font-src 'self'; " +
           "img-src 'self' data: blob:; " +
-          "media-src 'self' blob: soundmind-audio:; " +
+          `media-src 'self' blob: soundmind-audio: ${backendOrigin}; ` +
           `connect-src 'self' ${backendOrigin} ${backendWsOrigin} ` +
           "https://api.openai.com https://api.moonshot.cn https://api.anthropic.com " +
           "https://api.deepseek.com https://api.siliconflow.cn " +
@@ -1372,6 +1395,8 @@ function closeSplashWindow() {
 }
 
 app.whenReady().then(async () => {
+  registerAudioProtocol();
+
   // 创建启动窗口
   createSplashWindow();
   

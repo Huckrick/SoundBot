@@ -1,7 +1,7 @@
 # 🎵 SoundBot - AI 音效管理器 / AI Sound Effect Manager
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Version](https://img.shields.io/badge/version-0.1.3-orange.svg)](https://github.com/Huckrick/SoundBot)
+[![Version](https://img.shields.io/badge/version-0.1.4-orange.svg)](https://github.com/Huckrick/SoundBot)
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![Electron](https://img.shields.io/badge/electron-28.x-9feaf9.svg)](https://www.electronjs.org/)
 
@@ -12,13 +12,13 @@
 
 ## 📥 下载 / Download
 
-**最新版本 / Latest Release**: [v0.1.3](https://github.com/Huckrick/SoundBot/releases/tag/v0.1.3)
+**最新版本 / Latest Release**: [v0.1.4](https://github.com/Huckrick/SoundBot/releases/tag/v0.1.4)
 
-### v0.1.3 修复版 / Stability Update
+### v0.1.4 性能修复版 / Performance Fix Update
 
-v0.1.3 重点修复 Windows/macOS 打包后的导入、工程隔离、磁盘空间显示和配置持久化问题。升级应用即可，AI 模型包无需重新下载，除非 release 中另行说明。
+v0.1.4 重点修复 Windows 上波形不显示、播放等待时间长、启动慢的问题。升级应用即可，AI 模型包无需重新下载，除非 release 中另行说明。
 
-v0.1.3 focuses on packaged-app import, project isolation, disk space display, and configuration persistence fixes. Upgrade the app package directly. The AI model package does not need to be downloaded again unless the release notes explicitly say otherwise.
+v0.1.4 focuses on waveform display, playback startup latency, and slow app startup on Windows. Upgrade the app package directly. The AI model package does not need to be downloaded again unless the release notes explicitly say otherwise.
 
 ### 🆕 新架构：一体化安装包 / New Architecture: All-in-One Installer
 
@@ -30,8 +30,8 @@ Starting from v0.1.2, SoundBot adopts a **PyInstaller all-in-one architecture**.
 
 | 平台 / Platform | 下载链接 / Download | 大小 / Size | 说明 / Description |
 |----------------|--------------------|-------------|-------------------|
-| **macOS (Universal)** | [📥 SoundBot-0.1.3.dmg](https://github.com/Huckrick/SoundBot/releases/download/v0.1.3/SoundBot-0.1.3.dmg) | ~300-500MB | 支持 Intel 和 Apple Silicon / Supports Intel & Apple Silicon |
-| **Windows (x64)** | [📥 SoundBot-Setup-0.1.3.exe](https://github.com/Huckrick/SoundBot/releases/download/v0.1.3/SoundBot-Setup-0.1.3.exe) | ~300-500MB | Windows 10/11 64位 / Windows 10/11 64-bit |
+| **macOS (Universal)** | [📥 SoundBot-0.1.4.dmg](https://github.com/Huckrick/SoundBot/releases/download/v0.1.4/SoundBot-0.1.4.dmg) | ~300-500MB | 支持 Intel 和 Apple Silicon / Supports Intel & Apple Silicon |
+| **Windows (x64)** | [📥 SoundBot-Setup-0.1.4.exe](https://github.com/Huckrick/SoundBot/releases/download/v0.1.4/SoundBot-Setup-0.1.4.exe) | ~300-500MB | Windows 10/11 64位 / Windows 10/11 64-bit |
 
 ### AI 模型包 / AI Model Package
 
@@ -39,7 +39,7 @@ Starting from v0.1.2, SoundBot adopts a **PyInstaller all-in-one architecture**.
 
 | 资源 / Resource | 下载链接 / Download | 大小 / Size | 说明 / Description |
 |----------------|--------------------|-------------|-------------------|
-| **AI 模型 / Models** | [📦 models.zip](https://github.com/Huckrick/SoundBot/releases/download/v0.1.3/models.zip) | ~500MB-1GB | **所有平台通用 / All platforms** |
+| **AI 模型 / Models** | [📦 models.zip](https://github.com/Huckrick/SoundBot/releases/download/v0.1.4/models.zip) | ~500MB-1GB | **所有平台通用 / All platforms** |
 
 ### 界面预览 / Screenshot
 
@@ -55,7 +55,7 @@ Starting from v0.1.2, SoundBot adopts a **PyInstaller all-in-one architecture**.
 #### macOS
 
 1. **下载应用包** / Download app package
-   - 下载 `SoundBot-0.1.3.dmg` / Download `SoundBot-0.1.3.dmg`
+   - 下载 `SoundBot-0.1.4.dmg` / Download `SoundBot-0.1.4.dmg`
 
 2. **安装应用** / Install app
    - 打开 `.dmg` 文件，将 SoundBot 拖到 Applications 文件夹 / Open `.dmg` and drag SoundBot to Applications folder
@@ -89,7 +89,7 @@ Starting from v0.1.2, SoundBot adopts a **PyInstaller all-in-one architecture**.
 #### Windows
 
 1. **下载应用包** / Download app package
-   - 下载 `SoundBot-Setup-0.1.3.exe` / Download `SoundBot-Setup-0.1.3.exe`
+   - 下载 `SoundBot-Setup-0.1.4.exe` / Download `SoundBot-Setup-0.1.4.exe`
 
 2. **安装应用** / Install app
    - 运行 `.exe` 安装程序，按向导完成安装 / Run `.exe` installer and follow wizard
@@ -134,6 +134,24 @@ models/
 ***
 
 ## 🧾 更新日志 / Changelog
+
+### v0.1.4
+
+**中文**
+
+- 修复从数据库加载音频后波形字段未映射到前端绘制字段，导致波形不能立即正确显示的问题。
+- 优化波形补载策略，只对当前可见列表项请求缺失波形，避免启动后批量扫描整个音频库。
+- 优化播放链路，默认使用本地安全协议直读音频，避免通过 IPC 或后端转 WAV 搬运整文件。
+- 修复后端健康检查触发 CLAP 模型同步加载的问题，减少 Windows 启动等待时间。
+- 优化后端完整性检查，移除启动时递归统计 PyInstaller 目录大小的耗时操作。
+
+**English**
+
+- Fixed waveform data mapping from the database to the frontend renderer so cached waveforms display immediately.
+- Limited missing-waveform loading to currently visible list items to avoid scanning the full library on startup.
+- Optimized playback to use a local secure audio protocol by default, avoiding whole-file IPC transfers and backend WAV transcoding.
+- Fixed the health check triggering synchronous CLAP model loading, reducing startup wait time on Windows.
+- Optimized backend integrity checks by removing the recursive PyInstaller directory size scan at startup.
 
 ### v0.1.3
 

@@ -335,6 +335,18 @@ def is_embedder_available() -> bool:
     return get_embedder() is not None
 
 
+def is_embedder_loaded() -> bool:
+    """检查 Embedder 是否已加载，且不触发延迟加载。"""
+    if _embedder is not None:
+        return True
+
+    try:
+        from core.model_preloader import get_preloader
+        return get_preloader().get_embedder() is not None
+    except ImportError:
+        return False
+
+
 def reset_embedder() -> None:
     """重置 Embedder 单例（用于测试或重新加载模型）"""
     global _embedder, _embedder_loading_failed
