@@ -25,6 +25,31 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertRegex(self.text, r"(?m)^  PYTHONUTF8: '1'$")
         self.assertRegex(self.text, r"(?m)^  PYTHONIOENCODING: 'utf-8'$")
 
+    def test_release_workflow_is_strictly_tag_push_only(self) -> None:
+        self.assertRegex(
+            self.text,
+            r"(?ms)^on:\n  push:\n    tags:\n      - 'v\*'\n\npermissions:",
+        )
+        self.assertNotIn("workflow_dispatch", self.text)
+        self.assertNotIn("inputs.tag_name", self.text)
+        self.assertNotIn("github.event_name", self.text)
+        self.assertIn(
+            "group: soundbot-release-${{ github.ref_name }}",
+            self.text,
+        )
+        self.assertEqual(
+            self.text.count("RELEASE_TAG: ${{ github.ref_name }}"),
+            1,
+        )
+
+    def test_windows_asar_inventory_is_path_separator_independent(self) -> None:
+        self.assertIn("$asarEntriesRaw = & npx --no-install asar list", self.text)
+        self.assertIn("-replace '\\\\', '/'", self.text)
+        self.assertIn(
+            "@('main.js', 'preload.js', 'index.html', 'assets/i18n.js')",
+            self.text,
+        )
+
     def test_every_job_checks_out_validated_release_source(self) -> None:
         self.assertIn("release_tag: ${{ steps.release-source.outputs.tag }}", self.text)
         self.assertIn("release_sha: ${{ steps.release-source.outputs.sha }}", self.text)

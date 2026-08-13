@@ -1,23 +1,41 @@
-# SoundBot
+# 🎵 SoundBot - AI 音效管理器 / AI Sound Effect Manager
+
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Version](https://img.shields.io/badge/version-v0.2.0--prerelease-orange.svg)](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.0)
+[![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
+[![Electron](https://img.shields.io/badge/electron-28.3.3-9feaf9.svg)](https://www.electronjs.org/)
 
 [中文](README.md) · [Changelog](CHANGELOG.md) · [Releases](https://github.com/Huckrick/SoundBot/releases) · [GPL-3.0](LICENSE)
 
-SoundBot is a local-first desktop sound-effects manager. Electron provides the desktop UI, while a local backend built with FastAPI, SQLite, PyAV, and Chroma is frozen and shipped with the application. It supports sound import, real waveforms, playback, tags, isolated projects, dual-index search, and an optional AI assistant.
+> Find the sound you want using natural language—a local-first, AI-powered desktop sound-effects manager.
+
+Electron provides the desktop UI, while a local backend built with FastAPI, SQLite, PyAV, and Chroma is frozen and shipped with the application. SoundBot supports sound import, real waveforms, playback, tags, isolated projects, dual-index search, and an optional AI assistant.
+
+***
+
+## 📥 Download
+
+**Latest test release:** [SoundBot v0.2.0](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.0)
 
 The current source version is **v0.2.0 (prerelease)**. This release focuses on audio decoding and waveform rendering in the frozen Windows package, SQLite/Chroma consistency, cross-project isolation, safe index rebuilding, and keeping API keys out of plaintext configuration.
 
-> The core library, waveforms, playback, tags, and keyword search do not require an LLM. If CLAP is absent, files still persist in SQLite and vectors remain recoverable. Installing or replacing the model automatically retries loading and queues repairs for every project; “Repair missing items” remains available as a manual action.
+| Resource | Target | Download |
+| --- | --- | --- |
+| macOS installer | macOS 14+ on Apple Silicon arm64 | [Download the DMG from the v0.2.0 Release](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.0) |
+| Windows installer | Windows 10/11 x64 | [Download the EXE from the v0.2.0 Release](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.0) |
+| CLAP model package | Shared by both platforms; required only for semantic audio indexing | [Download `models.zip` from the v0.2.0 Release](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.0) |
 
-## Supported platforms
+> This is a test release. Back up the SoundBot user-data directory before upgrading. The core library, waveforms, playback, tags, and keyword search do not require an LLM or CLAP model; files remain safely stored in SQLite when the model is absent.
 
-The only official v0.2.0 build targets are:
+### Interface preview
 
-- Windows 10/11 x64;
-- macOS 14 or later on Apple Silicon arm64.
+![SoundBot main interface](Home1.png)
 
-This release does not provide Linux, macOS Intel/x64, or cross-OS builds. The PyInstaller backend contains native binaries, so Windows must be built on Windows x64 and macOS must be built on Apple Silicon macOS. The build script rejects a mismatched host or architecture before cleaning or packaging.
+![SoundBot waveform and search interface](Home2.png)
 
-## Main capabilities
+***
+
+## ✨ Features
 
 | Capability | v0.2.0 behavior |
 | --- | --- |
@@ -32,7 +50,39 @@ This release does not provide Linux, macOS Intel/x64, or cross-OS builds. The Py
 | AI assistant | Local and OpenAI-compatible LLMs are supported; if AI is unavailable, the original query is used for local search |
 | Privacy | No cloud telemetry; an external LLM/Embedding service receives text only after the user explicitly configures it |
 
-## Audio formats, waveforms, and playback
+***
+
+## 🚀 Installation and quick start
+
+### Installation
+
+1. Download the installer for your platform from the [v0.2.0 Release](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.0).
+2. On macOS, open the DMG and drag SoundBot to Applications. On Windows, run the EXE and complete the installer wizard.
+3. Import, waveforms, playback, tags, and keyword search work on first launch. For semantic audio search, download `models.zip` from the same Release and follow “Model installation and verification” below.
+4. External LLM and text-Embedding providers are optional and contact the network only after you configure one in Settings.
+
+### Quick start
+
+1. Create or select a project, then use Import Folder or Import Files to add your sound library.
+2. Import jobs persist file records before generating waveforms and indexes; switching projects cannot redirect a running job.
+3. Click a sound card to preview it and use the main waveform to select a region. Keyword search works without a model.
+4. Install the CLAP model to enable semantic audio search. The index-status view can Repair missing items or perform a non-destructive Full rebuild.
+5. If the AI assistant is unavailable, the query automatically falls back to local dual-index and keyword search.
+
+***
+
+## 🖥️ Supported platforms
+
+The only official v0.2.0 build targets are:
+
+- Windows 10/11 x64;
+- macOS 14 or later on Apple Silicon arm64.
+
+This release does not provide Linux, macOS Intel/x64, or cross-OS builds. The PyInstaller backend contains native binaries, so Windows must be built on Windows x64 and macOS must be built on Apple Silicon macOS. The build script rejects a mismatched host or architecture before cleaning or packaging.
+
+***
+
+## 🎧 Audio formats, waveforms, and playback
 
 The scanner, file picker, backend decoder, waveform generator, indexer, and playback fallback share a single audio capability table. These nine extensions are officially supported:
 
@@ -60,7 +110,9 @@ The waveform contract is:
 
 The playback WAV cache defaults to 128 files and 512 MiB. Its key includes the source fingerprint, and least-recently-used files are removed when the limit is reached.
 
-## Database, migration, and artifact state
+***
+
+## 💾 Database, migration, and artifact state
 
 SQLite v3 is the single source of truth. `indexed_files_meta.json` no longer controls index decisions; Chroma contains rebuildable vector data only.
 
@@ -82,7 +134,9 @@ Each file has three separately tracked artifacts:
 
 Artifact state is `pending`, `processing`, `ready`, `failed`, or `stale`, and failures retain a code and message. After an unexpected process stop, orphaned `processing` items return to resumable `pending` state on the next launch, while unfinished jobs are marked interrupted instead of being counted as indexed.
 
-## CLAP + text-metadata dual indexes
+***
+
+## 🧠 CLAP + text-metadata dual indexes
 
 SoundBot does not claim that a general text embedding can replace an audio encoder:
 
@@ -109,7 +163,9 @@ Project index status shows ready, pending/stale, and failed counts for waveforms
 
 Import, repair, and rebuild jobs capture an immutable `project_id` when created. Switching the visible project while work is running cannot redirect SQLite, Chroma, search caches, or the AI searcher to another project.
 
-## LLM and text Embeddings
+***
+
+## 🤖 LLM and text Embeddings
 
 The following LLM entries are enabled in v0.2.0:
 
@@ -133,7 +189,9 @@ Text Embeddings can use:
 
 External text Embeddings receive metadata text only. They neither replace the CLAP audio encoder nor upload original audio.
 
-## Model installation and verification
+***
+
+## 📦 Model installation and verification
 
 The CLAP model is not required to start the application, manage files, decode audio, render waveforms, play sounds, or use keyword search. Semantic audio indexing expects this layout:
 
@@ -157,7 +215,9 @@ In a source checkout, the default destination is the repository's `models/` dire
 
 The backend loads CLAP only from a local directory and derives its engine fingerprint from the manifest revision and per-file SHA values; request paths never fall back to Hugging Face. After a missing model causes preload to fail, status polling detects a changed local package and retries. A successful load creates durable reconcile jobs for every project and backfills `pending`, `failed`, or `stale` audio vectors and default CLAP text vectors.
 
-## Secrets, privacy, and network boundaries
+***
+
+## 🔐 Secrets, privacy, and network boundaries
 
 Electron encrypts API keys with OS-backed `safeStorage` and stores the encrypted blobs in its user-data directory. The renderer sends only `keep`, `set`, or `clear` intent:
 
@@ -168,7 +228,9 @@ Electron encrypts API keys with OS-backed `safeStorage` and stores the encrypted
 
 SoundBot contains no cloud telemetry. Paths, tags, waveforms, CLAP audio vectors, and Chroma data remain local by default. When an external LLM is selected, chat content, search context, or candidate metadata may be sent to that provider. When an external text Embedding provider is selected, metadata text used for that index is sent to the provider. Provider pricing, retention, and compliance policies are outside SoundBot's control.
 
-## User data and logs
+***
+
+## 🗂️ User data and logs
 
 Default user-data directories are:
 
@@ -207,7 +269,9 @@ If a file exists but has no waveform or search result:
 
 Do not paste real API keys, complete private paths, or the full user database into a public issue. Redact diagnostic material before sharing it.
 
-## Development environment
+***
+
+## 🛠️ Development environment
 
 Recommended tools:
 
@@ -232,7 +296,9 @@ python scripts/build.py --skip-electron
 npm start
 ```
 
-## Native builds
+***
+
+## 🏗️ Native builds
 
 The unified build script verifies release metadata, installs/checks dependencies, freezes the backend, checks PyAV/FFmpeg/licenses, builds Electron, and validates the native backend inside the final package.
 
@@ -266,11 +332,13 @@ This repository does not fabricate a Windows package on macOS or a macOS package
 - the macOS DMG, packaged arm64 backend, and `app.asar` resource set pass integrity checks;
 - any failed functional smoke test prevents the Release job from running.
 
-The tag must already exist, be annotated, and point to a commit reachable from the default branch. Every job is bound to that same tag commit, and the complete source and renderer contracts run again before packaging. The workflow first creates a draft Release, uploads the model archive and checksum, DMG, EXE, and unified `SHA256SUMS.txt`, compares remote names, sizes, SHA-256 digests, and upload states, and produces provenance attestations before publishing. It refuses to overwrite any existing Release or draft for that tag, so reruns cannot mix old and new assets. v0.2.0 remains a project-designated prerelease; later SemVer-suffixed versions use the prerelease channel, while stable versions use the full-release channel.
+The Release workflow accepts only a pushed annotated `v*` version tag and has no manual-dispatch entry point. The tag must already exist and point to a commit reachable from the default branch. Every job is bound to that same tag commit, and the complete source and renderer contracts run again before packaging. The workflow first creates a draft Release, uploads the model archive and checksum, DMG, EXE, and unified `SHA256SUMS.txt`, compares remote names, sizes, SHA-256 digests, and upload states, and produces provenance attestations before publishing. It refuses to overwrite any existing Release or draft for that tag, so reruns cannot mix old and new assets. v0.2.0 remains a project-designated prerelease; later SemVer-suffixed versions use the prerelease channel, while stable versions use the full-release channel.
 
 Minimal release order: run `python scripts/bump_version.py --version X.Y.Z --write`, replace the changelog placeholder, and commit; wait for `Validate / Source contracts` on main to pass; then run `git tag -a vX.Y.Z -m "SoundBot vX.Y.Z"` and `git push origin vX.Y.Z`. Do not use a lightweight tag.
 
-## Tests
+***
+
+## 🧪 Tests
 
 Python unit and integration tests:
 
@@ -300,7 +368,9 @@ python scripts/test_pyinstaller.py --build
 
 CI runs the frozen-backend full-format/CLAP/Chroma test through `tests/build/check_frozen_audio_matrix.py` with a controlled port and temporary user-data directory. It requires a running frozen backend and a verified CLAP model and is not intended as an ordinary source-level unit test.
 
-## Public API summary
+***
+
+## 🔌 Public API summary
 
 The backend listens on `127.0.0.1` only. Electron selects a free local port if the default is occupied. Extensions should obtain the runtime address through preload/runtime config instead of hard-coding a port.
 
@@ -333,7 +403,9 @@ Folder imports must also use the project-explicit route; the old `POST /api/v1/i
 }
 ```
 
-## Known limitations
+***
+
+## ⚠️ Known limitations
 
 - v0.2.0 is a prerelease; packages do not yet promise production-grade code signing, notarization, or automatic updates.
 - Only Windows x64 and macOS arm64 are supported. Linux and Intel Macs are outside the build, test, and support matrix.
@@ -343,7 +415,9 @@ Folder imports must also use the project-explicit route; the old `POST /api/v1/i
 - Availability, rate limits, pricing, model behavior, and data policy for external LLM/Embedding services are outside SoundBot's control.
 - Opening `index.html` directly provides a UI preview only; real imports, safeStorage, and the local protocol require Electron.
 
-## Repository layout
+***
+
+## 📁 Repository layout
 
 ```text
 SoundBot/
@@ -357,8 +431,44 @@ SoundBot/
 └── tests/build/                 # Frozen-runtime and release gates
 ```
 
-## Contributing and license
+***
 
-Reproducible reports are welcome through [Issues](https://github.com/Huckrick/SoundBot/issues), and improvements are welcome through pull requests. Changes to data migration, index formats, audio formats, or packaging should include tests and a synchronized bilingual changelog entry.
+## 📝 About this project
 
-Copyright © 2026 Nagisa_Huckrick (胡杨), email: Nagisa_Huckrick@yeah.net. Licensed under the [GNU General Public License v3.0](LICENSE).
+- Developer: **Nagisa_Huckrick (胡杨)**
+- Project focus: local-first sound-asset management, waveform preview, semantic search, and an optional AI assistant
+- Development approach: the author leads product concepts, interaction design, and testing, with implementation assisted by AI coding tools
+
+> The author is not a professional programmer. Public test releases are defined by actual automated builds, frozen-runtime tests, and verified assets; an unverified “fixed” claim is not treated as a release result.
+
+## 📄 License
+
+SoundBot is licensed under the [GNU General Public License v3.0](LICENSE).
+
+```text
+Copyright (C) 2026 Nagisa_Huckrick (胡杨)
+```
+
+## 🙏 Acknowledgments
+
+- [LAION](https://laion.ai/): the pretrained CLAP model
+- [Chroma](https://www.trychroma.com/): the local vector database
+- [FastAPI](https://fastapi.tiangolo.com/): the local API backend
+- [Electron](https://www.electronjs.org/): the desktop application runtime
+- [PyAV](https://pyav.org/) and [PyInstaller](https://pyinstaller.org/): unified audio decoding and native backend freezing
+- [Trae](https://www.trae.ai/) and [Cursor](https://cursor.sh/): AI-assisted coding tools
+
+## 📞 Contact
+
+- Email: **Nagisa_Huckrick@yeah.net**
+- Downloads: [GitHub Releases](https://github.com/Huckrick/SoundBot/releases)
+- Release history: [CHANGELOG.md](CHANGELOG.md)
+
+Issues and Pull Requests are disabled for this repository. To report a test-release problem, remove API keys, private paths, and database content before contacting the author by email.
+
+***
+
+<p align="center">
+  Made with ❤️ by Nagisa_Huckrick (胡杨) with AI-assisted development<br>
+  使用 AI 编程工具辅助制作
+</p>

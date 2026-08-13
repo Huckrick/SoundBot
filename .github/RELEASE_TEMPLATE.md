@@ -1,6 +1,6 @@
 # SoundBot v0.2.0 — Release notes and verification / 发布说明与验证
 
-> Release notes for tagged builds are generated automatically from the matching section of `CHANGELOG.md`. This file is the bilingual manual-release fallback and verification checklist; do not mark a gate as passed without its CI evidence. / Tag 构建的发布说明会从 `CHANGELOG.md` 对应版本自动生成。本文件是双语手动发布备选模板与验证清单；没有 CI 证据时不要把门禁标为已通过。
+> Release publishing starts only when an existing annotated `v*` tag is pushed, and its notes are generated automatically from the matching section of `CHANGELOG.md`. This file is a bilingual human-verification and incident-recovery reference, not an alternate manual publishing path; do not mark a gate as passed without its CI evidence. / 只有推送既有的 annotated `v*` tag 才会启动发布，发布说明会从 `CHANGELOG.md` 对应版本自动生成。本文件仅是双语人工核验与故障恢复参考，不是备用的手动发布入口；没有 CI 证据时不要把门禁标为已通过。
 
 **Status / 状态:** Prerelease / 预发布<br>
 **Version / 版本:** 0.2.0<br>
@@ -13,7 +13,7 @@
 | Windows 10/11 x64 | `SoundBot Setup 0.2.0*.exe` | Official target / 正式目标 |
 | macOS 14+ Apple Silicon arm64 | `SoundBot-0.2.0*.dmg` | Official target / 正式目标 |
 | Optional CLAP model / 可选 CLAP 模型 | `models.zip` + `models.zip.sha256` | Required only for semantic audio indexing / 仅语义音频索引需要 |
-| Release integrity / 发布完整性 | `SHA256SUMS.txt` + GitHub attestation | Covers the model archive, DMG, and EXE / 覆盖模型包、DMG 与 EXE |
+| Release integrity / 发布完整性 | `models.zip.sha256` + `SHA256SUMS.txt` + GitHub attestations | The checksum files verify the model archive, DMG, and EXE; attestations cover all five assets / 校验文件验证模型包、DMG 与 EXE，证明覆盖全部五个资产 |
 
 Linux and Intel macOS are not built, tested, or supported in v0.2.0. Do not publish an artifact for those targets or relabel a foreign native build. / v0.2.0 不构建、不测试也不支持 Linux 和 Intel macOS。不得为这些目标发布文件，也不得把其他平台的原生构建改名冒充。
 
@@ -68,11 +68,11 @@ Configuration reads expose only `has_api_key`. If OS secure storage is unavailab
 
 ## Required release evidence / 必需发布证据
 
-Leave every item unchecked in the template. The native CI job is the evidence source. Release creation must depend on all jobs and must not run after any failed smoke test. / 模板中的每项默认保持未勾选，原生 CI 作业才是证据来源。Release 创建必须依赖全部作业，任一 smoke test 失败后都不得运行。
+Leave every item unchecked in the template. The native CI job is the evidence source. There is no manual-dispatch release path: recovery must fix the source and push a valid annotated tag through the same workflow, never bypass failed gates with a manual asset upload. Release creation must depend on all jobs and must not run after any failed smoke test. / 模板中的每项默认保持未勾选，原生 CI 作业才是证据来源。发布不存在手动触发入口：故障恢复必须修复源码并通过同一工作流推送有效 annotated tag，绝不能以手工上传资产绕过失败门禁。Release 创建必须依赖全部作业，任一 smoke test 失败后都不得运行。
 
 - [ ] Version `0.2.0` matches `package.json`, `package-lock.json`, `backend/config.py`, tag `v0.2.0`, both READMEs, and the bilingual changelog. / 版本 `0.2.0` 与 `package.json`、`package-lock.json`、`backend/config.py`、tag `v0.2.0`、两份 README 和双语 changelog 一致。
 - [ ] The CLAP asset was downloaded from the pinned immutable revision, its per-file manifest passed, and `models.zip.sha256` matches. / CLAP 资源来自固定不可变 revision，逐文件 manifest 通过，且 `models.zip.sha256` 匹配。
-- [ ] The draft Release contains exactly the expected assets; remote names, sizes, SHA-256 digests, and `uploaded` states match, `SHA256SUMS.txt` verifies, and GitHub provenance attestations exist before publication. / 草稿 Release 仅包含预期资产，远端名称、大小、SHA-256 digest 与 `uploaded` 状态一致，`SHA256SUMS.txt` 校验通过，并在公开前生成 GitHub provenance 证明。
+- [ ] The draft Release contains exactly five assets: `models.zip`, `models.zip.sha256`, one DMG, one EXE, and `SHA256SUMS.txt`. Remote names, sizes, GitHub-provided SHA-256 digests, and `uploaded` states match the local files; both checksum files verify, and GitHub provenance attestations cover all five assets before publication. / 草稿 Release 必须恰好包含五个资产：`models.zip`、`models.zip.sha256`、一个 DMG、一个 EXE 与 `SHA256SUMS.txt`。远端名称、大小、GitHub 提供的 SHA-256 digest 和 `uploaded` 状态必须与本地文件一致；两个校验文件均通过，且公开前 GitHub provenance 证明覆盖全部五个资产。
 - [ ] The macOS arm64 frozen backend starts, contains the PyAV/FFmpeg runtime and notices, the DMG passes integrity verification, and the packaged backend is arm64. / macOS arm64 冻结后端可启动，包含 PyAV/FFmpeg 运行时与许可证，DMG 通过完整性验证，且应用内后端为 arm64。
 - [ ] The Windows x64 frozen backend starts with a clean `PATH` and no system FFmpeg, then decodes WAV, MP3, FLAC, AIFF, AIF, OGG, M4A, AAC, and WMA from special-character paths into exact 2,000-point waveforms. / Windows x64 冻结后端在干净 `PATH`、无系统 FFmpeg 下启动，并从特殊字符路径解码 WAV、MP3、FLAC、AIFF、AIF、OGG、M4A、AAC、WMA，生成精确 2,000 点波形。
 - [ ] The same Windows matrix reaches ready waveform/audio/text artifacts, activates cosine CLAP and Chroma manifests, returns hybrid component scores, and produces a valid WMA playback WAV. / 同一 Windows 矩阵使波形/音频/文本 artifact 达到 ready，激活 cosine CLAP 与 Chroma manifest，返回混合搜索分项得分，并生成有效 WMA 播放 WAV。
@@ -92,6 +92,6 @@ This checklist describes CI requirements; it does not claim that a Windows packa
 
 ## Feedback and license / 反馈与许可
 
-Report reproducible issues at [GitHub Issues](https://github.com/Huckrick/SoundBot/issues) after redacting API keys and private paths. / 请在脱敏 API 密钥与私人路径后，通过 [GitHub Issues](https://github.com/Huckrick/SoundBot/issues) 提交可复现问题。
+Issues and Pull Requests are disabled for this repository. After removing API keys, private paths, and database content, send test-release feedback to **Nagisa_Huckrick@yeah.net**. / 本仓库未开放 Issues 与 Pull Requests；请先移除 API 密钥、私人路径和数据库内容，再将测试版反馈发送到 **Nagisa_Huckrick@yeah.net**。
 
 Copyright © 2026 Nagisa_Huckrick (胡杨), Nagisa_Huckrick@yeah.net. SoundBot is licensed under GNU GPL v3. / SoundBot 使用 GNU GPL v3 许可。

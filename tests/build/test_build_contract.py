@@ -72,6 +72,9 @@ class NativeBuildContractTests(unittest.TestCase):
         self.assertIn("pyinstaller==6.16.0", build_requirements)
         self.assertIn("pyinstaller-hooks-contrib==2026.6", build_requirements)
 
+        spec = (root / "backend" / "main.spec").read_text(encoding="utf-8")
+        self.assertIn("('X utf8=1', None, 'OPTION')", spec)
+
         workflow = (root / ".github" / "workflows" / "build.yml").read_text(encoding="utf-8")
         revision = re.search(r"CLAP_MODEL_REVISION:\s*'([0-9a-f]+)'", workflow)
         self.assertIsNotNone(revision)

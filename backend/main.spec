@@ -351,7 +351,9 @@ exe_name_with_ext = exe_name + ('.exe' if sys.platform == 'win32' else '')
 exe = EXE(
     pyz,
     a.scripts,
-    [],
+    # Frozen Python does not honor PYTHONUTF8 from the parent process. Keep
+    # redirected Windows logs UTF-8 so Chinese diagnostics never hit cp1252.
+    [('X utf8=1', None, 'OPTION')],
     exclude_binaries=True,
     name=exe_name_with_ext,
     debug=False,

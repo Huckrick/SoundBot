@@ -1,23 +1,41 @@
-# SoundBot
+# 🎵 SoundBot - AI 音效管理器 / AI Sound Effect Manager
 
-[English](README.en.md) · [更新日志](CHANGELOG.md) · [Releases](https://github.com/Huckrick/SoundBot/releases) · [GPL-3.0](LICENSE)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Version](https://img.shields.io/badge/version-v0.2.0--prerelease-orange.svg)](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.0)
+[![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
+[![Electron](https://img.shields.io/badge/electron-28.3.3-9feaf9.svg)](https://www.electronjs.org/)
 
-SoundBot 是一款本地优先的桌面音效管理器。它使用 Electron 提供桌面界面，以 FastAPI、SQLite、PyAV 和 Chroma 组成随应用冻结的本地后端，支持音效导入、真实波形、播放、标签、项目隔离、双索引检索和可选的 AI 助手。
+[English](README.en.md) · [更新日志](CHANGELOG.md) · [版本发布](https://github.com/Huckrick/SoundBot/releases) · [GPL-3.0](LICENSE)
+
+> 用自然语言找到你想要的声音——本地优先、AI 驱动的桌面音效管理器。
+
+SoundBot 使用 Electron 提供桌面界面，以 FastAPI、SQLite、PyAV 和 Chroma 组成随应用冻结的本地后端，支持音效导入、真实波形、播放、标签、项目隔离、双索引检索和可选的 AI 助手。
+
+***
+
+## 📥 下载
+
+**最新测试版本：** [SoundBot v0.2.0](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.0)
 
 当前源码版本为 **v0.2.0（预发布）**。本版本重点解决 Windows 冻结包的音频解码与波形显示、SQLite/Chroma 状态失步、项目串库、索引重建安全性和 API 密钥落盘问题。
 
-> 基础音频库、波形、播放、标签和关键词检索不依赖 LLM。缺少 CLAP 模型时，文件仍会保存在 SQLite 中，向量保持可恢复状态；安装或替换模型后，后台会自动重试加载并为各工程排队修复，也可以手动点击“修复缺失项”。
+| 资源 | 适用环境 | 下载 |
+| --- | --- | --- |
+| macOS 安装包 | macOS 14+、Apple Silicon arm64 | [在 v0.2.0 Release 中下载 DMG](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.0) |
+| Windows 安装包 | Windows 10/11 x64 | [在 v0.2.0 Release 中下载 EXE](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.0) |
+| CLAP 模型包 | 两个平台通用；仅语义音频索引需要 | [在 v0.2.0 Release 中下载 `models.zip`](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.0) |
 
-## 支持平台
+> 这是测试版本。升级前请备份 SoundBot 用户数据目录。基础音频库、波形、播放、标签和关键词检索不依赖 LLM 或 CLAP 模型；模型缺失时文件仍会安全保存在 SQLite 中。
 
-v0.2.0 的正式构建目标只有：
+### 界面预览
 
-- Windows 10/11 x64；
-- macOS 14 或更高版本、Apple Silicon arm64。
+![SoundBot 主界面](Home1.png)
 
-本版本不提供 Linux、macOS Intel/x64 或跨系统构建。PyInstaller 后端包含平台原生二进制，因此 Windows 包必须在 Windows x64 构建，macOS 包必须在 Apple Silicon macOS 构建。构建脚本会在清理和打包前拒绝错误的宿主或架构。
+![SoundBot 波形与检索界面](Home2.png)
 
-## 主要能力
+***
+
+## ✨ 功能特性
 
 | 能力 | v0.2.0 行为 |
 | --- | --- |
@@ -32,7 +50,39 @@ v0.2.0 的正式构建目标只有：
 | AI 助手 | 支持本地或 OpenAI-compatible LLM；AI 不可用时直接用原始查询执行本地搜索 |
 | 隐私 | 无云端遥测；外部 LLM/Embedding 只有在用户主动配置后才会接收相关文本 |
 
-## 音频格式、波形与播放
+***
+
+## 🚀 安装与快速使用
+
+### 安装
+
+1. 在 [v0.2.0 Release](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.0) 下载与你平台对应的安装包。
+2. macOS 打开 DMG 并将 SoundBot 拖入“应用程序”；Windows 运行 EXE 并按安装向导完成安装。
+3. 首次启动即可使用导入、波形、播放、标签和关键词搜索。需要语义音频检索时，再下载同一 Release 中的 `models.zip`，按下文“模型安装与校验”放置。
+4. 外部 LLM 和文本 Embedding 均为可选能力，只有在设置页主动配置后才会联网。
+
+### 快速使用
+
+1. 创建或选择工程，再通过“导入文件夹”或“导入文件”加入音效库。
+2. 导入作业会先保存文件记录，再生成波形和索引；切换工程不会把任务写入其他工程。
+3. 点击音效卡片预览，使用主波形选择片段；关键词搜索无需模型即可工作。
+4. 安装 CLAP 模型后可使用语义音频搜索；索引状态页可执行“修复缺失项”或非破坏性的“完整重建”。
+5. AI 助手不可用时，查询会自动回退到本地双索引与关键词搜索。
+
+***
+
+## 🖥️ 支持平台
+
+v0.2.0 的正式构建目标只有：
+
+- Windows 10/11 x64；
+- macOS 14 或更高版本、Apple Silicon arm64。
+
+本版本不提供 Linux、macOS Intel/x64 或跨系统构建。PyInstaller 后端包含平台原生二进制，因此 Windows 包必须在 Windows x64 构建，macOS 包必须在 Apple Silicon macOS 构建。构建脚本会在清理和打包前拒绝错误的宿主或架构。
+
+***
+
+## 🎧 音频格式、波形与播放
 
 扫描器、文件选择器、后端解码、波形、索引和播放回退共用同一份音频能力表。正式支持以下 9 个扩展名：
 
@@ -60,7 +110,9 @@ v0.2.0 的正式构建目标只有：
 
 播放用 WAV 缓存默认最多 128 个文件、512 MiB。缓存键包含源文件指纹，源文件变化后会生成新文件；缓存满时按最近最少使用策略清理。
 
-## 数据库、迁移与 artifact 状态
+***
+
+## 💾 数据库、迁移与 artifact 状态
 
 SQLite v3 是唯一真相源。`indexed_files_meta.json` 不再参与索引判断；Chroma 只保存可重建的向量数据。
 
@@ -82,7 +134,9 @@ SQLite v3 是唯一真相源。`indexed_files_meta.json` 不再参与索引判�
 
 artifact 状态为 `pending`、`processing`、`ready`、`failed` 或 `stale`，失败项会保留错误码和错误信息。进程意外终止后，遗留的 `processing` 会在下次启动恢复为可处理的 `pending`，未完成作业会标记为中断，而不是把文件误计为已索引。
 
-## CLAP + 文本元数据双索引
+***
+
+## 🧠 CLAP + 文本元数据双索引
 
 SoundBot 不把普通文本 embedding 宣称为音频编码器：
 
@@ -109,7 +163,9 @@ SoundBot 不把普通文本 embedding 宣称为音频编码器：
 
 导入、修复和重建在创建作业时捕获不可变的 `project_id`。即使处理中切换界面项目，SQLite、Chroma、搜索缓存和 AI 搜索器也不会切到另一项目。
 
-## LLM 与文本 Embedding
+***
+
+## 🤖 LLM 与文本 Embedding
 
 v0.2.0 正式启用以下 LLM 入口：
 
@@ -133,7 +189,9 @@ LLM 请求使用共享异步 HTTP 客户端，支持流式 SSE 跨 chunk 缓冲�
 
 外部文本 Embedding 只处理元数据文本，不替代 CLAP 音频编码，也不会上传原始音频。
 
-## 模型安装与校验
+***
+
+## 📦 模型安装与校验
 
 CLAP 模型不是应用启动、管理文件、解码、波形、播放或关键词搜索的前置条件。语义音频索引需要模型目录：
 
@@ -157,7 +215,9 @@ python scripts/download_manager.py check
 
 后端只从本地目录加载 CLAP，并使用 manifest 的 revision 与逐文件 SHA 生成引擎指纹；不会在请求路径访问 Hugging Face。模型缺失导致预加载失败后，状态轮询会检测本地包变化并重试；加载成功会为所有工程自动创建持久化 reconcile 作业，补算 `pending`、`failed` 或 `stale` 的音频与默认 CLAP 文本向量。
 
-## 密钥、隐私与网络边界
+***
+
+## 🔐 密钥、隐私与网络边界
 
 API 密钥由 Electron `safeStorage` 使用操作系统安全能力加密后保存在 Electron 用户数据目录。渲染层只提交 `keep`、`set` 或 `clear` 意图：
 
@@ -168,7 +228,9 @@ API 密钥由 Electron `safeStorage` 使用操作系统安全能力加密后保�
 
 SoundBot 不包含云端遥测。文件路径、标签、波形、CLAP 音频和 Chroma 数据默认留在本机。选择外部 LLM 时，聊天内容、搜索上下文或候选元数据可能发送给该 provider；选择外部文本 Embedding 时，组成索引的元数据文本会发送给该 provider。服务费用、留存和合规策略由对应提供商决定。
 
-## 用户数据与日志
+***
+
+## 🗂️ 用户数据与日志
 
 默认用户数据目录：
 
@@ -207,7 +269,9 @@ SoundBot/
 
 请不要把真实 API 密钥、完整私人文件路径或整个用户数据库直接粘贴到公开 Issue。提交诊断信息前先脱敏。
 
-## 开发环境
+***
+
+## 🛠️ 开发环境
 
 建议使用：
 
@@ -232,7 +296,9 @@ python scripts/build.py --skip-electron
 npm start
 ```
 
-## 原生构建
+***
+
+## 🏗️ 原生构建
 
 构建脚本会统一验证版本、安装/检查依赖、冻结后端、检查 PyAV/FFmpeg/许可证、构建 Electron，并验证最终包中的原生后端。
 
@@ -266,11 +332,13 @@ python scripts/build.py --platform windows
 - macOS DMG、应用内 arm64 后端和 `app.asar` 资源必须通过完整性检查；
 - 任一功能 smoke test 失败，Release 作业不会运行。
 
-发布标签必须事先存在、为 annotated tag，且对应提交必须可从默认分支达到；所有 job 都绑定同一 tag commit，并在打包前重跑全量源码与渲染层契约。工作流先创建草稿 Release，上传模型包及校验、DMG、EXE 和统一 `SHA256SUMS.txt`，核对远端名称、大小、SHA-256 与上传状态，并生成 provenance attestation 后才公开；若该 tag 已有 Release 或草稿则拒绝覆盖，避免重跑混入旧资产。v0.2.0 按项目约定保持预发布，后续带 SemVer 预发布后缀的版本进入预发布渠道，稳定版本自动进入正式渠道。
+Release 工作流只接受 annotated `v*` 版本标签的推送，不提供手动触发入口。发布标签必须事先存在，且对应提交必须可从默认分支达到；所有 job 都绑定同一 tag commit，并在打包前重跑全量源码与渲染层契约。工作流先创建草稿 Release，上传模型包及校验、DMG、EXE 和统一 `SHA256SUMS.txt`，核对远端名称、大小、SHA-256 与上传状态，并生成 provenance attestation 后才公开；若该 tag 已有 Release 或草稿则拒绝覆盖，避免重跑混入旧资产。v0.2.0 按项目约定保持预发布，后续带 SemVer 预发布后缀的版本进入预发布渠道，稳定版本自动进入正式渠道。
 
 最短发布顺序：先运行 `python scripts/bump_version.py --version X.Y.Z --write`，填完 changelog 占位内容并提交；等待 main 上的 `Validate / Source contracts` 通过后，执行 `git tag -a vX.Y.Z -m "SoundBot vX.Y.Z"` 和 `git push origin vX.Y.Z`。不要使用 lightweight tag。
 
-## 测试
+***
+
+## 🧪 测试
 
 Python 单元与集成测试：
 
@@ -300,7 +368,9 @@ python scripts/test_pyinstaller.py --build
 
 冻结后端全格式/CLAP/Chroma 测试由 CI 在受控端口和临时用户数据目录运行，入口为 `tests/build/check_frozen_audio_matrix.py`。它需要已启动的冻结后端和已校验的 CLAP 模型，不应被当作普通源码单元测试直接运行。
 
-## 公共 API 摘要
+***
+
+## 🔌 公共 API 摘要
 
 后端默认只监听 `127.0.0.1`，Electron 会在默认端口被占用时选择本机可用端口。运行时地址应从 preload/runtime config 获取，不要在扩展代码中写死端口。
 
@@ -333,7 +403,9 @@ python scripts/test_pyinstaller.py --build
 }
 ```
 
-## 已知限制
+***
+
+## ⚠️ 已知限制
 
 - v0.2.0 是预发布版本；安装包尚不保证生产级代码签名、公证或自动更新体验。
 - 只支持 Windows x64 与 macOS arm64；Linux 和 Intel Mac 不在测试、构建或支持范围内。
@@ -343,7 +415,9 @@ python scripts/test_pyinstaller.py --build
 - 外部 LLM/Embedding 的网络可用性、限流、费用、模型行为和数据政策不由 SoundBot 控制。
 - 直接在浏览器打开 `index.html` 只能预览界面；真实导入、safeStorage 和本地协议需要 Electron。
 
-## 仓库结构
+***
+
+## 📁 仓库结构
 
 ```text
 SoundBot/
@@ -357,8 +431,44 @@ SoundBot/
 └── tests/build/                 # 冻结运行时与发布门禁
 ```
 
-## 贡献与许可
+***
 
-欢迎通过 [Issues](https://github.com/Huckrick/SoundBot/issues) 提交可复现的问题，通过 Pull Request 提交改进。涉及数据迁移、索引格式、音频格式或构建链路的修改，请同时补充测试和双语 changelog。
+## 📝 关于本项目
 
-Copyright © 2026 Nagisa_Huckrick（胡杨），邮箱：Nagisa_Huckrick@yeah.net。项目使用 [GNU General Public License v3.0](LICENSE)。
+- 开发者：**Nagisa_Huckrick（胡杨）**
+- 项目方向：本地优先的音效资产管理、波形预览、语义检索与可选 AI 助手
+- 开发方式：产品构思、交互设计与测试由作者负责，代码实现使用 AI 编程工具辅助完成
+
+> 作者并非专业程序员。本项目的公开测试版本以实际自动构建、冻结运行时测试和校验资产为准；未经过门禁验证的“已修复”描述不会作为发布结论。
+
+## 📄 许可证
+
+SoundBot 使用 [GNU General Public License v3.0](LICENSE)。
+
+```text
+Copyright (C) 2026 Nagisa_Huckrick (胡杨)
+```
+
+## 🙏 致谢
+
+- [LAION](https://laion.ai/)：CLAP 预训练模型
+- [Chroma](https://www.trychroma.com/)：本地向量数据库
+- [FastAPI](https://fastapi.tiangolo.com/)：本地 API 后端
+- [Electron](https://www.electronjs.org/)：桌面应用运行时
+- [PyAV](https://pyav.org/) 与 [PyInstaller](https://pyinstaller.org/)：统一音频解码与原生后端冻结
+- [Trae](https://www.trae.ai/) 与 [Cursor](https://cursor.sh/)：AI 编程辅助工具
+
+## 📞 联系方式
+
+- 邮箱：**Nagisa_Huckrick@yeah.net**
+- 版本下载：[GitHub Releases](https://github.com/Huckrick/SoundBot/releases)
+- 更新记录：[CHANGELOG.md](CHANGELOG.md)
+
+当前仓库不开放 Issues 和 Pull Requests；如需反馈测试版问题，请先移除 API 密钥、私人路径和数据库内容，再通过邮箱联系作者。
+
+***
+
+<p align="center">
+  Made with ❤️ by Nagisa_Huckrick（胡杨）with AI-assisted development<br>
+  使用 AI 编程工具辅助制作
+</p>
