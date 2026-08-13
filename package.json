@@ -26,7 +26,7 @@
   "author": "Nagisa_Huckrick (胡杨) <Nagisa_Huckrick@yeah.net>",
   "license": "GPL-3.0",
   "devDependencies": {
-    "electron": "28.3.3",
+    "electron": "43.3.0",
     "electron-builder": "26.8.1"
   },
   "build": {
