@@ -1,0 +1,18 @@
+# SoundBot runtime dependencies maintained by the application itself.
+#
+# requirements.txt is the resolved runtime lock (including dependencies that
+# Chroma requires even when its cloud/default-embedding code paths are not
+# frozen). Build-only tooling belongs in requirements-build.txt.
+
+av==18.0.0
+chromadb==1.5.5
+fastapi==0.135.1
+httpx==0.28.1
+jieba==0.42.1
+mutagen==1.47.0
+numpy==2.4.3
+pydantic==2.12.5
+tinytag==1.10.1
+torch==2.10.0
+transformers==5.3.0
+uvicorn[standard]==0.42.0

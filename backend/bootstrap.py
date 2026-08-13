@@ -65,9 +65,9 @@ def check_environment():
     
     # 检查模型
     if not Path(CLAP_MODEL_PATH).exists():
-        errors.append({
+        warnings.append({
             'type': 'missing_models',
-            'message': f'AI 模型文件未找到: {CLAP_MODEL_PATH}',
+            'message': f'AI 模型文件未找到，将以元数据模式启动: {CLAP_MODEL_PATH}',
             'solution': '请从 GitHub Releases 下载 models.zip（或 models-版本号.zip）并解压到以下任一位置:',
             'possible_locations': [
                 str(get_executable_dir() / 'models'),
@@ -79,7 +79,7 @@ def check_environment():
     try:
         import torch
     except ImportError as e:
-        errors.append({
+        warnings.append({
             'type': 'missing_dependency',
             'message': f'PyTorch 未安装: {e}',
             'solution': '如果看到此错误，说明 PyInstaller 打包可能不完整'
@@ -88,7 +88,7 @@ def check_environment():
     try:
         import transformers
     except ImportError as e:
-        errors.append({
+        warnings.append({
             'type': 'missing_dependency',
             'message': f'Transformers 未安装: {e}',
             'solution': '如果看到此错误，说明 PyInstaller 打包可能不完整'

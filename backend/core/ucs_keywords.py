@@ -61,8 +61,13 @@ Copyright (c) 2024 SoundBot Project
 import os
 import re
 import logging
+import posixpath
+import sys
+import zipfile
+from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 from functools import lru_cache
+from xml.etree import ElementTree
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +75,10 @@ logger = logging.getLogger(__name__)
 _ucs_keywords_cache: Optional[Dict[str, List[str]]] = None
 _ucs_loaded = False
 _jieba_available = False
+_UCS_FILENAME = 'UCS+音效分类中英文对照表.xlsx'
+_SPREADSHEET_NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
+_DOCUMENT_REL_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+_PACKAGE_REL_NS = 'http://schemas.openxmlformats.org/package/2006/relationships'
 
 # 尝试导入 jieba
 try:
@@ -80,6 +89,89 @@ try:
 except ImportError:
     logger.warning("jieba 未安装，中文分词功能受限。请运行: pip install jieba")
     _jieba_available = False
+
+
+def _default_ucs_path() -> Path:
+    """Resolve the committed UCS workbook in source and frozen layouts."""
+    candidates = []
+    frozen_root = getattr(sys, '_MEIPASS', None)
+    if frozen_root:
+        candidates.append(Path(frozen_root) / _UCS_FILENAME)
+    candidates.extend([
+        Path(sys.executable).resolve().parent / _UCS_FILENAME,
+        Path(__file__).resolve().parents[2] / _UCS_FILENAME,
+    ])
+    return next((path for path in candidates if path.is_file()), candidates[0])
+
+
+def _column_index(reference: str) -> int:
+    letters = ''.join(character for character in reference if character.isalpha())
+    value = 0
+    for character in letters.upper():
+        value = value * 26 + ord(character) - ord('A') + 1
+    return value - 1
+
+
+def _cell_text(cell: ElementTree.Element, shared_strings: List[str]) -> str:
+    cell_type = cell.get('t', '')
+    if cell_type == 'inlineStr':
+        return ''.join(
+            node.text or ''
+            for node in cell.iter(f'{{{_SPREADSHEET_NS}}}t')
+        )
+    value = cell.find(f'{{{_SPREADSHEET_NS}}}v')
+    raw = value.text if value is not None and value.text is not None else ''
+    if cell_type == 's' and raw:
+        return shared_strings[int(raw)]
+    return raw
+
+
+def _read_xlsx_rows(path: Path) -> List[Dict[str, str]]:
+    """Read the first XLSX worksheet using only the Python standard library."""
+    with zipfile.ZipFile(path) as archive:
+        shared_strings: List[str] = []
+        if 'xl/sharedStrings.xml' in archive.namelist():
+            shared_root = ElementTree.parse(archive.open('xl/sharedStrings.xml')).getroot()
+            shared_strings = [
+                ''.join(node.text or '' for node in item.iter(f'{{{_SPREADSHEET_NS}}}t'))
+                for item in shared_root.findall(f'{{{_SPREADSHEET_NS}}}si')
+            ]
+
+        workbook = ElementTree.parse(archive.open('xl/workbook.xml')).getroot()
+        first_sheet = workbook.find(f'.//{{{_SPREADSHEET_NS}}}sheet')
+        if first_sheet is None:
+            return []
+        relation_id = first_sheet.get(f'{{{_DOCUMENT_REL_NS}}}id')
+        relationships = ElementTree.parse(
+            archive.open('xl/_rels/workbook.xml.rels')
+        ).getroot()
+        targets = {
+            item.get('Id'): item.get('Target')
+            for item in relationships.findall(f'{{{_PACKAGE_REL_NS}}}Relationship')
+        }
+        target = targets.get(relation_id)
+        if not target:
+            return []
+        sheet_path = (
+            target.lstrip('/')
+            if target.startswith('/')
+            else posixpath.normpath(posixpath.join('xl', target))
+        )
+
+        sheet = ElementTree.parse(archive.open(sheet_path)).getroot()
+        headers: Dict[int, str] = {}
+        records: List[Dict[str, str]] = []
+        for row in sheet.findall(f'.//{{{_SPREADSHEET_NS}}}row'):
+            row_number = int(row.get('r', '0') or 0)
+            values = {
+                _column_index(cell.get('r', '')): _cell_text(cell, shared_strings)
+                for cell in row.findall(f'{{{_SPREADSHEET_NS}}}c')
+            }
+            if row_number == 3:
+                headers = {column: value.strip() for column, value in values.items() if value.strip()}
+            elif row_number > 3 and headers:
+                records.append({header: values.get(column, '') for column, header in headers.items()})
+        return records
 
 
 def load_ucs_keywords(excel_path: Optional[str] = None) -> Dict[str, List[str]]:
@@ -98,10 +190,7 @@ def load_ucs_keywords(excel_path: Optional[str] = None) -> Dict[str, List[str]]:
         return _ucs_keywords_cache
     
     if excel_path is None:
-        # 默认路径：项目根目录下的 Excel 文件
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        excel_path = os.path.join(base_dir, '..', 'UCS+音效分类中英文对照表.xlsx')
-        excel_path = os.path.normpath(excel_path)
+        excel_path = str(_default_ucs_path())
     
     if not os.path.exists(excel_path):
         logger.warning(f"UCS 关键词文件不存在: {excel_path}")
@@ -109,23 +198,15 @@ def load_ucs_keywords(excel_path: Optional[str] = None) -> Dict[str, List[str]]:
         return {}
     
     try:
-        import pandas as pd
-        
-        # 读取 Excel，使用第3行作为 header（索引2）
-        df = pd.read_excel(excel_path, header=2)
-        
-        # 过滤掉空值
-        df = df.dropna(subset=['Category_zh', 'Synonyms - Comma Separated'])
-        
         # 构建关键词映射
         keywords_map: Dict[str, List[str]] = {}
         
-        for _, row in df.iterrows():
+        for row in _read_xlsx_rows(Path(excel_path)):
             # 从 Category_zh 和 SubCategory_zh 提取中文关键词
             chinese_keywords = []
             
-            cat_zh = str(row.get('Category_zh', '')).strip()
-            subcat_zh = str(row.get('SubCategory_zh', '')).strip()
+            cat_zh = row.get('Category_zh', '').strip()
+            subcat_zh = row.get('SubCategory_zh', '').strip()
             
             if cat_zh and cat_zh != 'nan':
                 chinese_keywords.append(cat_zh)
@@ -133,7 +214,7 @@ def load_ucs_keywords(excel_path: Optional[str] = None) -> Dict[str, List[str]]:
                 chinese_keywords.append(subcat_zh)
             
             # 获取英文同义词
-            synonyms = str(row.get('Synonyms - Comma Separated', '')).strip()
+            synonyms = row.get('Synonyms - Comma Separated', '').strip()
             if not synonyms or synonyms == 'nan':
                 continue
             

@@ -9,7 +9,41 @@ import os
 import sys
 import subprocess
 import shutil
+import argparse
+import platform
+from importlib.metadata import distribution
 from pathlib import Path
+
+
+def verify_native_executable(executable: Path):
+    """Verify that the frozen executable matches the current operating system."""
+    if not executable.is_file():
+        print(f"❌ 可执行文件不存在: {executable}")
+        return False
+
+    magic = executable.read_bytes()[:4]
+    system = platform.system()
+    if system == 'Windows':
+        valid = magic[:2] == b'MZ'
+    elif system == 'Darwin':
+        valid = magic in {
+            b'\xfe\xed\xfa\xce', b'\xce\xfa\xed\xfe',
+            b'\xfe\xed\xfa\xcf', b'\xcf\xfa\xed\xfe',
+            b'\xca\xfe\xba\xbe', b'\xbe\xba\xfe\xca',
+        }
+    elif system == 'Linux':
+        valid = magic == b'\x7fELF'
+    else:
+        print(f"❌ 不支持的宿主平台: {system}")
+        return False
+
+    if not valid:
+        print(f"❌ 可执行文件格式与宿主平台 {system} 不匹配: {executable}")
+        return False
+    if system != 'Windows' and not os.access(executable, os.X_OK):
+        print(f"❌ 可执行文件缺少执行权限: {executable}")
+        return False
+    return True
 
 def check_imports():
     """检查关键依赖是否可以导入"""
@@ -23,8 +57,7 @@ def check_imports():
         ('chromadb', 'ChromaDB'),
         ('transformers', 'Transformers'),
         ('torch', 'PyTorch'),
-        ('librosa', 'Librosa'),
-        ('soundfile', 'SoundFile'),
+        ('av', 'PyAV'),
         ('numpy', 'NumPy'),
         ('pydantic', 'Pydantic'),
     ]
@@ -40,33 +73,72 @@ def check_imports():
     
     return all_ok
 
-def check_soundfile_library():
-    """检查 soundfile 的二进制库"""
+
+def check_native_build_host():
+    """Only release hosts supported by package.json may pass this gate."""
+    system = platform.system()
+    machine = platform.machine().lower()
+    expected = {
+        'Darwin': {'arm64', 'aarch64'},
+        'Windows': {'amd64', 'x86_64'},
+    }
+    if system not in expected:
+        print(f"❌ 不支持在 {system}/{machine} 构建发布包")
+        return False
+    if machine not in expected[system]:
+        print(f"❌ 构建架构不受支持: {system}/{machine}")
+        return False
+    print(f"✅ 原生发布宿主: {system}/{machine}")
+    return True
+
+
+def check_pyav_runtime():
+    """Verify PyAV can load its wheel-bundled FFmpeg runtime without a CLI."""
     print("\n" + "=" * 60)
-    print("检查 soundfile 二进制库...")
+    print("检查 PyAV / FFmpeg 运行时...")
     print("=" * 60)
-    
     try:
-        import soundfile
-        soundfile_dir = Path(soundfile.__file__).parent
-        
-        # 检查不同平台的库文件
-        if sys.platform == 'win32':
-            lib_file = soundfile_dir / '_soundfile_data' / 'libsndfile-1.dll'
-        elif sys.platform == 'darwin':
-            lib_file = soundfile_dir / '_soundfile_data' / 'libsndfile.dylib'
-        else:
-            lib_file = soundfile_dir / '_soundfile_data' / 'libsndfile.so'
-        
-        if lib_file.exists():
-            print(f"✅ 找到 soundfile 库: {lib_file}")
-            return True
-        else:
-            print(f"⚠️  未找到 soundfile 库: {lib_file}")
-            print("   这可能导致打包后的应用无法播放音频")
+        import av
+
+        if av.__version__ != '18.0.0':
+            print(f"❌ PyAV 版本漂移: 期望 18.0.0，实际 {av.__version__}")
             return False
-    except Exception as e:
-        print(f"❌ 检查 soundfile 失败: {e}")
+        expected_versions = {
+            'libavcodec': (62, 28, 102),
+            'libavdevice': (62, 3, 102),
+            'libavfilter': (11, 14, 102),
+            'libavformat': (62, 12, 102),
+            'libavutil': (60, 26, 102),
+            'libswresample': (6, 3, 102),
+            'libswscale': (9, 5, 102),
+        }
+        required = set(expected_versions)
+        versions = set(av.library_versions)
+        missing = sorted(required - versions)
+        if missing:
+            print(f"❌ PyAV 缺少 FFmpeg 组件: {', '.join(missing)}")
+            return False
+        mismatched = {
+            name: av.library_versions[name]
+            for name, expected in expected_versions.items()
+            if tuple(av.library_versions[name]) != expected
+        }
+        if mismatched:
+            print(f"❌ PyAV wheel 的 FFmpeg 版本漂移: {mismatched}")
+            return False
+        dist = distribution('av')
+        license_files = [
+            item for item in (dist.files or [])
+            if any(token in Path(str(item)).name.lower() for token in ('license', 'copying', 'notice'))
+        ]
+        if not license_files:
+            print("❌ PyAV wheel 元数据中没有许可证文件")
+            return False
+        print(f"✅ PyAV {av.__version__}; FFmpeg: {', '.join(sorted(required))}")
+        print(f"✅ PyAV 许可证: {', '.join(str(item) for item in license_files)}")
+        return True
+    except Exception as exc:
+        print(f"❌ PyAV / FFmpeg 检查失败: {exc}")
         return False
 
 def check_file_structure():
@@ -88,6 +160,9 @@ def check_file_structure():
         'core/embedder.py',
         'core/indexer.py',
         'core/database.py',
+        'core/audio_service.py',
+        '../tests/build/licenses/THIRD_PARTY_AUDIO_NOTICES.txt',
+        '../tests/build/fixtures/manifest.json',
     ]
     
     all_ok = True
@@ -164,21 +239,37 @@ def test_build():
                 exe_name = 'soundbot-backend.exe' if sys.platform == 'win32' else 'soundbot-backend'
                 exe_path = output_dir / exe_name
                 
-                if exe_path.exists():
+                executable_ok = verify_native_executable(exe_path)
+                if executable_ok:
                     size_mb = exe_path.stat().st_size / 1024 / 1024
                     print(f"✅ 可执行文件创建成功: {exe_path} ({size_mb:.1f} MB)")
                 else:
-                    print(f"⚠️  可执行文件路径异常: {exe_path}")
+                    print(f"❌ 可执行文件路径或格式异常: {exe_path}")
                     # 列出目录内容
                     print("   目录内容:")
                     for item in output_dir.iterdir():
                         print(f"     - {item.name}")
                 
+                runtime_ok = (output_dir / '_internal').is_dir() or (output_dir / 'lib').is_dir()
+                if not runtime_ok:
+                    print("❌ PyInstaller 运行时目录缺失（需要 _internal 或 lib）")
+
+                frozen_check = subprocess.run([
+                    sys.executable,
+                    str(backend_dir.parent / 'tests' / 'build' / 'verify_frozen_bundle.py'),
+                    '--bundle', str(output_dir),
+                    '--platform', 'windows' if sys.platform == 'win32' else 'macos',
+                    '--arch', 'x64' if sys.platform == 'win32' else 'arm64',
+                ], capture_output=True, text=True)
+                print(frozen_check.stdout)
+                if frozen_check.returncode:
+                    print(frozen_check.stderr)
+
                 # 清理测试构建
                 shutil.rmtree(backend_dir / 'dist' / 'test', ignore_errors=True)
                 shutil.rmtree(backend_dir / 'dist' / 'build', ignore_errors=True)
                 
-                return True
+                return executable_ok and runtime_ok and frozen_check.returncode == 0
             else:
                 print(f"❌ 输出目录未创建: {output_dir}")
                 return False
@@ -199,6 +290,14 @@ def test_build():
 
 def main():
     """主函数"""
+    parser = argparse.ArgumentParser(description='检查 SoundBot PyInstaller 打包环境')
+    parser.add_argument(
+        '--build',
+        action='store_true',
+        help='实际执行一次当前宿主平台的 PyInstaller 测试构建（默认只做静态检查）'
+    )
+    args = parser.parse_args()
+
     print("=" * 60)
     print("SoundBot PyInstaller 打包环境检查")
     print("=" * 60)
@@ -206,15 +305,13 @@ def main():
     results = []
     
     # 运行所有检查
+    results.append(("原生构建宿主", check_native_build_host()))
     results.append(("依赖导入", check_imports()))
-    results.append(("soundfile 库", check_soundfile_library()))
+    results.append(("PyAV / FFmpeg", check_pyav_runtime()))
     results.append(("文件结构", check_file_structure()))
     results.append(("multiprocessing 修复", check_multiprocessing_fix()))
     
-    # 询问是否测试构建
-    print("\n" + "=" * 60)
-    response = input("是否测试 PyInstaller 构建？(这可能需要几分钟) [y/N]: ")
-    if response.lower() == 'y':
+    if args.build:
         results.append(("PyInstaller 构建", test_build()))
     
     # 汇总结果
@@ -236,7 +333,7 @@ def main():
     else:
         print("⚠️  部分检查未通过，请修复上述问题后再尝试构建。")
         print("\n参考文档:")
-        print("  BUILD_FIX_README.md")
+        print("  README.md / README.en.md")
     print("=" * 60)
     
     return 0 if all_passed else 1

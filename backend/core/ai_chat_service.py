@@ -1,308 +1,351 @@
 # -*- coding: utf-8 -*-
 # SoundBot - AI 音效管理器
 # Copyright (C) 2026 Nagisa_Huckrick (胡杨)
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""
-AI 对话服务 - 自然语言音效搜索
-"""
+
+"""AI intent routing with deterministic search fallback and project isolation."""
+
+from __future__ import annotations
 
 import json
-import asyncio
-from typing import Optional, List, Dict, Any, AsyncGenerator
+import logging
+from typing import Any, AsyncGenerator, Dict, List, Literal, Optional
 
-from utils.logger import get_logger
+from pydantic import BaseModel, Field, ValidationError, field_validator
+
+import config
 from core.llm_client import get_llm_client
-from core.search_engine import get_optimized_searcher_sync
+from core.search_engine import get_optimized_searcher_sync, reset_optimized_searcher
 from core.searcher import SearchResult
-
-logger = get_logger(__name__)
-
-
-# ==================== 系统提示词 ====================
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """你是 SoundBot 音效管理器的智能助手。
+判断用户消息是闲聊还是找音效，只返回一个 JSON 对象。
+找音效: {"type":"search","keywords":["english keyword"],"response":"简短说明"}
+闲聊: {"type":"chat","response":"简短回复"}
+type 只能是 search 或 chat；search 必须提供非空 keywords。"""
 
-## 你的任务
-判断用户消息是"闲聊"还是"找音效"，然后按格式返回 JSON。
 
-## 判断规则
-1. **找音效** - 用户提到任何声音、音效、拟声词，或要求找声音
-   - "找个爆炸声"
-   - "噼里啪啦的篝火"
-   - "有没有雨声"
-   - "很闷的撞击声"
-   - "帮我找音效"
-   → 返回 search 格式
+class IntentResult(BaseModel):
+    type: Literal["search", "chat"] = "search"
+    keywords: List[str] = Field(default_factory=list)
+    response: str = ""
 
-2. **闲聊** - 纯聊天、问候、问问题
-   - "你好"
-   - "你能做什么"
-   - "今天天气怎么样"
-   - "谢谢"
-   → 返回 chat 格式
-
-## 返回格式
-
-**找音效时**:
-{
-    "type": "search",
-    "keywords": ["explosion", "boom"],
-    "response": "帮你找爆炸音效"
-}
-
-**闲聊时**:
-{
-    "type": "chat",
-    "response": "你好呀！需要找什么音效吗？"
-}
-
-**极其重要的规则**：
-- type 只能是 "search" 或 "chat"
-- search 时必须有 keywords（英文关键词）
-- response 字段中绝对不能包含双引号 "，请使用单引号 ' 或避免使用引号
-- 如果需要在 response 中引用词语，请用单引号包裹，例如：'爆炸声'、'雨声'
-"""
+    @field_validator("keywords", mode="before")
+    @classmethod
+    def _keywords_are_list(cls, value: Any) -> List[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return [value]
+        if not isinstance(value, list):
+            return []
+        return [str(item).strip() for item in value if str(item).strip()]
 
 
 class AIChatService:
-    """AI 对话服务"""
-    
-    def __init__(self):
+    def __init__(self, project_id: Optional[str] = None):
+        self._project_id = str(project_id) if project_id else None
         self._llm_client = None
-        self._searcher = None
-    
+        self._searchers: Dict[str, Any] = {}
+        self._searcher_signatures: Dict[str, str] = {}
+
+    def _resolve_project(self, project_id: Optional[str] = None) -> str:
+        return str(project_id or self._project_id or config.CURRENT_PROJECT_ID)
+
+    @property
+    def project_id(self) -> str:
+        return self._resolve_project()
+
+    def set_project(self, project_id: str) -> None:
+        """Bind future calls to a project without sharing old search state."""
+        self._project_id = str(project_id)
+
     @property
     def llm_client(self):
         if self._llm_client is None:
             self._llm_client = get_llm_client()
         return self._llm_client
-    
+
+    def get_searcher(self, project_id: Optional[str] = None):
+        resolved = self._resolve_project(project_id)
+        from core.database import get_db_manager
+
+        db_manager = get_db_manager()
+        audio_manifest = db_manager.get_index_manifest(resolved, "audio_vector") or {}
+        text_manifest = db_manager.get_index_manifest(resolved, "text_vector") or {}
+        audio_collection = audio_manifest.get("collection_name") or "audio_embeddings"
+        text_collection = (
+            text_manifest.get("collection_name") or "text_metadata_embeddings"
+        )
+        revision = int(audio_manifest.get("revision", 0)) + int(
+            text_manifest.get("revision", 0)
+        )
+        fingerprint = "|".join(
+            filter(
+                None,
+                (
+                    audio_manifest.get("engine_fingerprint"),
+                    text_manifest.get("engine_fingerprint"),
+                ),
+            )
+        ) or None
+        signature = json.dumps(
+            {
+                "audio": audio_collection,
+                "text": text_collection,
+                "revision": revision,
+                "fingerprint": fingerprint,
+            },
+            sort_keys=True,
+        )
+        if self._searcher_signatures.get(resolved) != signature:
+            self._searchers[resolved] = get_optimized_searcher_sync(
+                project_id=resolved,
+                collection_name=audio_collection,
+                text_collection_name=text_collection,
+                index_revision=revision,
+                model_fingerprint=fingerprint,
+            )
+            self._searcher_signatures[resolved] = signature
+        return self._searchers[resolved]
+
     @property
     def searcher(self):
-        if self._searcher is None:
-            self._searcher = get_optimized_searcher_sync()
-        return self._searcher
-    
-    def reload(self):
+        return self.get_searcher()
+
+    def reload(self) -> None:
         self._llm_client = None
-        self._searcher = None
-    
+        self._searchers.clear()
+        self._searcher_signatures.clear()
+
+    @staticmethod
+    def _prepare_messages(
+        message: str,
+        history: Optional[List[Dict[str, str]]],
+        *,
+        limit: int,
+    ) -> List[Dict[str, str]]:
+        prepared: List[Dict[str, str]] = []
+        for item in (history or [])[-limit:]:
+            role = str(item.get("role", ""))
+            content = str(item.get("content", "")).strip()
+            if role in {"user", "assistant"} and content:
+                prepared.append({"role": role, "content": content})
+        # Some renderer versions include the current user message in history.
+        # Do not submit it twice.
+        if not prepared or prepared[-1] != {"role": "user", "content": message}:
+            prepared.append({"role": "user", "content": message})
+        return prepared
+
     async def chat(
         self,
         message: str,
         conversation_history: Optional[List[Dict[str, str]]] = None,
         top_k: int = 20,
-        threshold: float = 0.1
+        threshold: float = 0.1,
+        project_id: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
-        """
-        处理对话
-        
-        Yields:
-            - {"type": "thinking", "content": "..."}
-            - {"type": "chat", "content": "..."}  # 闲聊模式
-            - {"type": "searching", "query": "..."}  # 搜索模式
-            - {"type": "results", "results": [...], "summary": "..."}
-        """
+        bound_project = self._resolve_project(project_id)
         try:
             yield {"type": "thinking", "content": "..."}
-            
-            # 调用 LLM 判断意图
-            result = await self._ask_llm(message, conversation_history)
-            
-            if result.get("type") == "chat":
-                # 闲聊模式 - 用普通对话生成真实回复
-                chat_response = await self._generate_chat_response(message, conversation_history)
-                yield {
-                    "type": "chat",
-                    "content": chat_response
-                }
+            if self.llm_client.is_available:
+                try:
+                    intent = await self._ask_llm(message, conversation_history)
+                except Exception as exc:
+                    logger.warning("意图模型不可用，直接搜索原始查询: %s", exc)
+                    intent = IntentResult(
+                        type="search", keywords=[message], response=f"正在搜索: {message}"
+                    )
             else:
-                # 搜索模式
-                keywords = result.get("keywords", [])
-                query = " ".join(keywords) if keywords else message
-                
-                yield {
-                    "type": "searching",
-                    "query": query,
-                    "content": result.get("response", f"正在搜索: {query}")
-                }
-                
-                # 执行搜索
-                results = await self._search(query, top_k, threshold)
-                
-                # 生成摘要
-                summary = self._make_summary(message, results)
-                
-                yield {
-                    "type": "results",
-                    "results": [r.dict() for r in results],
-                    "count": len(results),
-                    "summary": summary
-                }
-            
-        except Exception as e:
-            logger.error(f"AI 处理失败: {e}")
-            yield {"type": "error", "content": f"处理失败: {str(e)}"}
-    
-    async def _ask_llm(self, message: str, history: Optional[List[Dict]] = None) -> Dict:
-        """询问 LLM 判断意图"""
-        messages = []
-        if history:
-            for h in history[-3:]:
-                messages.append(h)
-        messages.append({"role": "user", "content": message})
-        
+                intent = IntentResult(
+                    type="search", keywords=[message], response=f"正在搜索: {message}"
+                )
+
+            if intent.type == "chat":
+                response = await self._generate_chat_response(message, conversation_history)
+                yield {"type": "chat", "content": response}
+                return
+
+            query = " ".join(intent.keywords).strip() or message
+            yield {
+                "type": "searching",
+                "query": query,
+                "content": intent.response or f"正在搜索: {query}",
+            }
+            results = await self._search(
+                query, top_k, threshold, project_id=bound_project
+            )
+            serialized = []
+            for result in results:
+                item = (
+                    result.model_dump()
+                    if hasattr(result, "model_dump")
+                    else result.dict()
+                )
+                metadata = dict(item.get("metadata") or {})
+                # Stable IDs are required by playback-source and waveform APIs.
+                # Keep the metadata copy for backwards compatibility while
+                # exposing the public field consumed by the renderer.
+                item["file_id"] = metadata.get("file_id")
+                serialized.append(item)
+            yield {
+                "type": "results",
+                "results": serialized,
+                "count": len(results),
+                "summary": self._make_summary(message, results),
+                "project_id": bound_project,
+            }
+        except Exception as exc:
+            logger.error("AI 处理失败: %s", exc)
+            yield {
+                "type": "error",
+                "code": "ai_chat_failed",
+                "content": f"处理失败: {exc}",
+                "retryable": False,
+                "details": {"project_id": bound_project},
+            }
+
+    @staticmethod
+    def _extract_json(text: str) -> Dict[str, Any]:
+        cleaned = text.strip()
+        if cleaned.startswith("```"):
+            lines = cleaned.splitlines()
+            if lines:
+                lines = lines[1:]
+            if lines and lines[-1].strip().startswith("```"):
+                lines = lines[:-1]
+            cleaned = "\n".join(lines).strip()
+        cleaned = cleaned.replace("“", '"').replace("”", '"')
+        decoder = json.JSONDecoder()
+        for index, char in enumerate(cleaned):
+            if char != "{":
+                continue
+            try:
+                value, _ = decoder.raw_decode(cleaned[index:])
+                if isinstance(value, dict):
+                    return value
+            except json.JSONDecodeError:
+                continue
+        raise ValueError("LLM 未返回有效 JSON 对象")
+
+    async def _ask_llm(
+        self, message: str, history: Optional[List[Dict[str, str]]] = None
+    ) -> IntentResult:
+        messages = self._prepare_messages(message, history, limit=6)
         full_response = ""
         async for chunk in self.llm_client.chat(
             messages=messages,
             system_prompt=SYSTEM_PROMPT,
             temperature=0.3,
             max_tokens=256,
-            stream=True
+            stream=True,
         ):
             if chunk["type"] == "content":
                 full_response += chunk["content"]
             elif chunk["type"] == "error":
-                raise RuntimeError(f"LLM 错误: {chunk['content']}")
-        
-        # 解析 JSON
+                raise RuntimeError(chunk.get("message", chunk.get("content", "LLM 错误")))
         try:
-            # 清理 markdown 代码块
-            json_str = full_response.strip()
-            
-            # 处理 ```json 或 ``` 开头的代码块
-            if json_str.startswith("```"):
-                # 移除开头的 ``` 或 ```json
-                json_str = json_str[3:].strip()
-                if json_str.startswith("json"):
-                    json_str = json_str[4:].strip()
-                # 移除结尾的 ```
-                if "```" in json_str:
-                    json_str = json_str[:json_str.rfind("```")].strip()
-            
-            # 修复中文引号
-            json_str = json_str.replace('\u201c', '"').replace('\u201d', '"')
-            json_str = json_str.replace('\u2018', "'").replace('\u2019', "'")
-            
-            data = json.loads(json_str)
-            
-            # 确保有 type 字段
-            if "type" not in data:
-                data["type"] = "search"
-            
-            return data
-            
-        except json.JSONDecodeError as e:
-            # JSON 解析失败，默认当作搜索
-            logger.warning(f"LLM 返回非 JSON: {e}, 内容: {full_response[:200]}")
-            return {"type": "search", "keywords": [message], "response": f"搜索: {message}"}
-    
-    async def _search(self, query: str, top_k: int, threshold: float) -> List[SearchResult]:
-        """执行搜索 - 使用与手动搜索相同的 search_async 方法"""
+            result = IntentResult.model_validate(self._extract_json(full_response))
+            if result.type == "search" and not result.keywords:
+                result.keywords = [message]
+            return result
+        except (ValidationError, ValueError) as exc:
+            logger.warning("意图 JSON 无效，回退原始查询: %s", exc)
+            return IntentResult(type="search", keywords=[message], response=f"搜索: {message}")
+
+    async def _search(
+        self,
+        query: str,
+        top_k: int,
+        threshold: float,
+        *,
+        project_id: Optional[str] = None,
+    ) -> List[SearchResult]:
         try:
-            # 使用 search_async 与手动搜索保持一致，包含三层搜索架构
-            results, stats = await self.searcher.search_async(
+            searcher = self.get_searcher(project_id)
+            results, stats = await searcher.search_async(
                 query=query,
                 top_k=top_k,
                 min_similarity=threshold,
-                use_cache=True
+                use_cache=True,
             )
-            
-            logger.info(f"AI 搜索 '{query}': 找到 {len(results)} 个结果, 缓存命中: {stats.get('cache_hit', False)}")
+            logger.info(
+                "AI 搜索 '%s': project=%s count=%s cache=%s",
+                query,
+                self._resolve_project(project_id),
+                len(results),
+                stats.get("cache_hit", False),
+            )
             return results
-        except Exception as e:
-            logger.error(f"搜索失败: {e}")
+        except Exception as exc:
+            logger.error("搜索失败: %s", exc)
             return []
-    
+
     def _make_summary(self, query: str, results: List[SearchResult]) -> str:
-        """生成搜索摘要"""
         count = len(results)
         if count == 0:
             return f"没找到「{query}」相关的音效，换个词试试？"
         if count == 1:
             return f"找到 1 个音效: {results[0].filename}"
         return f"找到 {count} 个相关音效"
-    
-    async def _generate_chat_response(self, message: str, history: Optional[List[Dict]] = None) -> str:
-        """生成闲聊回复 - 使用普通对话模式，不限制身份"""
-        messages = []
-        if history:
-            for h in history[-5:]:
-                messages.append(h)
-        messages.append({"role": "user", "content": message})
-        
-        # 使用简单的系统提示词，不限制模型身份
-        chat_system_prompt = """你是一个有帮助的 AI 助手。请直接回答用户的问题，不要回避身份问题。"""
-        
+
+    async def _generate_chat_response(
+        self, message: str, history: Optional[List[Dict[str, str]]] = None
+    ) -> str:
+        messages = self._prepare_messages(message, history, limit=10)
         full_response = ""
         async for chunk in self.llm_client.chat(
             messages=messages,
-            system_prompt=chat_system_prompt,
+            system_prompt="你是一个有帮助的 AI 助手。请简洁、直接地回答用户。",
             temperature=0.7,
             max_tokens=512,
-            stream=True
+            stream=True,
         ):
             if chunk["type"] == "content":
                 full_response += chunk["content"]
             elif chunk["type"] == "error":
-                logger.error(f"生成聊天回复失败: {chunk['content']}")
-                return "抱歉，我现在有点忙，稍后再聊好吗？"
-        
-        return full_response.strip() or "你好！有什么可以帮你的吗？"
+                return "抱歉，我现在无法连接到 AI 服务。你仍然可以直接输入关键词搜索音效。"
+        return full_response.strip() or "你好！需要找什么音效吗？"
 
 
-async def stream_to_sse(generator: AsyncGenerator[Dict[str, Any], None]) -> AsyncGenerator[str, None]:
-    """
-    将异步生成器转换为 SSE 格式
-    
-    Args:
-        generator: 异步生成器，产生字典对象
-        
-    Yields:
-        SSE 格式的字符串
-    """
+async def stream_to_sse(
+    generator: AsyncGenerator[Dict[str, Any], None]
+) -> AsyncGenerator[str, None]:
     try:
         async for chunk in generator:
-            # 将字典转换为 JSON 字符串
-            data = json.dumps(chunk, ensure_ascii=False)
-            # SSE 格式: data: {...}\n\n
-            yield f"data: {data}\n\n"
-        
-        # 发送结束标记
+            yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
         yield "data: [DONE]\n\n"
-        
-    except Exception as e:
-        logger.error(f"SSE 流转换错误: {e}")
-        error_chunk = json.dumps({"type": "error", "content": str(e)}, ensure_ascii=False)
-        yield f"data: {error_chunk}\n\n"
+    except Exception as exc:
+        logger.error("SSE 流转换错误: %s", exc)
+        error = {
+            "type": "error",
+            "code": "sse_stream_failed",
+            "content": str(exc),
+            "retryable": False,
+            "details": {},
+        }
+        yield f"data: {json.dumps(error, ensure_ascii=False)}\n\n"
         yield "data: [DONE]\n\n"
 
 
-# ==================== 单例 ====================
-
-_ai_chat_service: Optional[AIChatService] = None
+_ai_chat_services: Dict[str, AIChatService] = {}
 
 
-def get_ai_chat_service() -> AIChatService:
-    global _ai_chat_service
-    if _ai_chat_service is None:
-        _ai_chat_service = AIChatService()
-    return _ai_chat_service
+def get_ai_chat_service(project_id: Optional[str] = None) -> AIChatService:
+    resolved = str(project_id or config.CURRENT_PROJECT_ID)
+    if resolved not in _ai_chat_services:
+        _ai_chat_services[resolved] = AIChatService(project_id=resolved)
+    return _ai_chat_services[resolved]
 
 
-def reset_ai_chat_service():
-    global _ai_chat_service
-    if _ai_chat_service is not None:
-        _ai_chat_service.reload()
+def reset_ai_chat_service(project_id: Optional[str] = None) -> None:
+    if project_id is None:
+        for service in _ai_chat_services.values():
+            service.reload()
+        _ai_chat_services.clear()
+        reset_optimized_searcher()
+        return
+    service = _ai_chat_services.pop(str(project_id), None)
+    if service is not None:
+        service.reload()
+    reset_optimized_searcher(str(project_id))

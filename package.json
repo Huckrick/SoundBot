@@ -1,6 +1,6 @@
 {
   "name": "soundbot",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "SoundBot - AI 音效管理器桌面版 (PyInstaller 一体化版本)",
   "main": "main.js",
   "scripts": {
@@ -9,11 +9,9 @@
     "build": "python scripts/build.py",
     "build:mac": "python scripts/build.py --platform macos",
     "build:win": "python scripts/build.py --platform windows",
-    "build:linux": "python scripts/build.py --platform linux",
-    "build:all": "python scripts/build.py --platform all",
     "pack": "electron-builder --dir",
     "postinstall": "electron-builder install-app-deps",
-    "clean": "rm -rf dist backend/dist backend/build"
+    "clean": "python scripts/build.py --clean"
   },
   "keywords": [
     "electron",
@@ -28,8 +26,8 @@
   "author": "Nagisa_Huckrick (胡杨) <Nagisa_Huckrick@yeah.net>",
   "license": "GPL-3.0",
   "devDependencies": {
-    "electron": "^28.0.0",
-    "electron-builder": "^26.0.0"
+    "electron": "28.3.3",
+    "electron-builder": "26.8.1"
   },
   "build": {
     "appId": "com.soundbot.app",
@@ -45,8 +43,6 @@
       "index.html",
       "tailwindcss.js",
       "lucide.min.js",
-      "wavesurfer.min.js",
-      "wavesurfer.regions.min.js",
       "assets/**/*",
       "config/**/*",
       "!backend/**",
@@ -54,6 +50,8 @@
       "!**/*.pyc",
       "!**/__pycache__",
       "!**/*.spec",
+      "!**/.DS_Store",
+      "!SoundBot.png",
       "!backend/dist",
       "!backend/build",
       "!dist-electron",
@@ -63,6 +61,7 @@
     ],
 
     "mac": {
+      "minimumSystemVersion": "14.0",
       "category": "public.app-category.music",
       "target": [
         {
@@ -88,12 +87,6 @@
         }
       ],
       "icon": "build/icon.ico"
-    },
-    "linux": {
-      "target": [
-        "AppImage"
-      ],
-      "category": "AudioVideo"
     },
     "nsis": {
       "oneClick": false,

@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
 SoundBot Backend PyInstaller Spec
-打包为目录模式，支持 Windows/macOS/Linux
+打包为目录模式，仅支持 Windows x64 与 macOS arm64
 
 使用 collect_all() / collect_submodules() 自动收集依赖，
 替代手动维护的 hiddenimports 列表，确保打包完整。
@@ -9,9 +9,11 @@ SoundBot Backend PyInstaller Spec
 
 import sys
 import os
+import platform
+from importlib.metadata import distribution
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules, copy_metadata
 
 # ==================== 路径设置 ====================
 
@@ -20,22 +22,38 @@ spec_dir = spec_file.parent
 backend_dir = spec_dir
 project_root = backend_dir.parent
 
+host_system = platform.system()
+host_machine = platform.machine().lower()
+if host_system == 'Windows':
+    if host_machine not in {'amd64', 'x86_64'}:
+        raise RuntimeError(f'SoundBot Windows releases require x64, got {host_machine}')
+elif host_system == 'Darwin':
+    if host_machine not in {'arm64', 'aarch64'}:
+        raise RuntimeError(f'SoundBot macOS releases require arm64, got {host_machine}')
+else:
+    raise RuntimeError(f'SoundBot does not publish a {host_system} backend target')
+
 block_cipher = None
 
 # ==================== 本地模块数据文件 ====================
 datas = []
 
-# 主入口和配置文件
-for filename in ['main.py', 'config.py', 'bootstrap.py']:
-    filepath = backend_dir / filename
-    if filepath.exists():
-        datas.append((str(filepath), '.'))
+audio_capabilities = project_root / 'config' / 'audio_capabilities.json'
+if not audio_capabilities.is_file():
+    raise FileNotFoundError(f'Required audio capability manifest is missing: {audio_capabilities}')
+datas.append((str(audio_capabilities), 'config'))
 
-# 子包目录
-for dirname in ['core', 'utils', 'models']:
-    dirpath = backend_dir / dirname
-    if dirpath.exists():
-        datas.append((str(dirpath), dirname))
+# Release notices are kept in the build-test fixtures so the same file is both
+# asserted by CI and placed in every frozen runtime.
+audio_notices = project_root / 'tests' / 'build' / 'licenses' / 'THIRD_PARTY_AUDIO_NOTICES.txt'
+if not audio_notices.is_file():
+    raise FileNotFoundError(f'Required third-party audio notice is missing: {audio_notices}')
+datas.append((str(audio_notices), 'licenses'))
+
+ucs_workbook = project_root / 'UCS+音效分类中英文对照表.xlsx'
+if not ucs_workbook.is_file():
+    raise FileNotFoundError(f'Required UCS keyword workbook is missing: {ucs_workbook}')
+datas.append((str(ucs_workbook), '.'))
 
 # ==================== 自动收集第三方包 ====================
 binaries = []
@@ -44,30 +62,14 @@ hiddenimports = []
 # 需要完整收集的包（数据文件 + 二进制扩展 + 子模块）
 # 这些包含有 PyInstaller 无法自动发现的运行时数据文件
 _collect_all_packages = [
-    'chromadb',              # 数据库迁移 SQL、配置文件
     'jieba',                 # 中文分词词典
-    'soundfile',             # libsndfile 原生库
-    'sounddevice',           # PortAudio 原生库 (Windows: portaudio-x86_64.dll)
     'tokenizers',            # Rust 原生扩展
     'safetensors',           # Rust 原生扩展
-    'sentence_transformers', # 模型配置和数据
-    'soxr',                  # 音频重采样原生库
-    'onnxruntime',           # ONNX 推理引擎
-    'numba',                 # JIT 编译器（含原生 .nbi/.nbc 缓存文件）
-    'llvmlite',              # LLVM 绑定（含 libllvmlite 原生库）
-    'alembic',               # 数据库迁移框架（chromadb 依赖）
-]
-
-# 需要收集子模块 + 数据文件的包（体量大，分开收集更可控）
-_collect_submodules_and_data_packages = [
-    'transformers',          # CLAP 模型配置 JSON
-    'torch',                 # 深度学习框架
-    'librosa',               # 音频分析数据文件
-    'sklearn',               # 机器学习子模块
 ]
 
 # 只需要收集子模块的包（纯 Python，PyInstaller 自动分析可能遗漏动态导入）
 _collect_submodules_packages = [
+    'av',                    # Python modules; wheel FFmpeg binaries are collected below
     'uvicorn',
     'starlette',
     'fastapi',
@@ -76,8 +78,6 @@ _collect_submodules_packages = [
     'httpx',
     'httpcore',
     'anyio',
-    'numpy',
-    'scipy',
     'huggingface_hub',
 ]
 
@@ -91,19 +91,37 @@ for pkg in _collect_all_packages:
     except Exception as e:
         print(f'Warning: collect_all({pkg}) failed: {e}')
 
-for pkg in _collect_submodules_and_data_packages:
-    try:
-        h = collect_submodules(pkg)
-        hiddenimports += h
-        print(f'[collect_submodules] {pkg}: {len(h)} imports')
-    except Exception as e:
-        print(f'Warning: collect_submodules({pkg}) failed: {e}')
-    try:
-        d = collect_data_files(pkg)
-        datas += d
-        print(f'[collect_data_files] {pkg}: {len(d)} datas')
-    except Exception as e:
-        print(f'Warning: collect_data_files({pkg}) failed: {e}')
+# Chroma's local persistent client only needs its migration SQL and a small
+# set of implementations selected by dotted class name at runtime.  Using
+# collect_all('chromadb') also freezes the cloud/server/CLI/ONNX/Kubernetes
+# stacks, none of which SoundBot invokes.
+try:
+    datas += collect_data_files('chromadb', includes=['migrations/**/*.sql'])
+except Exception as e:
+    raise RuntimeError(f'Unable to collect Chroma migration SQL: {e}')
+
+# Preserve PyAV distribution metadata and its bundled license notices.
+try:
+    datas += copy_metadata('av')
+except Exception as e:
+    print(f'Warning: copy_metadata(av) failed: {e}')
+
+# auditwheel/delvewheel may put FFmpeg libraries in an ``av.libs`` sibling
+# directory rather than inside the import package.  Collect every native file
+# declared by the pinned wheel explicitly instead of relying on PATH or a
+# system FFmpeg installation.  Also copy the wheel's own license verbatim.
+try:
+    av_distribution = distribution('av')
+    for relative in av_distribution.files or []:
+        source = Path(av_distribution.locate_file(relative))
+        relative_path = Path(str(relative))
+        lower_name = relative_path.name.lower()
+        if source.is_file() and source.suffix.lower() in {'.dll', '.dylib', '.so', '.pyd'}:
+            binaries.append((str(source), str(relative_path.parent)))
+        if source.is_file() and any(token in lower_name for token in ('license', 'copying', 'notice')):
+            datas.append((str(source), 'licenses/pyav'))
+except Exception as e:
+    raise RuntimeError(f'Unable to collect pinned PyAV wheel binaries/licenses: {e}')
 
 for pkg in _collect_submodules_packages:
     try:
@@ -125,11 +143,11 @@ hiddenimports += [
     'core.database',
     'core.embedder',
     'core.indexer',
+    'core.index_lifecycle',
     'core.scanner',
     'core.searcher',
     'core.search_engine',
-    'core.audio_cache',
-    'core.playback_manager',
+    'core.audio_service',
     'core.websocket_manager',
     'core.model_preloader',
     'core.llm_config_manager',
@@ -140,9 +158,37 @@ hiddenimports += [
     # utils / models 子模块
     'utils',
     'utils.logger',
-    'utils.audio_utils',
     'models',
     'models.schemas',
+
+    # Transformers lazily resolves these classes from the local CLAP model.
+    'transformers.models.clap',
+    'transformers.models.clap.configuration_clap',
+    'transformers.models.clap.feature_extraction_clap',
+    'transformers.models.clap.modeling_clap',
+    'transformers.models.clap.processing_clap',
+    'transformers.models.roberta',
+    'transformers.models.roberta.tokenization_roberta',
+    'transformers.models.auto.configuration_auto',
+    'transformers.models.auto.feature_extraction_auto',
+    'transformers.models.auto.modeling_auto',
+    'transformers.models.auto.processing_auto',
+    'transformers.models.encoder_decoder.configuration_encoder_decoder',
+    'transformers.generation.configuration_utils',
+    'transformers.generation.utils',
+    'transformers.distributed.configuration_utils',
+    'transformers.tokenization_utils_base',
+    'transformers.feature_extraction_utils',
+
+    # Chroma selects the local implementations from string settings.
+    'chromadb_rust_bindings',
+    'chromadb.api.rust',
+    'chromadb.db.impl.sqlite',
+    'chromadb.execution.executor.local',
+    'chromadb.quota.simple_quota_enforcer',
+    'chromadb.rate_limit.simple_rate_limit',
+    'chromadb.segment.impl.manager.local',
+    'chromadb.telemetry.product.posthog',
 ]
 
 # ==================== 额外手动补充 ====================
@@ -166,13 +212,11 @@ hiddenimports += [
     'concurrent.futures.process',
 
     # 数据库
-    'aiosqlite',
     'sqlite3',
 
     # 网络
     'h11',
     'websockets',
-    'requests',
     'urllib3',
 
     # 数据验证
@@ -181,16 +225,12 @@ hiddenimports += [
     'typing_extensions',
 
     # 音频
-    'audioread',
-    'audioread.rawread',
-    'audioread.ffdec',
     'mutagen',
     'mutagen.mp4',
     'mutagen.flac',
     'mutagen.oggvorbis',
     'mutagen.easymp4',
     'tinytag',
-    'sounddevice',
     'wave',
 
     # 工具
@@ -202,8 +242,6 @@ hiddenimports += [
     'packaging',
     'packaging.version',
     'packaging.specifiers',
-    'joblib',
-    'threadpoolctl',
     'pkg_resources',
 
     # 编码
@@ -241,7 +279,34 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        # Optional developer/cloud/media stacks that are not reachable from
+        # SoundBot's local CLAP + Chroma execution path.
+        'accelerate',
+        'aiofiles',
+        'aiosqlite',
+        'audioread',
+        'cv2',
+        'flax',
+        'IPython',
+        'jax',
+        'kubernetes',
+        'librosa',
+        'llvmlite',
+        'matplotlib',
+        'numba',
+        'onnxruntime',
+        'openpyxl',
+        'pandas',
+        'scipy',
+        'sentence_transformers',
+        'sklearn',
+        'soundfile',
+        'soxr',
+        'tensorflow',
+        'tkinter',
+        'torch.utils.tensorboard',
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -257,6 +322,24 @@ _binaries_to_exclude = [
 a.binaries = [
     b for b in a.binaries
     if not any(x in str(b[0]) for x in _binaries_to_exclude)
+]
+
+# The Transformers hook copies metadata for every optional package visible in
+# the build environment.  Keep frozen availability checks truthful: packages
+# excluded above must not reappear as orphaned ``*.dist-info`` directories.
+_excluded_metadata_prefixes = (
+    'accelerate-', 'aiofiles-', 'aiosqlite-', 'audioread-', 'flax-',
+    'jax-', 'jaxlib-', 'kubernetes-', 'librosa-', 'llvmlite-', 'numba-',
+    'onnxruntime-', 'openpyxl-', 'pandas-', 'scikit_learn-', 'scipy-',
+    'sentence_transformers-', 'soundfile-', 'soxr-', 'tensorflow-',
+)
+a.datas = [
+    item for item in a.datas
+    if not any(
+        part.casefold().startswith(prefix)
+        for part in Path(str(item[0])).parts
+        for prefix in _excluded_metadata_prefixes
+    )
 ]
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)

@@ -1,0 +1,92 @@
+from __future__ import annotations
+
+import re
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[2]
+WORKFLOW = ROOT / ".github" / "workflows" / "build.yml"
+VALIDATE_WORKFLOW = ROOT / ".github" / "workflows" / "validate.yml"
+
+
+class WorkflowContractTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.text = WORKFLOW.read_text(encoding="utf-8")
+
+    def test_every_action_is_pinned_to_a_full_commit(self) -> None:
+        uses = re.findall(r"(?m)^\s*uses:\s*([^\s#]+)", self.text)
+        self.assertTrue(uses)
+        unpinned = [value for value in uses if not re.fullmatch(r"[^@]+@[0-9a-f]{40}", value)]
+        self.assertEqual(unpinned, [])
+
+    def test_every_job_checks_out_validated_release_source(self) -> None:
+        self.assertIn("release_tag: ${{ steps.release-source.outputs.tag }}", self.text)
+        self.assertIn("release_sha: ${{ steps.release-source.outputs.sha }}", self.text)
+        self.assertIn('git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"', self.text)
+        self.assertIn('git cat-file -t "refs/tags/$RELEASE_TAG"', self.text)
+        self.assertIn('git merge-base --is-ancestor "$TAG_SHA" "origin/$DEFAULT_BRANCH"', self.text)
+        self.assertGreaterEqual(
+            self.text.count("ref: ${{ needs.validate-release.outputs.release_sha }}"),
+            4,
+        )
+        self.assertIn("--verify-tag", self.text)
+
+    def test_builds_use_one_canonical_native_script(self) -> None:
+        self.assertEqual(self.text.count("python scripts/build.py"), 2)
+        self.assertNotRegex(self.text, r"(?m)^\s+pyinstaller\s+main\.spec")
+        self.assertNotRegex(self.text, r"(?m)^\s+npx electron-builder")
+
+    def test_model_and_release_gates_are_not_contradictory(self) -> None:
+        self.assertIn('$env:ENABLE_MODEL_PRELOAD = "true"', self.text)
+        self.assertIn("CLAP model did not become ready", self.text)
+        self.assertIn("check_frozen_audio_matrix.py", self.text)
+        self.assertIn("verify_model_manifest", self.text)
+        self.assertIn('p["version"] == sys.argv[2].removeprefix("v")', self.text)
+        self.assertIn("$resp.version -eq ($env:RELEASE_TAG).TrimStart('v')", self.text)
+        self.assertIn("soundbot-models-intentionally-missing", self.text)
+
+    def test_release_is_draft_verified_and_channel_aware(self) -> None:
+        self.assertIn("cancel-in-progress: false", self.text)
+        self.assertIn("--draft", self.text)
+        self.assertIn('"v0.2.0"', self.text)
+        self.assertIn("verify_release_assets.py", self.text)
+        self.assertIn("SHA256SUMS.txt", self.text)
+        self.assertIn("actions/attest@", self.text)
+        self.assertIn("CREATE_ARGS+=(--prerelease)", self.text)
+        self.assertIn('gh release create "${CREATE_ARGS[@]}"', self.text)
+        self.assertIn('--json isDraft --jq .isDraft', self.text)
+        self.assertIn('gh release delete "$RELEASE_TAG" --yes', self.text)
+        self.assertIn("refusing to overwrite", self.text)
+        self.assertNotIn("prerelease: true", self.text)
+
+
+class ValidationWorkflowContractTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.text = VALIDATE_WORKFLOW.read_text(encoding="utf-8")
+
+    def test_runs_before_tags_on_pull_requests_and_main(self) -> None:
+        self.assertRegex(self.text, r"(?m)^  pull_request:$")
+        self.assertRegex(self.text, r"(?m)^  push:$")
+        self.assertIn("- main", self.text)
+        self.assertIn("cancel-in-progress: true", self.text)
+
+    def test_validation_actions_are_immutable_and_permissions_are_read_only(self) -> None:
+        uses = re.findall(r"(?m)^\s*uses:\s*([^\s#]+)", self.text)
+        self.assertTrue(uses)
+        self.assertEqual(
+            [value for value in uses if not re.fullmatch(r"[^@]+@[0-9a-f]{40}", value)],
+            [],
+        )
+        self.assertRegex(self.text, r"(?ms)^permissions:\n  contents: read$")
+
+    def test_runs_full_source_and_renderer_contracts(self) -> None:
+        self.assertIn("unittest discover -s tests", self.text)
+        self.assertIn("node tests/frontend/check_renderer_contract.js", self.text)
+        self.assertIn("npm ci --ignore-scripts", self.text)
+
+
+if __name__ == "__main__":
+    unittest.main()

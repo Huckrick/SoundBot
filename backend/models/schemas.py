@@ -20,8 +20,8 @@ Pydantic 数据模型
 定义 API 请求/响应的数据结构和验证规则。
 """
 
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from typing import Optional, List, Dict, Any, Literal
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 # ==================== 请求模型 ====================
@@ -35,7 +35,7 @@ class ScanRequest(BaseModel):
 class SearchRequest(BaseModel):
     """语义搜索请求"""
     query: str = Field(..., description="搜索查询文本")
-    top_k: int = Field(default=10000, ge=1, le=10000, description="返回结果数量")
+    top_k: int = Field(default=400, ge=1, le=1000, description="候选结果数量")
     threshold: float = Field(default=0.15, ge=0.0, le=1.0, description="相似度阈值")
     page: int = Field(default=1, ge=1, description="页码（从1开始）")
     page_size: int = Field(default=50, ge=1, le=200, description="每页数量")
@@ -44,6 +44,7 @@ class SearchRequest(BaseModel):
     sample_rate: Optional[int] = Field(default=None, description="采样率（如 44100, 48000）")
     channels: Optional[int] = Field(default=None, description="声道数（1=单声道, 2=立体声）")
     format: Optional[str] = Field(default=None, description="音频格式（如 wav, mp3, flac）")
+    project_id: str = Field(..., min_length=1, description="搜索所属工程 ID")
 
 
 class IndexRequest(BaseModel):
@@ -52,10 +53,53 @@ class IndexRequest(BaseModel):
     recursive: bool = Field(default=True, description="是否递归扫描")
 
 
+class ImportFilesRequest(BaseModel):
+    """单文件/多文件导入请求。"""
+    file_paths: List[str] = Field(..., min_length=1, max_length=1000)
+    client_id: Optional[str] = Field(default=None)
+    project_id: Optional[str] = Field(default=None)
+
+
+class ProjectImportRequest(BaseModel):
+    """Project-explicit import of exactly one folder or file-path list."""
+    file_paths: Optional[List[str]] = Field(
+        default=None, min_length=1, max_length=1000
+    )
+    folder_path: Optional[str] = Field(default=None, min_length=1)
+    recursive: bool = Field(default=True)
+    client_id: Optional[str] = Field(default=None)
+
+    @model_validator(mode="after")
+    def validate_exactly_one_source(self) -> "ProjectImportRequest":
+        has_files = self.file_paths is not None
+        has_folder = bool((self.folder_path or "").strip())
+        if has_files == has_folder:
+            raise ValueError("exactly one of file_paths or folder_path is required")
+        return self
+
+
+class TagsRequest(BaseModel):
+    """Typed tag update body; the legacy raw-array form remains accepted."""
+    tags: List[str] = Field(default_factory=list, max_length=500)
+
+
+class WaveformBatchRequest(BaseModel):
+    """可见文件波形批量请求。"""
+    file_ids: List[str] = Field(..., min_length=1, max_length=100)
+    project_id: Optional[str] = Field(default=None)
+    points: Literal[2000] = 2000
+
+
+class IndexActionRequest(BaseModel):
+    """项目索引修复/重建请求。"""
+    kinds: List[str] = Field(default=["waveform", "audio_vector", "text_vector"])
+
+
 # ==================== 响应模型 ====================
 
 class AudioFile(BaseModel):
     """音频文件元数据"""
+    id: Optional[str] = Field(default=None, description="工程内稳定文件 UUID")
     path: str = Field(..., description="文件完整路径")
     filename: str = Field(..., description="文件名")
     duration: float = Field(..., description="时长（秒）")
@@ -117,6 +161,9 @@ class IndexStatus(BaseModel):
     total_files: int = Field(default=0, description="总文件数")
     indexed_files: int = Field(default=0, description="已索引文件数")
     last_update: Optional[str] = Field(None, description="最后更新时间")
+    project_id: Optional[str] = None
+    artifacts: Dict[str, Dict[str, int]] = Field(default_factory=dict)
+    manifests: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
 
 
 # ==================== 音频处理请求模型 ====================
@@ -174,7 +221,8 @@ class TempDirRequest(BaseModel):
 
 class CreateProjectRequest(BaseModel):
     """创建工程请求"""
-    id: Optional[str] = Field(None, description="工程唯一标识（可选，不传则自动生成）")
+    model_config = ConfigDict(extra="forbid")
+
     name: str = Field(..., description="工程名称")
     description: str = Field(default="", description="工程描述")
     temp_dir: Optional[str] = Field(None, description="工程特定的临时文件目录")
@@ -195,35 +243,12 @@ class TempDirResponse(BaseModel):
     message: Optional[str] = Field(None, description="消息")
 
 
-# ==================== 播放控制请求模型 ====================
-
-class PlayRequest(BaseModel):
-    """播放请求"""
-    path: str = Field(..., description="音频文件路径")
-    start: float = Field(default=0.0, ge=0, description="起始位置（秒）")
-
-
-class SeekRequest(BaseModel):
-    """跳转请求"""
-    position: float = Field(..., ge=0, description="目标位置（秒）")
-
-
-class PlaybackResponse(BaseModel):
-    """播放状态响应"""
-    success: bool = Field(..., description="是否成功")
-    state: str = Field(..., description="当前状态: idle/playing/paused")
-    file_path: str = Field(default="", description="当前播放文件")
-    position: float = Field(..., description="当前播放位置（秒）")
-    duration: float = Field(..., description="音频总时长（秒）")
-    is_playing: bool = Field(..., description="是否正在播放")
-    message: Optional[str] = Field(None, description="消息")
-
-
 # ==================== AI Chat 请求模型 ====================
 
 class AIChatRequest(BaseModel):
     """AI 对话请求"""
     message: str = Field(..., description="用户消息")
+    project_id: str = Field(default="default", description="搜索所属工程 ID")
     history: Optional[List[Dict[str, str]]] = Field(default=[], description="对话历史")
     top_k: int = Field(default=20, ge=1, le=100, description="返回结果数量")
     threshold: float = Field(default=0.1, ge=0.0, le=1.0, description="相似度阈值")

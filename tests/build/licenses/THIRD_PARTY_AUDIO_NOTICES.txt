@@ -1,0 +1,25 @@
+SoundBot audio runtime third-party notices
+==========================================
+
+PyAV
+-----
+Project: https://pyav.org/ and https://github.com/PyAV-Org/PyAV
+License: BSD-3-Clause
+
+The complete PyAV license shipped by the installed wheel is collected from
+the ``av`` distribution metadata into this frozen bundle.  The source code
+for the exact PyAV release is available from the project URL above.
+
+FFmpeg libraries bundled by the PyAV wheel
+------------------------------------------
+Project and source: https://ffmpeg.org/
+License information: https://ffmpeg.org/legal.html
+
+PyAV binary wheels include FFmpeg shared libraries.  FFmpeg is generally
+available under LGPL-2.1-or-later, but optional build flags can change the
+applicable terms.  SoundBot release CI verifies and publishes only the
+libraries supplied by the pinned PyAV wheel; redistributors must inspect the
+wheel's exact build configuration and comply with its applicable license.
+
+This notice is informational and does not replace the license texts shipped
+with PyAV or FFmpeg.

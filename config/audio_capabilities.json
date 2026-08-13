@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "formats": {
+    ".wav": { "name": "WAV", "mime_type": "audio/wav", "requires_playback_transcode": false },
+    ".mp3": { "name": "MP3", "mime_type": "audio/mpeg", "requires_playback_transcode": false },
+    ".flac": { "name": "FLAC", "mime_type": "audio/flac", "requires_playback_transcode": false },
+    ".aiff": { "name": "AIFF", "mime_type": "audio/aiff", "requires_playback_transcode": true },
+    ".aif": { "name": "AIFF", "mime_type": "audio/aiff", "requires_playback_transcode": true },
+    ".ogg": { "name": "Ogg Vorbis", "mime_type": "audio/ogg", "requires_playback_transcode": false },
+    ".m4a": { "name": "M4A", "mime_type": "audio/mp4", "requires_playback_transcode": true },
+    ".aac": { "name": "AAC", "mime_type": "audio/aac", "requires_playback_transcode": true },
+    ".wma": { "name": "WMA", "mime_type": "audio/x-ms-wma", "requires_playback_transcode": true }
+  }
+}

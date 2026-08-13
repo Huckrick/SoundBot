@@ -17,6 +17,59 @@
  */
 
 const { contextBridge, ipcRenderer } = require('electron');
+const audioCapabilityManifest = require('./config/audio_capabilities.json');
+const supportedAudioExtensions = Object.freeze(
+  Object.keys(audioCapabilityManifest.formats || {})
+);
+
+const BACKEND_ERROR_SENTINEL = '__soundbotBackendError';
+
+function createRendererError(payload = {}) {
+  const error = new Error(payload.message || payload.error || '请求失败');
+  error.code = payload.code || 'REQUEST_FAILED';
+  error.retryable = Boolean(payload.retryable);
+  error.details = payload.details && typeof payload.details === 'object'
+    ? payload.details
+    : (payload.detail && typeof payload.detail === 'object' ? payload.detail : {});
+  error.detail = error.details;
+  error.status = Number.isInteger(payload.status) ? payload.status : null;
+  error.action = payload.action || null;
+  error.url = payload.url || null;
+  return error;
+}
+
+async function invokeBackend(action, data) {
+  const result = await ipcRenderer.invoke('backend-api', action, data);
+  if (result?.[BACKEND_ERROR_SENTINEL]) {
+    throw createRendererError(result.error);
+  }
+  return result;
+}
+
+async function invokeSecret(action, payload) {
+  const result = await ipcRenderer.invoke('secure-secret', action, payload);
+  if (result?.success === false) {
+    throw createRendererError(result);
+  }
+  return result;
+}
+
+async function invokeAIConfig(action, payload) {
+  const result = await ipcRenderer.invoke('ai-config', action, payload);
+  if (result?.success === false) {
+    throw createRendererError(result);
+  }
+  return result;
+}
+
+function deepCloneValue(obj) {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (obj instanceof Date) return new Date(obj.getTime());
+  if (Array.isArray(obj)) return obj.map(deepCloneValue);
+  const cloned = {};
+  for (const key of Object.keys(obj)) cloned[key] = deepCloneValue(obj[key]);
+  return cloned;
+}
 
 // 安全地暴露 API 给前端
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -28,16 +81,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     isMaximized: () => ipcRenderer.invoke('window-control', 'isMaximized')
   },
 
-  // 文件操作
-  fileOperation: {
-    openFile: (options) => ipcRenderer.invoke('file-operation', 'open', options),
-    saveFile: (data, options) => ipcRenderer.invoke('file-operation', 'save', { data, options }),
-    importFiles: (options) => ipcRenderer.invoke('file-operation', 'import', options),
-    exportProject: (data, options) => ipcRenderer.invoke('file-operation', 'export', { data, options })
-  },
-
   // 文件导入（专门为导入按钮设计）
   fileImport: {
+    supportedExtensions: supportedAudioExtensions,
     // 打开音频文件选择对话框
     selectAudioFiles: (options = {}) => ipcRenderer.invoke('file-import', 'select-audio', options),
     // 打开文件夹选择对话框
@@ -48,20 +94,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getFileInfo: (filePath) => ipcRenderer.invoke('file-import', 'get-info', filePath),
     // 验证文件类型
     validateFileType: (filePath) => ipcRenderer.invoke('file-import', 'validate-type', filePath)
-  },
-
-  // 应用设置
-  appSettings: {
-    get: (key) => ipcRenderer.invoke('app-settings', { action: 'get', key }),
-    set: (key, value) => ipcRenderer.invoke('app-settings', { action: 'set', key, value }),
-    getAll: () => ipcRenderer.invoke('app-settings', { action: 'getAll' })
-  },
-
-  // 系统信息
-  systemInfo: {
-    platform: process.platform,
-    version: process.versions.electron,
-    isDev: process.env.NODE_ENV === 'development'
   },
 
   // 菜单事件监听
@@ -76,44 +108,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('backend-ready', callback);
   },
 
-  // 移除事件监听器
-  removeAllListeners: (channel) => {
-    ipcRenderer.removeAllListeners(channel);
-  },
-
-  // 音频文件处理（增强功能）
-  audioProcessing: {
-    analyzeFile: (filePath) => ipcRenderer.invoke('audio-processing', 'analyze', filePath),
-    convertFormat: (filePath, format) => ipcRenderer.invoke('audio-processing', 'convert', { filePath, format }),
-    extractMetadata: (filePath) => ipcRenderer.invoke('audio-processing', 'metadata', filePath)
-  },
-
-  // 项目管理
-  projectManager: {
-    createProject: (name, settings) => ipcRenderer.invoke('project-manager', 'create', { name, settings }),
-    openProject: (path) => ipcRenderer.invoke('project-manager', 'open', path),
-    saveProject: (data) => ipcRenderer.invoke('project-manager', 'save', data),
-    closeProject: () => ipcRenderer.invoke('project-manager', 'close')
-  },
-
-  // 主题管理
-  themeManager: {
-    getTheme: () => ipcRenderer.invoke('theme-manager', 'get'),
-    setTheme: (theme) => ipcRenderer.invoke('theme-manager', 'set', theme),
-    toggleTheme: () => ipcRenderer.invoke('theme-manager', 'toggle')
-  },
-
-  // 快捷键管理
-  shortcuts: {
-    register: (accelerator, callback) => {
-      // 使用 accelerator 作为稳定 ID，先注册监听器再调用 API
-      ipcRenderer.on(`shortcut-${accelerator}`, callback);
-      ipcRenderer.invoke('shortcuts-register', accelerator);
-      return accelerator;
-    },
-    unregister: (id) => ipcRenderer.invoke('shortcuts-unregister', id)
-  },
-
   // 对话框
   dialogs: {
     showMessageBox: (options) => ipcRenderer.invoke('dialog-message', options),
@@ -121,98 +115,110 @@ contextBridge.exposeInMainWorld('electronAPI', {
     showSaveDialog: (options) => ipcRenderer.invoke('dialog-save', options)
   },
 
-  // 通知
-  notifications: {
-    show: (title, body, options) => ipcRenderer.invoke('notification-show', { title, body, options })
-  },
-
   // 原生拖拽导出（用于拖拽文件到 DAW）
   startDrag: (filePath) => ipcRenderer.invoke('start-drag', filePath),
 
-  // 读取本地音频文件并返回 ArrayBuffer（用于播放）
-  readAudioFile: (filePath) => ipcRenderer.invoke('read-audio-file', filePath),
-
-    // 后端 API（与 FastAPI 服务通信）
-    backendAPI: {
+  // 后端 API（与 FastAPI 服务通信；失败时 Promise 会 reject，并保留结构化错误字段）
+  backendAPI: {
         // 健康检查
-        healthCheck: () => ipcRenderer.invoke('backend-api', 'health'),
-
-        // 扫描并索引音频文件夹
-        scanFolder: (folderPath, recursive = true) =>
-          ipcRenderer.invoke('backend-api', 'scan', { folderPath, recursive }),
+        healthCheck: () => invokeBackend('health'),
 
         // 仅扫描文件不建索引（用于没有模型的情况）
         scanOnly: (folderPath, recursive = true) =>
-          ipcRenderer.invoke('backend-api', 'scan-only', { folderPath, recursive }),
+          invokeBackend('scan-only', { folderPath, recursive }),
 
         // 异步导入文件夹（带进度推送）
-        importFolderAsync: (folderPath, recursive = true, clientId = 'default') =>
-          ipcRenderer.invoke('backend-api', 'import-async', { folderPath, recursive, clientId }),
+        importFolderAsync: (folderPath, recursive = true, clientId = 'default', projectId) =>
+          invokeBackend('import-async', { folderPath, recursive, clientId, projectId }),
+
+        // 将文件路径交给后端导入任务；不再通过 IPC 搬运整文件字节数组
+        importFiles: (filePaths, clientId = 'default', projectId) =>
+          invokeBackend('import-files', { filePaths, clientId, projectId }),
 
         // 语义搜索音频（支持分页）
-        searchAudio: (query, topK = 10000, threshold = 0.15, page = 1, pageSize = 50) =>
-          ipcRenderer.invoke('backend-api', 'search', { query, topK, threshold, page, page_size: pageSize }),
+        searchAudio: (query, topK = 400, threshold = 0.15, page = 1, pageSize = 50, projectId) =>
+          invokeBackend('search', { query, topK, threshold, page, page_size: pageSize, projectId }),
 
         // 获取索引状态
-        getIndexStatus: () => ipcRenderer.invoke('backend-api', 'index-status'),
+        getIndexStatus: () => invokeBackend('index-status'),
 
         // 获取已索引的文件列表
-        getIndexedFiles: () => ipcRenderer.invoke('backend-api', 'indexed-files'),
+        getIndexedFiles: () => invokeBackend('indexed-files'),
 
         // 从 SQLite 获取所有文件（启动时加载）
-        getAllDbFiles: () => ipcRenderer.invoke('backend-api', 'db-files'),
+        getAllDbFiles: () => invokeBackend('db-files'),
 
         // 获取单个文件详情
-        getDbFile: (path) => ipcRenderer.invoke('backend-api', 'db-file', path),
+        getDbFile: (path) => invokeBackend('db-file', path),
 
         // 更新文件标签
-        updateFileTags: (path, tags) => ipcRenderer.invoke('backend-api', 'db-file-tags', { path, tags }),
+        updateFileTags: (path, tags) => invokeBackend('db-file-tags', { path, tags }),
 
         // 从数据库删除文件
-        deleteDbFile: (path) => ipcRenderer.invoke('backend-api', 'db-file-delete', path),
+        deleteDbFile: (path) => invokeBackend('db-file-delete', path),
 
         // 获取数据库统计
-        getDbStats: () => ipcRenderer.invoke('backend-api', 'db-stats'),
+        getDbStats: () => invokeBackend('db-stats'),
 
         // 获取音频文件 URL
-        getAudioUrl: (filePath) => ipcRenderer.invoke('backend-api', 'audio-url', filePath),
+        getAudioUrl: (filePath) => invokeBackend('audio-url', filePath),
 
         // 启动后端服务
-        startServer: () => ipcRenderer.invoke('backend-api', 'start-server'),
+        startServer: () => invokeBackend('start-server'),
 
         // 停止后端服务
-        stopServer: () => ipcRenderer.invoke('backend-api', 'stop-server'),
+        stopServer: () => invokeBackend('stop-server'),
 
         // 获取音频波形数据
-        getWaveform: (filePath) => ipcRenderer.invoke('backend-api', 'waveform', filePath),
+        getWaveform: (filePath, requestId = null) =>
+          invokeBackend('waveform', { filePath, requestId }),
 
-        // 预加载音频到 LRU 缓存（用于加速后续播放）
-        preloadAudio: (filePath) => ipcRenderer.invoke('backend-api', 'audio-preload', filePath),
+        // 数据库文件优先使用稳定 file_id，避免路径编码和工程歧义
+        getWaveformById: (fileId, projectId = 'default', requestId = null) =>
+          invokeBackend('waveform-by-id', { fileId, projectId, requestId }),
 
-        // 获取已解码的音频数据（使用 LRU 缓存）
-        getDecodedAudio: (filePath) => ipcRenderer.invoke('backend-api', 'audio-decoded', filePath),
+        // Abort a renderer-owned in-flight backend request (used by waveform selection).
+        cancelRequest: (requestId) => ipcRenderer.invoke('backend-api-cancel', requestId),
 
-        // 从 LRU 缓存流式获取音频（WAV 格式，用于前端播放）
-        streamAudio: (filePath) => ipcRenderer.invoke('backend-api', 'audio-stream', filePath),
+        // 批量获取可见列表项波形
+        getWaveformsBatch: (fileIds, projectId = 'default') =>
+          invokeBackend('waveforms-batch', { fileIds, projectId }),
 
         // 裁切音频片段
-        exportClip: (filePath, start, end, tempFile = true) => ipcRenderer.invoke('backend-api', 'export-clip', { filePath, start, end, tempFile }),
+        exportClip: (filePath, start, end, tempFile = true) => invokeBackend('export-clip', { filePath, start, end, tempFile }),
 
         // 音频淡入淡出
-        applyFade: (filePath, fadeIn, fadeOut) => ipcRenderer.invoke('backend-api', 'audio-fade', { filePath, fadeIn, fadeOut }),
+        applyFade: (filePath, fadeIn, fadeOut) => invokeBackend('audio-fade', { filePath, fadeIn, fadeOut }),
 
         // 获取临时文件目录
-        getTempDir: () => ipcRenderer.invoke('backend-api', 'get-temp-dir'),
+        getTempDir: () => invokeBackend('get-temp-dir'),
 
         // 设置临时文件目录
-        setTempDir: (tempDir) => ipcRenderer.invoke('backend-api', 'set-temp-dir', { tempDir }),
+        setTempDir: (tempDir) => invokeBackend('set-temp-dir', { tempDir }),
 
         // 获取磁盘空间信息
-        getDiskSpace: () => ipcRenderer.invoke('backend-api', 'disk-space'),
+        getDiskSpace: () => invokeBackend('disk-space'),
 
         // 清理临时裁切文件
-        clearTempClips: () => ipcRenderer.invoke('backend-api', 'clear-temp-clips')
+        clearTempClips: () => invokeBackend('clear-temp-clips')
     },
+
+  // OS-backed encrypted secrets. Legacy plaintext is migrated by Electron
+  // before the backend starts; stored plaintext is never exposed here.
+  secrets: {
+    isAvailable: () => invokeSecret('status'),
+    set: (key, value) => invokeSecret('set', { key, value }),
+    has: (key) => invokeSecret('has', { key }),
+    // Backward-compatible alias; returns existence only, never plaintext.
+    get: (key) => invokeSecret('has', { key }),
+    delete: (key) => invokeSecret('delete', { key })
+  },
+
+  aiConfig: {
+    get: () => invokeAIConfig('get'),
+    save: (config) => invokeAIConfig('save', config),
+    test: (config) => invokeAIConfig('test', config)
+  },
 
   backendStatus: {
     waitUntilReady: (timeoutMs = 60000) => ipcRenderer.invoke('wait-backend-ready', timeoutMs)
@@ -234,23 +240,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 打开隐私设置（macOS）
   openPrivacySettings: () => ipcRenderer.invoke('open-privacy-settings'),
 
-  // 资源管理
-  resources: {
-    // 检查资源状态
-    check: () => ipcRenderer.invoke('check-resources'),
-    // 打开下载页面
-    openDownloadPage: () => ipcRenderer.invoke('open-download-page')
-  },
-
-  // 调试信息
-  debug: {
-    // 获取后端进程状态
-    getBackendStatus: () => ipcRenderer.invoke('get-backend-status'),
-    // 获取应用路径信息
-    getAppPaths: () => ipcRenderer.invoke('get-app-paths'),
-    // 打开开发者工具
-    openDevTools: () => ipcRenderer.invoke('open-dev-tools')
-  }
+  // Keep the renderer surface deliberately small; unsupported and unused IPC
+  // contracts were removed in v0.2.0.
 });
 
 // 暴露一些常用的 Node.js 功能（安全版本）
@@ -287,19 +278,7 @@ contextBridge.exposeInMainWorld('nodeAPI', {
 // 为前端提供一些工具函数
 contextBridge.exposeInMainWorld('utils', {
   // 深拷贝对象
-  deepClone: (obj) => {
-    if (obj === null || typeof obj !== 'object') return obj;
-    if (obj instanceof Date) return new Date(obj.getTime());
-    if (obj instanceof Array) return obj.map(item => utils.deepClone(item));
-    
-    const cloned = {};
-    for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
-        cloned[key] = utils.deepClone(obj[key]);
-      }
-    }
-    return cloned;
-  },
+  deepClone: deepCloneValue,
 
   // 防抖函数
   debounce: (func, wait) => {

@@ -26,17 +26,28 @@ import os
 import re
 from pathlib import Path
 from typing import List, Optional, Dict, Any
-import librosa
-import soundfile as sf
 from pydantic import BaseModel
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import threading
+
+try:
+    from config import SUPPORTED_FORMATS
+except ModuleNotFoundError:
+    from backend.config import SUPPORTED_FORMATS  # type: ignore
+
+try:
+    from core.audio_service import AudioService, AudioServiceError, get_audio_service
+except ModuleNotFoundError:
+    from backend.core.audio_service import (  # type: ignore
+        AudioService,
+        AudioServiceError,
+        get_audio_service,
+    )
 
 logger = logging.getLogger(__name__)
 
 
-# 支持的音频格式
-SUPPORTED_AUDIO_FORMATS = {'.wav', '.mp3', '.aac', '.flac', '.aiff', '.ogg', '.m4a'}
+# 向后兼容旧调用方；真实来源是 config.AUDIO_FORMAT_CAPABILITIES。
+SUPPORTED_AUDIO_FORMATS = frozenset(SUPPORTED_FORMATS)
 
 
 class AudioFile(BaseModel):
@@ -72,8 +83,39 @@ class FolderNode(BaseModel):
 class AudioScanner:
     """音频文件扫描器"""
 
-    def __init__(self):
+    def __init__(self, audio_service: Optional[AudioService] = None):
         self.supported_formats = SUPPORTED_AUDIO_FORMATS
+        self.audio_service = audio_service or get_audio_service()
+
+    def collect_audio_paths(self, folder_path: str, recursive: bool = True) -> List[Path]:
+        """Collect supported paths without decoding so failures remain durable imports."""
+        folder = Path(folder_path).expanduser().resolve(strict=False)
+        if not folder.exists():
+            raise FileNotFoundError(f"文件夹不存在: {folder_path}")
+        if not folder.is_dir():
+            raise NotADirectoryError(f"路径不是文件夹: {folder_path}")
+
+        paths: List[Path] = []
+        if recursive:
+            for root, _dirs, files in os.walk(folder):
+                for filename in files:
+                    file_path = Path(root) / filename
+                    if file_path.suffix.lower() in self.supported_formats:
+                        paths.append(file_path.resolve(strict=False))
+        else:
+            paths.extend(
+                file_path.resolve(strict=False)
+                for file_path in folder.iterdir()
+                if file_path.is_file() and file_path.suffix.lower() in self.supported_formats
+            )
+        # A directory can expose the same file through multiple symlink aliases.
+        # Keep one physical path so a single import job never processes it twice.
+        unique_paths = {
+            os.path.normcase(str(file_path)): file_path for file_path in paths
+        }
+        return sorted(
+            unique_paths.values(), key=lambda value: os.path.normcase(str(value))
+        )
 
     def scan(self, folder_path: str, recursive: bool = True, max_workers: int = 8) -> List[AudioFile]:
         """
@@ -90,33 +132,12 @@ class AudioScanner:
         import time
         start_time = time.time()
         
-        folder = Path(folder_path)
-
-        if not folder.exists():
-            raise FileNotFoundError(f"文件夹不存在: {folder_path}")
-
-        if not folder.is_dir():
-            raise NotADirectoryError(f"路径不是文件夹: {folder_path}")
-
         logger.info(f"[SCANNER] 开始扫描文件夹: {folder_path}, 递归: {recursive}, 并行线程: {max_workers}")
         print(f"[SCANNER] 开始扫描文件夹: {folder_path}, 递归: {recursive}, 并行线程: {max_workers}", flush=True)
 
         # 第一步：快速收集所有音频文件路径
-        audio_file_paths = []
-        scanned_dirs = []
-        
-        if recursive:
-            logger.info(f"[SCANNER] 快速收集文件路径...")
-            for root, dirs, files in os.walk(folder):
-                scanned_dirs.append(root)
-                for filename in files:
-                    file_path = Path(root) / filename
-                    if file_path.suffix.lower() in self.supported_formats:
-                        audio_file_paths.append(file_path)
-        else:
-            for file_path in folder.iterdir():
-                if file_path.is_file() and file_path.suffix.lower() in self.supported_formats:
-                    audio_file_paths.append(file_path)
+        logger.info(f"[SCANNER] 快速收集文件路径...")
+        audio_file_paths = self.collect_audio_paths(folder_path, recursive)
         
         total_files = len(audio_file_paths)
         logger.info(f"[SCANNER] 找到 {total_files} 个音频文件，开始并行处理...")
@@ -165,7 +186,7 @@ class AudioScanner:
         Returns:
             (音频文件列表, 文件夹树形结构根节点)
         """
-        folder = Path(folder_path)
+        folder = Path(folder_path).expanduser().resolve(strict=False)
         root_name = folder.name or folder_path
 
         # 先扫描所有文件
@@ -174,7 +195,7 @@ class AudioScanner:
         # 构建文件夹树形结构
         root_node = FolderNode(
             name=root_name,
-            path=str(folder.absolute()),
+            path=str(folder),
             relative_path="",
             children=[],
             file_count=len(audio_files)
@@ -190,20 +211,20 @@ class AudioScanner:
             folder_files[parent_path].append(audio_file)
 
         # 构建文件夹层级结构
-        folder_nodes = {str(folder.absolute()): root_node}
+        folder_nodes = {str(folder): root_node}
 
         for parent_path, files in folder_files.items():
             parent = Path(parent_path)
 
             # 确保父文件夹节点存在
-            current_path = str(parent.absolute())
+            current_path = str(parent.resolve(strict=False))
             if current_path not in folder_nodes:
                 # 创建从根到当前文件夹的路径
                 relative = parent.relative_to(folder)
                 parts = list(relative.parts) if relative.parts else []
 
                 current_node = root_node
-                current_build_path = str(folder.absolute())
+                current_build_path = str(folder)
 
                 for part in parts:
                     current_build_path = os.path.join(current_build_path, part)
@@ -273,7 +294,9 @@ class AudioScanner:
             # 保留长度大于1的词，或者包含字母的词
             if len(token) > 1 or any(c.isalpha() for c in token):
                 # 去除常见无意义后缀
-                if token.lower() not in ['wav', 'mp3', 'flac', 'aif', 'aiff', 'm4a', 'ogg']:
+                if token.lower() not in [
+                    'wav', 'mp3', 'flac', 'aif', 'aiff', 'm4a', 'aac', 'ogg', 'wma'
+                ]:
                     meaningful_tokens.append(token)
 
         # 生成描述
@@ -299,14 +322,6 @@ class AudioScanner:
                 # 尝试读取 INFO 块
                 # 注意：标准 wave 模块不支持扩展块，需要手动解析
                 pass
-
-            # 使用 soundfile 读取更多元数据
-            info = sf.info(str(file_path))
-
-            # 尝试读取 BWF 元数据 (Broadcast Wave Format)
-            if hasattr(info, 'comment') and info.comment:
-                metadata['comment'] = info.comment
-                metadata['description'] = info.comment
 
             # 使用 mutagen 读取 WAV 的 BWF 标签
             try:
@@ -374,11 +389,6 @@ class AudioScanner:
         suffix = file_path.suffix.lower()
 
         try:
-            # 使用 soundfile 读取元数据
-            info = sf.info(str(file_path))
-            if hasattr(info, 'comment') and info.comment:
-                metadata['comment'] = info.comment
-
             # WAV 文件特殊处理（BWF/iXML）
             if suffix == '.wav':
                 wav_metadata = self._extract_wav_metadata(file_path)
@@ -436,6 +446,19 @@ class AudioScanner:
                 except ImportError:
                     pass
 
+            # WMA 文件
+            elif suffix == '.wma':
+                try:
+                    from mutagen.asf import ASF
+
+                    audio = ASF(str(file_path))
+                    if audio.tags:
+                        for key, value in audio.tags.items():
+                            if value:
+                                metadata[key] = str(value[0]) if isinstance(value, list) else str(value)
+                except ImportError:
+                    pass
+
         except Exception as e:
             logger.debug(f"提取音频元数据失败 {file_path}: {e}")
 
@@ -451,76 +474,40 @@ class AudioScanner:
         Returns:
             音频文件信息，如果不支持则返回 None
         """
+        file_path = file_path.expanduser().resolve(strict=False)
+
         # 检查文件格式
         if file_path.suffix.lower() not in self.supported_formats:
             return None
 
         try:
-            # 获取文件基本信息
             stat = file_path.stat()
-
-            # 解析文件名（这个很快，先做）
             parsed_name, name_tokens, name_description = self._parse_filename(file_path.name)
 
-            # 使用 soundfile 获取音频信息（只读文件头，不加载音频数据）
-            info = sf.info(str(file_path))
-
-            # 简化元数据提取 - 只提取基本信息，跳过耗时的 mutagen 解析
-            metadata_tags = {}
-            if hasattr(info, 'comment') and info.comment:
-                metadata_tags['comment'] = info.comment
+            # AudioService owns the pinned PyAV/FFmpeg decoder boundary.
+            info = self.audio_service.probe(file_path)
 
             return AudioFile(
-                path=str(file_path.absolute()),
+                path=str(file_path),
                 filename=file_path.name,
                 duration=info.duration,
-                sample_rate=info.samplerate,
+                sample_rate=info.sample_rate,
                 channels=info.channels,
                 format=info.format,
                 size=stat.st_size,
                 parsed_name=parsed_name,
                 name_tokens=name_tokens,
                 name_description=name_description,
-                metadata_tags=metadata_tags
+                metadata_tags={},
             )
-        except Exception as e:
-            # 如果 soundfile 失败，尝试使用 librosa（但只读取信息，不加载整个文件）
-            try:
-                stat = file_path.stat()
-                
-                # 使用 librosa 的 get_duration 直接获取时长，不加载音频数据
-                duration = librosa.get_duration(path=str(file_path))
-                
-                # 使用 soundfile 获取其他信息（如果可能）
-                try:
-                    info = sf.info(str(file_path))
-                    sr = info.samplerate
-                    channels = info.channels
-                except:
-                    # 如果 soundfile 也失败，使用默认值
-                    sr = 44100
-                    channels = 2
-
-                # 解析文件名
-                parsed_name, name_tokens, name_description = self._parse_filename(file_path.name)
-
-                return AudioFile(
-                    path=str(file_path.absolute()),
-                    filename=file_path.name,
-                    duration=duration,
-                    sample_rate=sr,
-                    channels=channels,
-                    format=file_path.suffix.lower()[1:],
-                    size=stat.st_size,
-                    parsed_name=parsed_name,
-                    name_tokens=name_tokens,
-                    name_description=name_description,
-                    metadata_tags={}
-                )
-            except Exception as e2:
-                # 跳过无法读取的文件
-                logger.debug(f"无法读取音频文件 {file_path}: {e2}")
-                return None
+        except AudioServiceError as exc:
+            logger.debug(
+                "无法读取音频文件 %s [%s]: %s", file_path, exc.code, exc.message
+            )
+            return None
+        except (OSError, ValueError) as exc:
+            logger.debug(f"无法读取音频文件 {file_path}: {exc}")
+            return None
 
     def is_audio_file(self, file_path: str) -> bool:
         """

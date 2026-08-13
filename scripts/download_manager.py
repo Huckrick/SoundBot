@@ -16,6 +16,8 @@ from pathlib import Path
 from urllib.request import urlopen, Request
 from urllib.error import HTTPError, URLError
 import ssl
+import uuid
+import re
 
 # 设置 UTF-8 编码（Windows 兼容）
 if sys.platform == 'win32':
@@ -32,13 +34,15 @@ DEFAULT_CONFIG = {
             "filename": "models.zip",
             "filename_patterns": ["models.zip", "models-*.zip"],
             "extract_to": "models",
-            "required": True,
+            "required": False,
+            "require_checksum": True,
             "description": "AI 模型文件 (CLAP等)"
         }
     }
 }
 
 CONFIG_FILE = "download_config.json"
+INSTALL_RECEIPT = ".soundbot-install.json"
 
 
 def get_config():
@@ -55,6 +59,21 @@ def get_project_root():
     return Path(__file__).parent.parent
 
 
+def get_resource_root() -> Path:
+    """Return the writable resource root used for model installation.
+
+    Desktop callers pass Electron's userData directory through
+    ``SOUNDBOT_USER_DATA_DIR``. Source checkouts default to the repository so
+    existing developer commands remain compatible.
+    """
+    configured = os.environ.get("SOUNDBOT_RESOURCE_ROOT") or os.environ.get(
+        "SOUNDBOT_USER_DATA_DIR"
+    )
+    root = Path(configured).expanduser() if configured else get_project_root()
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
 def get_platform():
     """获取当前平台"""
     if sys.platform == 'darwin':
@@ -67,8 +86,8 @@ def get_platform():
 
 def get_download_dir():
     """获取下载目录"""
-    download_dir = get_project_root() / "downloads"
-    download_dir.mkdir(exist_ok=True)
+    download_dir = get_resource_root() / "downloads"
+    download_dir.mkdir(parents=True, exist_ok=True)
     return download_dir
 
 
@@ -90,9 +109,11 @@ def get_github_releases(repo):
         return None
 
 
-def get_latest_release(repo):
-    """获取最新 release"""
-    url = f"https://api.github.com/repos/{repo}/releases/latest"
+def get_release_by_tag(repo, tag):
+    """Fetch one exact release so prerelease model assets remain version-safe."""
+    from urllib.parse import quote
+
+    url = f"https://api.github.com/repos/{repo}/releases/tags/{quote(tag, safe='')}"
     headers = {
         "Accept": "application/vnd.github.v3+json",
         "User-Agent": "SoundBot-DownloadManager/1.0"
@@ -104,8 +125,20 @@ def get_latest_release(repo):
         with urlopen(req, context=ctx, timeout=30) as response:
             return json.loads(response.read().decode('utf-8'))
     except Exception as e:
-        print(f"[ERROR] 获取最新 release 失败: {e}")
+        print(f"[ERROR] 获取 release {tag} 失败: {e}")
         return None
+
+
+def get_application_release_tag() -> str:
+    """Return the exact release tag matching this source/application version."""
+    config_text = (get_project_root() / "backend" / "config.py").read_text(encoding="utf-8")
+    match = re.search(r'^APP_VERSION\s*=\s*["\']([^"\']+)["\']', config_text, re.MULTILINE)
+    if match:
+        version = match.group(1)
+    else:
+        package = json.loads((get_project_root() / "package.json").read_text(encoding="utf-8"))
+        version = str(package["version"])
+    return f"v{version}"
 
 
 def download_file(url, dest_path, progress_callback=None):
@@ -140,13 +173,30 @@ def download_file(url, dest_path, progress_callback=None):
 
 
 def extract_zip(zip_path, extract_to, progress_callback=None):
-    """解压 zip 文件"""
+    """安全解压 zip，拒绝路径逃逸和符号链接。"""
     try:
+        root = Path(extract_to).resolve(strict=False)
+        root.mkdir(parents=True, exist_ok=True)
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            total_files = len(zip_ref.namelist())
-            
-            for i, file in enumerate(zip_ref.namelist()):
-                zip_ref.extract(file, extract_to)
+            members = zip_ref.infolist()
+            total_files = len(members)
+
+            for i, member in enumerate(members):
+                # Unix symlink bit in the upper mode word.
+                mode = member.external_attr >> 16
+                if (mode & 0o170000) == 0o120000:
+                    raise ValueError(f"压缩包包含符号链接: {member.filename}")
+                member_name = member.filename.replace('\\', '/')
+                if member_name.startswith('/') or '..' in Path(member_name).parts:
+                    raise ValueError(f"压缩包路径越界: {member.filename}")
+                destination = (root / member_name).resolve(strict=False)
+                destination.relative_to(root)
+                if member.is_dir():
+                    destination.mkdir(parents=True, exist_ok=True)
+                else:
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    with zip_ref.open(member, 'r') as source, open(destination, 'wb') as output:
+                        shutil.copyfileobj(source, output)
                 if progress_callback:
                     progress = ((i + 1) / total_files) * 100
                     progress_callback(i + 1, total_files, progress)
@@ -169,11 +219,159 @@ def verify_download(file_path, expected_hash=None):
                 sha256_hash.update(byte_block)
         
         actual_hash = sha256_hash.hexdigest()
-        if actual_hash != expected_hash:
+        if actual_hash.lower() != str(expected_hash).strip().lower():
             print(f"[ERROR] 文件校验失败: {actual_hash} != {expected_hash}")
             return False
     
     return True
+
+
+def read_release_checksum(resource, release, asset_name, download_dir):
+    """Resolve a pinned checksum from config or a sibling release asset."""
+    configured = resource.get("expected_sha256")
+    if configured:
+        return configured
+    checksum_names = {
+        f"{asset_name}.sha256",
+        f"{asset_name}.sha256.txt",
+        "SHA256SUMS",
+        "SHA256SUMS.txt",
+    }
+    checksum_asset = next(
+        (item for item in release.get("assets", []) if item.get("name") in checksum_names),
+        None,
+    )
+    if not checksum_asset:
+        return None
+    checksum_path = download_dir / checksum_asset["name"]
+    if not download_file(checksum_asset["browser_download_url"], checksum_path):
+        return None
+    try:
+        for line in checksum_path.read_text(encoding="utf-8").splitlines():
+            parts = line.strip().split()
+            if not parts:
+                continue
+            if len(parts) == 1 or parts[-1].lstrip('*') == asset_name:
+                candidate = parts[0]
+                if len(candidate) == 64 and all(ch in '0123456789abcdefABCDEF' for ch in candidate):
+                    return candidate.lower()
+    finally:
+        checksum_path.unlink(missing_ok=True)
+    return None
+
+
+def verify_model_manifest(staging_dir):
+    """Verify immutable identity and a complete per-file model hash manifest."""
+    staging = Path(staging_dir)
+    clap_dir = staging / "clap"
+    if not clap_dir.is_dir():
+        raise ValueError("模型包必须包含 clap/ 目录")
+    manifest_path = staging / "model-manifest.json"
+    if not manifest_path.is_file():
+        raise ValueError("模型包缺少 model-manifest.json")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not manifest.get("model_id") or not manifest.get("revision"):
+        raise ValueError("模型 manifest 缺少 model_id/revision")
+    revision = str(manifest["revision"])
+    if not re.fullmatch(r"[0-9a-fA-F]{40,64}", revision):
+        raise ValueError("模型 manifest revision 必须是 40-64 位不可变十六进制 commit")
+    files = manifest.get("files")
+    if not isinstance(files, dict) or not files:
+        raise ValueError("模型 manifest 必须包含非空逐文件 SHA-256 清单")
+    for relative, expected in files.items():
+        if not isinstance(relative, str) or not relative.startswith("clap/"):
+            raise ValueError(f"模型 manifest 路径无效: {relative!r}")
+        if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", expected):
+            raise ValueError(f"模型 manifest SHA-256 无效: {relative}")
+        candidate = (staging / relative).resolve(strict=False)
+        candidate.relative_to(staging.resolve(strict=False))
+        if not candidate.is_file() or not verify_download(candidate, expected):
+            raise ValueError(f"模型文件校验失败: {relative}")
+    actual_files = {
+        path.relative_to(staging).as_posix()
+        for path in clap_dir.rglob("*")
+        if path.is_file()
+    }
+    declared_files = set(files)
+    if actual_files != declared_files:
+        missing = sorted(declared_files - actual_files)
+        extra = sorted(actual_files - declared_files)
+        raise ValueError(f"模型 manifest 文件集合不完整: missing={missing}, extra={extra}")
+    return manifest
+
+
+def write_install_receipt(
+    staging_dir: Path,
+    *,
+    release_tag: str,
+    asset_name: str,
+    archive_sha256: str,
+    manifest: dict,
+) -> None:
+    """Bind an installed model directory to one immutable release asset."""
+    receipt = {
+        "schema_version": 1,
+        "release_tag": release_tag,
+        "asset_name": asset_name,
+        "archive_sha256": archive_sha256.lower(),
+        "model_id": manifest["model_id"],
+        "revision": manifest["revision"],
+    }
+    (Path(staging_dir) / INSTALL_RECEIPT).write_text(
+        json.dumps(receipt, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def verify_install_receipt(
+    installed_dir: Path,
+    *,
+    release_tag: str,
+    asset_name: str,
+    archive_sha256: str,
+) -> dict:
+    """Reject an internally valid model installed for another release."""
+    receipt_path = Path(installed_dir) / INSTALL_RECEIPT
+    if not receipt_path.is_file():
+        raise ValueError("已安装模型缺少 release 来源凭据")
+    try:
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"已安装模型来源凭据无效: {exc}") from exc
+    expected = {
+        "schema_version": 1,
+        "release_tag": release_tag,
+        "asset_name": asset_name,
+        "archive_sha256": archive_sha256.lower(),
+    }
+    mismatch = {
+        key: {"installed": receipt.get(key), "expected": value}
+        for key, value in expected.items()
+        if receipt.get(key) != value
+    }
+    if mismatch:
+        raise ValueError(f"已安装模型与当前 release 不匹配: {mismatch}")
+    return receipt
+
+
+def atomic_replace_directory(staging_dir, target_dir):
+    """Replace a directory only after staging has been fully validated."""
+    staging = Path(staging_dir)
+    target = Path(target_dir)
+    backup = target.with_name(f"{target.name}.previous-{uuid.uuid4().hex[:8]}")
+    if target.exists():
+        os.replace(target, backup)
+    try:
+        os.replace(staging, target)
+    except Exception:
+        if backup.exists() and not target.exists():
+            os.replace(backup, target)
+        raise
+    if backup.exists():
+        if backup.is_dir():
+            shutil.rmtree(backup)
+        else:
+            backup.unlink()
 
 
 def find_release_asset(resource, release):
@@ -199,7 +397,7 @@ def download_resource(resource_type, release_tag=None, force=False):
     
     Args:
         resource_type: 'models'
-        release_tag: 指定 release 标签，None 表示最新版
+        release_tag: 指定 release 标签；None 表示当前应用版本的精确标签
         force: 是否强制重新下载
     """
     config = get_config()
@@ -218,26 +416,14 @@ def download_resource(resource_type, release_tag=None, force=False):
             return True
     
     # 获取 release 信息
-    if release_tag:
-        releases = get_github_releases(repo)
-        if not releases:
-            print("[ERROR] 无法获取 releases 列表")
-            return False
-        
-        release = None
-        for r in releases:
-            if r["tag_name"] == release_tag:
-                release = r
-                break
-        
-        if not release:
-            print(f"[ERROR] 未找到 release: {release_tag}")
-            return False
-    else:
-        release = get_latest_release(repo)
-        if not release:
-            print("[ERROR] 无法获取最新 release")
-            return False
+    release_tag = release_tag or get_application_release_tag()
+    release = get_release_by_tag(repo, release_tag)
+    if not release:
+        print(f"[ERROR] 未找到与当前应用兼容的 release: {release_tag}")
+        return False
+    if release.get("tag_name") != release_tag:
+        print(f"[ERROR] Release tag 响应不匹配: {release.get('tag_name')} != {release_tag}")
+        return False
     
     # 查找资源文件
     filename = resource["filename"]
@@ -247,18 +433,34 @@ def download_resource(resource_type, release_tag=None, force=False):
         print(f"[ERROR] 在 release {release['tag_name']} 中未找到 {filename}")
         print(f"[INFO] 可用资源: {[a['name'] for a in release.get('assets', [])]}")
         return False
+
+    download_dir = get_download_dir()
+    expected_hash = read_release_checksum(resource, release, asset_name, download_dir)
+    if resource.get("require_checksum", False) and not expected_hash:
+        print("[ERROR] Release 未提供必需的 SHA-256 校验值")
+        return False
     
     # 检查是否已存在
-    project_root = get_project_root()
-    extract_to = project_root / resource["extract_to"]
+    resource_root = get_resource_root()
+    extract_to = resource_root / resource["extract_to"]
     
     if extract_to.exists() and not force:
-        print(f"[INFO] {resource_type} 已存在: {extract_to}")
-        print(f"[INFO] 使用 --force 重新下载")
-        return True
+        try:
+            if resource_type == "models":
+                verify_model_manifest(extract_to)
+                verify_install_receipt(
+                    extract_to,
+                    release_tag=release_tag,
+                    asset_name=asset_name,
+                    archive_sha256=expected_hash or "",
+                )
+            print(f"[INFO] {resource_type} 已存在且校验通过: {extract_to}")
+            print(f"[INFO] 使用 --force 重新下载")
+            return True
+        except Exception as exc:
+            print(f"[WARN] 已安装 {resource_type} 校验失败，将重新下载: {exc}")
     
     # 下载文件
-    download_dir = get_download_dir()
     download_path = download_dir / asset_name
     
     print(f"[INFO] 下载 {resource_type}...")
@@ -277,26 +479,44 @@ def download_resource(resource_type, release_tag=None, force=False):
     
     print()
     print(f"[OK] 下载完成: {download_path}")
+
+    if not verify_download(download_path, expected_hash):
+        download_path.unlink(missing_ok=True)
+        return False
     
     # 解压文件
     print(f"[INFO] 解压到: {extract_to}")
     
-    # 清理旧文件
-    if extract_to.exists():
-        print(f"[INFO] 清理旧文件...")
-        shutil.rmtree(extract_to)
-    
     extract_to.parent.mkdir(parents=True, exist_ok=True)
+    staging_dir = extract_to.parent / f".{extract_to.name}.staging-{uuid.uuid4().hex}"
     
     def extract_progress(current, total, percent):
         print(f"\r[PROGRESS] 解压中... {current}/{total} ({percent:.1f}%)", end='', flush=True)
     
-    if not extract_zip(download_path, extract_to.parent, extract_progress):
+    if not extract_zip(download_path, staging_dir, extract_progress):
         print()
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        return False
+
+    try:
+        manifest = verify_model_manifest(staging_dir)
+        write_install_receipt(
+            staging_dir,
+            release_tag=release_tag,
+            asset_name=asset_name,
+            archive_sha256=expected_hash or "",
+            manifest=manifest,
+        )
+        atomic_replace_directory(staging_dir, extract_to)
+    except Exception as exc:
+        print(f"\n[ERROR] 模型包校验/替换失败: {exc}")
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        download_path.unlink(missing_ok=True)
         return False
     
     print()
-    print(f"[OK] 解压完成: {extract_to}")
+    print(f"[OK] 模型已原子安装: {extract_to}")
+    print(f"[INFO] 模型: {manifest['model_id']} @ {manifest['revision']}")
     
     # 清理下载文件
     if download_path.exists():
@@ -309,7 +529,7 @@ def download_resource(resource_type, release_tag=None, force=False):
 def check_resources():
     """检查所需资源是否已下载"""
     config = get_config()
-    project_root = get_project_root()
+    project_root = get_resource_root()
     
     results = {}
     all_ready = True
@@ -326,6 +546,13 @@ def check_resources():
         
         extract_to = project_root / resource["extract_to"]
         exists = extract_to.exists()
+        error = None
+        if resource_type == "models" and exists:
+            try:
+                verify_model_manifest(extract_to)
+            except Exception as exc:
+                exists = False
+                error = str(exc)
         required = resource.get("required", False)
         
         status = "✓" if exists else "✗"
@@ -336,7 +563,8 @@ def check_resources():
         results[resource_type] = {
             "exists": exists,
             "required": required,
-            "path": str(extract_to)
+            "path": str(extract_to),
+            "error": error,
         }
         
         if required and not exists:
@@ -420,7 +648,7 @@ def main():
     
     parser.add_argument(
         "--tag", "-t",
-        help="指定 release 标签（默认使用最新版）"
+        help="指定 release 标签（默认使用当前应用版本的精确标签）"
     )
     
     parser.add_argument(
@@ -476,22 +704,18 @@ def main():
         # 检查资源
         results, all_ready = check_resources()
         
-        if all_ready:
-            print("\n[OK] 环境已准备就绪，无需操作")
-            sys.exit(0)
-        
-        # 尝试下载缺失的资源
-        print("\n[INFO] 开始下载缺失的资源...")
-        
-        # 下载模型
-        if not results.get("models", {}).get("exists", False):
-            if not download_resource("models"):
-                print("[WARN] 模型下载失败，应用可能无法正常使用")
+        # Always resolve the exact application release. A model can be
+        # internally valid while still belonging to an older app version.
+        print("\n[INFO] 检查并安装当前版本的精确模型资源...")
+        compatible_release = download_resource("models", args.tag, args.force)
+        if not compatible_release:
+            print("[WARN] 模型下载失败，应用仍可以使用基础功能")
         
         # 最终检查
         print("\n" + "=" * 60)
         results, all_ready = check_resources()
-        sys.exit(0 if all_ready else 1)
+        models_ready = results.get("models", {}).get("exists", False)
+        sys.exit(0 if compatible_release and all_ready and models_ready else 1)
 
 
 if __name__ == "__main__":

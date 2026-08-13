@@ -5,11 +5,14 @@
  * 前后端一体化打包，无需单独安装 Python 环境
  */
 
-const { app, BrowserWindow, Menu, ipcMain, dialog, protocol, shell, Notification, globalShortcut } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, protocol, shell, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const net = require('net');
+const audioCapabilityManifest = require('./config/audio_capabilities.json');
+const supportedAudioExtensions = new Set(Object.keys(audioCapabilityManifest.formats || {}));
+const supportedAudioFilterExtensions = [...supportedAudioExtensions].map((value) => value.slice(1));
 
 // 自定义协议：用于在渲染进程中安全加载本地音频
 const AUDIO_PROTOCOL = 'soundmind-audio';
@@ -27,26 +30,15 @@ let backendPort = Number(process.env.SOUNDBOT_PORT || 8000);
 let backendOrigin = `http://127.0.0.1:${backendPort}`;
 let backendWsOrigin = `ws://127.0.0.1:${backendPort}`;
 let apiBaseUrl = `${backendOrigin}/api/v1`;
-let appSettingsCache = null;
-const registeredShortcuts = new Set();
+let secureSecretsCache = null;
+let backendSecretsHydrated = false;
 let audioProtocolRegistered = false;
-
-// GitHub 仓库配置
-const GITHUB_REPO = 'Huckrick/SoundBot';
+const activeBackendRequests = new Map();
+let quitInProgress = false;
+const BACKEND_ERROR_SENTINEL = '__soundbotBackendError';
+const SECRET_KEY_PATTERN = /^(llm|embedding)\.[a-z0-9_-]+\.api_key$/;
 
 // ==================== 路径辅助函数 ====================
-
-/**
- * 获取应用资源路径
- * 开发环境：项目根目录
- * 生产环境：app.asar 解压后的资源目录
- */
-function getAppPath() {
-  if (app.isPackaged) {
-    return path.join(process.resourcesPath, 'app.asar.unpacked');
-  }
-  return __dirname;
-}
 
 /**
  * 获取应用根目录
@@ -65,33 +57,214 @@ function getUserDataDir() {
   return app.getPath('userData');
 }
 
-function getAppSettingsPath() {
-  return path.join(getUserDataDir(), 'app_settings.json');
+function getSecureSecretsPath() {
+  return path.join(getUserDataDir(), 'secure_secrets.json');
 }
 
-function readAppSettings() {
-  if (appSettingsCache) {
-    return appSettingsCache;
+function validateSecretKey(key) {
+  if (typeof key !== 'string' || !SECRET_KEY_PATTERN.test(key)) {
+    throw new Error('无效的密钥标识');
   }
+}
+
+function readSecureSecrets() {
+  if (secureSecretsCache) return secureSecretsCache;
 
   try {
-    const settingsPath = getAppSettingsPath();
-    if (fs.existsSync(settingsPath)) {
-      appSettingsCache = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-      return appSettingsCache;
+    const secretsPath = getSecureSecretsPath();
+    if (fs.existsSync(secretsPath)) {
+      const parsed = JSON.parse(fs.readFileSync(secretsPath, 'utf-8'));
+      secureSecretsCache = parsed && typeof parsed === 'object' ? parsed : {};
+      return secureSecretsCache;
     }
   } catch (error) {
-    console.warn('[Settings] Failed to read app settings:', error);
+    console.warn('[Secrets] Failed to read encrypted secret store:', error);
   }
 
-  appSettingsCache = {};
-  return appSettingsCache;
+  secureSecretsCache = {};
+  return secureSecretsCache;
 }
 
-function writeAppSettings(settings) {
-  appSettingsCache = settings || {};
+function writeSecureSecrets(secrets) {
+  const secretsPath = getSecureSecretsPath();
+  const temporaryPath = `${secretsPath}.tmp-${process.pid}`;
   fs.mkdirSync(getUserDataDir(), { recursive: true });
-  fs.writeFileSync(getAppSettingsPath(), JSON.stringify(appSettingsCache, null, 2), 'utf-8');
+  fs.writeFileSync(temporaryPath, JSON.stringify(secrets, null, 2), { encoding: 'utf-8', mode: 0o600 });
+  fs.renameSync(temporaryPath, secretsPath);
+  secureSecretsCache = secrets;
+}
+
+function getSafeStorageStatus() {
+  const encryptionAvailable = safeStorage.isEncryptionAvailable();
+  let backend = null;
+  if (encryptionAvailable && typeof safeStorage.getSelectedStorageBackend === 'function') {
+    try {
+      backend = safeStorage.getSelectedStorageBackend();
+    } catch (error) {
+      console.warn('[Secrets] Failed to inspect safeStorage backend:', error);
+    }
+  }
+  // Linux's basic_text backend is obfuscation, not OS-backed encryption.  It
+  // is outside the supported release targets and must not be advertised as a
+  // secure credential store.
+  const available = encryptionAvailable && backend !== 'basic_text';
+  return { available, backend };
+}
+
+function isSecureStorageAvailable() {
+  return getSafeStorageStatus().available;
+}
+
+function secretKeyFor(scope, provider) {
+  const key = `${scope}.${String(provider || '').toLowerCase()}.api_key`;
+  validateSecretKey(key);
+  return key;
+}
+
+function hasEncryptedSecret(key) {
+  validateSecretKey(key);
+  const secrets = readSecureSecrets();
+  return typeof secrets[key] === 'string' && secrets[key].length > 0;
+}
+
+function decryptStoredSecret(key) {
+  validateSecretKey(key);
+  if (!isSecureStorageAvailable()) return null;
+  const encoded = readSecureSecrets()[key];
+  if (!encoded) return null;
+  return safeStorage.decryptString(Buffer.from(encoded, 'base64'));
+}
+
+function setStoredSecret(key, value) {
+  validateSecretKey(key);
+  if (!isSecureStorageAvailable()) {
+    const error = new Error('系统安全存储当前不可用');
+    error.code = 'ENCRYPTION_UNAVAILABLE';
+    throw error;
+  }
+  if (typeof value !== 'string' || value.length === 0) {
+    const error = new Error('密钥值不能为空');
+    error.code = 'INVALID_SECRET';
+    throw error;
+  }
+  const secrets = { ...readSecureSecrets() };
+  secrets[key] = safeStorage.encryptString(value).toString('base64');
+  writeSecureSecrets(secrets);
+}
+
+function deleteStoredSecret(key) {
+  validateSecretKey(key);
+  const secrets = { ...readSecureSecrets() };
+  const existed = Object.prototype.hasOwnProperty.call(secrets, key);
+  if (existed) {
+    delete secrets[key];
+    writeSecureSecrets(secrets);
+  }
+  return existed;
+}
+
+function redactLegacyConfigSecrets(configData) {
+  const migrated = [];
+  const sanitized = JSON.parse(JSON.stringify(configData || {}));
+  const llm = sanitized.llm && typeof sanitized.llm === 'object' ? sanitized.llm : {};
+  for (const [provider, providerConfig] of Object.entries(llm)) {
+    if (!providerConfig || typeof providerConfig !== 'object' || Array.isArray(providerConfig)) continue;
+    const value = typeof providerConfig.api_key === 'string' ? providerConfig.api_key : '';
+    if (value && value !== '***') {
+      migrated.push({ key: secretKeyFor('llm', provider), value });
+    }
+    delete providerConfig.api_key;
+    if (providerConfig.headers && typeof providerConfig.headers === 'object') {
+      for (const header of Object.keys(providerConfig.headers)) {
+        if (/(authorization|api[-_]?key|access[-_]?token|secret)/i.test(header)) {
+          delete providerConfig.headers[header];
+        }
+      }
+    }
+  }
+
+  const embedding = sanitized.embedding && typeof sanitized.embedding === 'object'
+    ? sanitized.embedding
+    : {};
+  for (const [provider, providerConfig] of Object.entries(embedding)) {
+    if (!providerConfig || typeof providerConfig !== 'object' || Array.isArray(providerConfig)) continue;
+    const value = typeof providerConfig.api_key === 'string' ? providerConfig.api_key : '';
+    if (value && value !== '***') {
+      migrated.push({ key: secretKeyFor('embedding', provider), value });
+    }
+    delete providerConfig.api_key;
+  }
+  return { sanitized, migrated };
+}
+
+function migrateLegacyPlaintextSecrets() {
+  const configPath = path.join(getUserDataDir(), 'ai_config.json');
+  if (!fs.existsSync(configPath)) return { success: true, migrated: 0 };
+  if (!isSecureStorageAvailable()) {
+    console.warn('[Secrets] Legacy plaintext migration pending: OS secure storage is unavailable');
+    return { success: false, pending: true, migrated: 0 };
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  } catch (error) {
+    console.warn('[Secrets] Legacy plaintext migration skipped: config is unreadable');
+    return { success: false, pending: true, migrated: 0 };
+  }
+
+  const { sanitized, migrated } = redactLegacyConfigSecrets(parsed);
+  const hasApiKeyFields = JSON.stringify(parsed) !== JSON.stringify(sanitized);
+  if (!hasApiKeyFields) return { success: true, migrated: 0 };
+
+  const originalSecrets = { ...readSecureSecrets() };
+  try {
+    for (const { key, value } of migrated) {
+      if (!hasEncryptedSecret(key)) {
+        setStoredSecret(key, value);
+      }
+    }
+    const temporaryPath = `${configPath}.tmp-${process.pid}`;
+    fs.writeFileSync(temporaryPath, JSON.stringify(sanitized, null, 2), {
+      encoding: 'utf-8',
+      mode: 0o600
+    });
+    fs.renameSync(temporaryPath, configPath);
+    console.log(`[Secrets] Migrated ${migrated.length} legacy credential(s) into OS secure storage`);
+    return { success: true, migrated: migrated.length };
+  } catch (error) {
+    // Keep the legacy file untouched and restore the previous secure store so
+    // a partial migration never loses or changes the user's credential.
+    try {
+      writeSecureSecrets(originalSecrets);
+    } catch (_) {
+    }
+    console.warn('[Secrets] Legacy plaintext migration failed; original config was preserved');
+    return { success: false, pending: true, migrated: 0 };
+  }
+}
+
+function toBackendError(error, context = {}) {
+  const rawDetails = error && Object.prototype.hasOwnProperty.call(error, 'details')
+    ? error.details
+    : (error && Object.prototype.hasOwnProperty.call(error, 'detail') ? error.detail : {});
+  const details = rawDetails && typeof rawDetails === 'object'
+    ? rawDetails
+    : (rawDetails == null ? {} : { detail: rawDetails });
+  return {
+    [BACKEND_ERROR_SENTINEL]: true,
+    error: {
+      code: error?.code || context.code || 'BACKEND_REQUEST_FAILED',
+      message: error?.message || context.message || '后端请求失败',
+      retryable: Boolean(error?.retryable ?? context.retryable ?? false),
+      details,
+      // v0.1 renderer compatibility; new code should use `details`.
+      detail: details,
+      status: Number.isInteger(error?.status) ? error.status : null,
+      action: context.action || null,
+      url: context.url || null
+    }
+  };
 }
 
 function registerAudioProtocol() {
@@ -267,33 +440,6 @@ function checkModels() {
 // ==================== 后端管理 ====================
 
 /**
- * 显示模型缺失提示
- */
-async function showModelMissingDialog(modelsPath) {
-  const result = await dialog.showMessageBox(mainWindow, {
-    type: 'warning',
-    title: '需要 AI 模型文件',
-    message: '未找到 AI 模型文件',
-    detail: `请在以下位置放置模型文件:\n\n${modelsPath}\n\n` +
-            `目录结构应为:\n${path.join(modelsPath, 'clap', '...')}\n\n` +
-            `您也可以将 models 文件夹放在应用安装目录。`,
-    buttons: ['打开下载页面', '打开模型目录', '退出'],
-    defaultId: 0,
-    cancelId: 2
-  });
-
-  if (result.response === 0) {
-    shell.openExternal(`https://github.com/${GITHUB_REPO}/releases`);
-  } else if (result.response === 1) {
-    // 创建目录并打开
-    fs.mkdirSync(modelsPath, { recursive: true });
-    shell.openPath(modelsPath);
-  }
-
-  app.quit();
-}
-
-/**
  * 查找可用端口（从 startPort 开始递增）
  */
 function findFreePort(startPort) {
@@ -308,10 +454,22 @@ function findFreePort(startPort) {
   });
 }
 
+function updateBackendEndpoint(port) {
+  const parsed = Number(port);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
+    throw new Error(`Invalid backend port: ${port}`);
+  }
+  backendPort = parsed;
+  backendOrigin = `http://127.0.0.1:${backendPort}`;
+  backendWsOrigin = `ws://127.0.0.1:${backendPort}`;
+  apiBaseUrl = `${backendOrigin}/api/v1`;
+}
+
 /**
  * 启动后端服务
  */
 async function startBackend() {
+  migrateLegacyPlaintextSecrets();
   if (backendProcess) {
     console.log('[Backend] Backend service already running');
     return { success: true };
@@ -321,18 +479,14 @@ async function startBackend() {
   const freePort = await findFreePort(backendPort);
   if (freePort !== backendPort) {
     console.log(`[Backend] Port ${backendPort} busy, switching to ${freePort}`);
-    backendPort = freePort;
-    backendOrigin = `http://127.0.0.1:${backendPort}`;
-    backendWsOrigin = `ws://127.0.0.1:${backendPort}`;
-    apiBaseUrl = `${backendOrigin}/api/v1`;
+    updateBackendEndpoint(freePort);
   }
 
   // 检查模型
   const modelStatus = checkModels();
   if (!modelStatus.exists) {
     console.warn('[Backend] Model files not found:', modelStatus.path);
-    await showModelMissingDialog(modelStatus.path);
-    return { success: false, error: '缺少模型文件' };
+    console.warn('[Backend] Starting without CLAP; management and keyword search remain available.');
   }
 
   // 获取后端可执行文件
@@ -360,6 +514,7 @@ async function startBackend() {
     ...process.env,
     SOUNDBOT_PORT: String(backendPort),
     SOUNDBOT_MODELS_PATH: modelStatus.path,
+    SOUNDBOT_USER_DATA_DIR: getUserDataDir(),
     PYTHONUNBUFFERED: '1',
     PYTHONIOENCODING: 'utf-8'
   };
@@ -377,10 +532,38 @@ async function startBackend() {
       detached: false
     });
 
+    // The Python process performs a final bind check and announces the actual
+    // port before starting Uvicorn. Treat that handshake as authoritative so
+    // a process racing for the Electron-probed port cannot split the app.
+    let resolvePortHandshake;
+    let portHandshakeSettled = false;
+    let stdoutHandshakeBuffer = '';
+    const portHandshake = new Promise((resolve) => {
+      resolvePortHandshake = (value) => {
+        if (portHandshakeSettled) return;
+        portHandshakeSettled = true;
+        resolve(value);
+      };
+    });
+
     // 日志处理
     backendProcess.stdout.on('data', (data) => {
-      const text = data.toString().trim();
+      const rawText = data.toString();
+      const text = rawText.trim();
       if (text) console.log(`[Backend] ${text}`);
+      stdoutHandshakeBuffer = `${stdoutHandshakeBuffer}${rawText}`;
+      const match = stdoutHandshakeBuffer.match(/BOUND_PORT=(\d{1,5})/);
+      if (match) {
+        try {
+          updateBackendEndpoint(Number(match[1]));
+          console.log(`[Backend] Confirmed bound port ${backendPort}`);
+          resolvePortHandshake(backendPort);
+        } catch (error) {
+          console.error('[Backend] Invalid port handshake:', error);
+          resolvePortHandshake(null);
+        }
+      }
+      stdoutHandshakeBuffer = stdoutHandshakeBuffer.slice(-4096);
     });
 
     backendProcess.stderr.on('data', (data) => {
@@ -392,45 +575,39 @@ async function startBackend() {
       console.error('[Backend] Process error:', error);
       backendProcess = null;
       backendStartupPromise = null;
+      backendSecretsHydrated = false;
+      resolvePortHandshake(null);
     });
 
     backendProcess.on('exit', (code, signal) => {
       console.log(`[Backend] Process exited, code: ${code}, signal: ${signal}`);
       backendProcess = null;
       backendStartupPromise = null;
+      backendSecretsHydrated = false;
+      resolvePortHandshake(null);
     });
 
-    // 等待服务启动
-    return new Promise((resolve) => {
-      let retries = 0;
-      const maxRetries = 120; // 120秒超时（torch冷启动在Windows上可能较慢）
+    let handshakeTimer;
+    const announcedPort = await Promise.race([
+      portHandshake,
+      new Promise((resolve) => {
+        handshakeTimer = setTimeout(() => resolve(null), 10000);
+      })
+    ]);
+    clearTimeout(handshakeTimer);
+    if (!announcedPort) {
+      console.error('[Backend] ✗ Port handshake timeout');
+      if (backendProcess && backendProcess.exitCode === null) backendProcess.kill();
+      return { success: false, error: '后端端口握手失败' };
+    }
 
-      const interval = setInterval(async () => {
-        // 快速失败：进程已提前退出
-        if (!backendProcess || backendProcess.exitCode !== null) {
-          clearInterval(interval);
-          const code = backendProcess ? backendProcess.exitCode : 'unknown';
-          console.error(`[Backend] ✗ Process exited before becoming healthy (code: ${code})`);
-          resolve({ success: false, error: `后端进程意外退出 (code: ${code})` });
-          return;
-        }
-        try {
-          const res = await fetch(`${apiBaseUrl}/health`);
-          if (res.ok) {
-            clearInterval(interval);
-            console.log('[Backend] ✓ Backend service started successfully');
-            resolve({ success: true });
-          }
-        } catch (e) {
-          retries++;
-          if (retries >= maxRetries) {
-            clearInterval(interval);
-            console.error('[Backend] ✗ Startup timeout');
-            resolve({ success: false, error: '启动超时' });
-          }
-        }
-      }, 1000);
-    });
+    const health = await waitForBackendHealth(120000);
+    if (health.success) {
+      console.log('[Backend] ✓ Backend service started successfully');
+    } else {
+      console.error(`[Backend] ✗ ${health.error}`);
+    }
+    return health;
 
   } catch (error) {
     console.error('[Backend] Startup failed:', error);
@@ -442,12 +619,23 @@ async function waitForBackendHealth(timeoutMs = 120000) {
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMs) {
+    if (!backendProcess || backendProcess.exitCode !== null) {
+      const code = backendProcess ? backendProcess.exitCode : 'unknown';
+      return { success: false, error: `后端进程意外退出 (code: ${code})` };
+    }
+    const controller = new AbortController();
+    const requestTimer = setTimeout(() => controller.abort(), 2000);
     try {
-      const res = await fetch(`${apiBaseUrl}/health`);
+      const res = await fetch(`${apiBaseUrl}/health`, { signal: controller.signal });
       if (res.ok) {
-        return { success: true };
+        const payload = await res.json().catch(() => null);
+        if (payload?.status === 'healthy' && typeof payload?.version === 'string') {
+          return { success: true };
+        }
       }
     } catch (error) {
+    } finally {
+      clearTimeout(requestTimer);
     }
 
     await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -458,7 +646,9 @@ async function waitForBackendHealth(timeoutMs = 120000) {
 
 async function ensureBackendStarted() {
   if (backendProcess) {
-    return await waitForBackendHealth();
+    const result = await waitForBackendHealth();
+    if (result.success) await hydrateBackendAISecrets();
+    return result;
   }
 
   if (backendStartupPromise) {
@@ -466,6 +656,10 @@ async function ensureBackendStarted() {
   }
 
   backendStartupPromise = startBackend()
+    .then(async (result) => {
+      if (result.success) await hydrateBackendAISecrets();
+      return result;
+    })
     .finally(() => {
       if (!backendProcess) {
         backendStartupPromise = null;
@@ -490,21 +684,64 @@ async function parseBackendError(response) {
   try {
     if (contentType.includes('application/json')) {
       const data = await response.json();
-      return data.detail || data.error || JSON.stringify(data);
+      const detailError = data?.detail && typeof data.detail === 'object' ? data.detail : null;
+      const structuredError = data?.error && typeof data.error === 'object'
+        ? data.error
+        : (detailError || data);
+      const message = typeof data.detail === 'string'
+        ? data.detail
+        : (typeof data.error === 'string'
+          ? data.error
+          : (structuredError?.message || `HTTP ${response.status}`));
+      return {
+        code: structuredError?.code || data.code || `HTTP_${response.status}`,
+        message,
+        retryable: Boolean(
+          structuredError?.retryable
+          ?? [408, 425, 429, 502, 503, 504].includes(response.status)
+        ),
+        details: structuredError?.details && typeof structuredError.details === 'object'
+          ? structuredError.details
+          : {},
+        status: response.status
+      };
     }
 
     const text = await response.text();
-    return text || `HTTP ${response.status}`;
+    return {
+      code: `HTTP_${response.status}`,
+      message: text || `HTTP ${response.status}`,
+      retryable: [408, 425, 429, 502, 503, 504].includes(response.status),
+      details: text ? { response: text } : {},
+      status: response.status
+    };
   } catch (error) {
-    return `HTTP ${response.status}`;
+    return {
+      code: `HTTP_${response.status}`,
+      message: `HTTP ${response.status}`,
+      retryable: [408, 425, 429, 502, 503, 504].includes(response.status),
+      details: {},
+      status: response.status
+    };
   }
+}
+
+async function throwBackendResponseError(response) {
+  const parsed = await parseBackendError(response);
+  const error = new Error(parsed.message);
+  error.code = parsed.code;
+  error.retryable = parsed.retryable;
+  error.details = parsed.details;
+  error.detail = parsed.details;
+  error.status = parsed.status;
+  throw error;
 }
 
 async function requestBackendJson(url, options = {}) {
   const response = await fetch(url, options);
 
   if (!response.ok) {
-    throw new Error(await parseBackendError(response));
+    await throwBackendResponseError(response);
   }
 
   const contentType = response.headers.get('content-type') || '';
@@ -515,22 +752,156 @@ async function requestBackendJson(url, options = {}) {
   return { success: true, data: await response.text() };
 }
 
-async function requestBackendBinary(url, options = {}) {
-  const response = await fetch(url, options);
+function cloneConfig(value) {
+  return JSON.parse(JSON.stringify(value || {}));
+}
 
-  if (!response.ok) {
-    throw new Error(await parseBackendError(response));
+function stripRendererSecretFields(providerConfig) {
+  const sanitized = cloneConfig(providerConfig);
+  delete sanitized.api_key;
+  delete sanitized.has_api_key;
+  delete sanitized.secret_action;
+  return sanitized;
+}
+
+function normalizeSecretUpdate(value) {
+  const action = value?.action || 'keep';
+  if (!['keep', 'set', 'clear'].includes(action)) {
+    const error = new Error('无效的密钥更新操作');
+    error.code = 'INVALID_SECRET_ACTION';
+    throw error;
   }
-
-  const buffer = await response.arrayBuffer();
-  return {
-    success: true,
-    data: Array.from(new Uint8Array(buffer)),
-    headers: {
-      cached: response.headers.get('X-Cached'),
-      duration: response.headers.get('X-Duration')
+  if (action === 'set') {
+    if (typeof value?.value !== 'string' || value.value.trim().length === 0) {
+      const error = new Error('新密钥不能为空');
+      error.code = 'INVALID_SECRET';
+      throw error;
     }
+    return { action, value: value.value.trim() };
+  }
+  return { action, value: null };
+}
+
+function resolveSecretForRequest(scope, provider, update) {
+  const key = secretKeyFor(scope, provider);
+  const normalized = normalizeSecretUpdate(update);
+  if (normalized.action === 'set') {
+    return { key, ...normalized, resolved: normalized.value };
+  }
+  if (normalized.action === 'clear') {
+    return { key, ...normalized, resolved: '' };
+  }
+  if (hasEncryptedSecret(key) && !isSecureStorageAvailable()) {
+    const error = new Error('已保存密钥当前无法由系统安全存储解密');
+    error.code = 'ENCRYPTION_UNAVAILABLE';
+    throw error;
+  }
+  return { key, ...normalized, resolved: decryptStoredSecret(key) || '' };
+}
+
+function prepareAIConfigRequest(payload = {}) {
+  const llmProvider = String(payload.llm_provider || '');
+  const embeddingProvider = String(payload.embedding_provider || '');
+  // Deriving the key also validates provider identifiers before any store or
+  // backend operation occurs.
+  const llmSecret = resolveSecretForRequest('llm', llmProvider, payload.llm_secret);
+  const embeddingSecret = resolveSecretForRequest(
+    'embedding', embeddingProvider, payload.embedding_secret
+  );
+  const llmConfig = stripRendererSecretFields(payload.llm_config);
+  const embeddingConfig = stripRendererSecretFields(payload.embedding_config);
+  llmConfig.api_key = llmSecret.resolved;
+  embeddingConfig.api_key = embeddingSecret.resolved;
+  return {
+    body: {
+      llm_provider: llmProvider,
+      llm_config: llmConfig,
+      embedding_provider: embeddingProvider,
+      embedding_config: embeddingConfig
+    },
+    updates: [llmSecret, embeddingSecret]
   };
+}
+
+function overlaySecureSecretStatus(responseData) {
+  const result = cloneConfig(responseData);
+  const groups = [
+    ['llm', result?.llm?.config],
+    ['embedding', result?.embedding?.config]
+  ];
+  for (const [scope, configs] of groups) {
+    if (!configs || typeof configs !== 'object') continue;
+    for (const [provider, providerConfig] of Object.entries(configs)) {
+      if (!providerConfig || typeof providerConfig !== 'object' || Array.isArray(providerConfig)) continue;
+      delete providerConfig.api_key;
+      try {
+        providerConfig.has_api_key = hasEncryptedSecret(secretKeyFor(scope, provider));
+      } catch (_) {
+        providerConfig.has_api_key = false;
+      }
+    }
+  }
+  result.secure_storage = getSafeStorageStatus();
+  return result;
+}
+
+function snapshotSecretStore() {
+  return { ...readSecureSecrets() };
+}
+
+function restoreSecretStore(snapshot) {
+  writeSecureSecrets({ ...(snapshot || {}) });
+}
+
+function applyPersistentSecretUpdates(updates) {
+  for (const update of updates) {
+    if (update.action === 'set') {
+      setStoredSecret(update.key, update.value);
+    } else if (update.action === 'clear') {
+      deleteStoredSecret(update.key);
+    }
+  }
+}
+
+async function hydrateBackendAISecrets() {
+  if (backendSecretsHydrated) return;
+  if (!isSecureStorageAvailable()) {
+    console.warn('[Secrets] Backend credential hydration skipped: secure storage unavailable');
+    return;
+  }
+  try {
+    const current = await requestBackendJson(`${apiBaseUrl}/ai/config`);
+    const llmProvider = current?.llm?.provider;
+    const embeddingProvider = current?.embedding?.provider;
+    if (!llmProvider || !embeddingProvider) return;
+    const prepared = prepareAIConfigRequest({
+      llm_provider: llmProvider,
+      llm_config: current?.llm?.config?.[llmProvider] || {},
+      llm_secret: { action: 'keep' },
+      embedding_provider: embeddingProvider,
+      embedding_config: current?.embedding?.config?.[embeddingProvider] || {},
+      embedding_secret: { action: 'keep' }
+    });
+    await requestBackendJson(`${apiBaseUrl}/ai/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(prepared.body)
+    });
+    backendSecretsHydrated = true;
+    console.log('[Secrets] Backend runtime credentials hydrated');
+  } catch (error) {
+    console.warn('[Secrets] Backend credential hydration failed:', error?.code || error?.message);
+  }
+}
+
+function requireProjectId(value) {
+  const projectId = typeof value === 'string' ? value.trim() : '';
+  if (!projectId) {
+    const error = new Error('projectId is required');
+    error.code = 'PROJECT_ID_REQUIRED';
+    throw error;
+  }
+  return projectId;
 }
 
 function createBackendRequest(action, data = {}) {
@@ -540,18 +911,6 @@ function createBackendRequest(action, data = {}) {
   switch (action) {
     case 'health':
       return { url: `${apiBaseUrl}/health` };
-    case 'scan':
-      return {
-        url: `${apiBaseUrl}/scan`,
-        options: {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            folder_path: data.folderPath,
-            recursive: data.recursive ?? true
-          })
-        }
-      };
     case 'scan-only':
       return {
         url: `${apiBaseUrl}/scan-only`,
@@ -566,13 +925,26 @@ function createBackendRequest(action, data = {}) {
       };
     case 'import-async':
       return {
-        url: `${apiBaseUrl}/import/async?client_id=${encodeURIComponent(data.clientId || 'default')}`,
+        url: `${apiBaseUrl}/projects/${encodeURIComponent(requireProjectId(data.projectId))}/imports`,
         options: {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             folder_path: data.folderPath,
-            recursive: data.recursive ?? true
+            recursive: data.recursive ?? true,
+            client_id: data.clientId || 'default'
+          })
+        }
+      };
+    case 'import-files':
+      return {
+        url: `${apiBaseUrl}/projects/${encodeURIComponent(requireProjectId(data.projectId))}/imports`,
+        options: {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            file_paths: Array.isArray(data.filePaths) ? data.filePaths : [],
+            client_id: data.clientId || 'default'
           })
         }
       };
@@ -587,7 +959,8 @@ function createBackendRequest(action, data = {}) {
             top_k: data.topK,
             threshold: data.threshold,
             page: data.page || 1,
-            page_size: data.page_size || 50
+            page_size: data.page_size || 50,
+            project_id: requireProjectId(data.projectId)
           })
         }
       };
@@ -619,15 +992,22 @@ function createBackendRequest(action, data = {}) {
       return { localOnly: true, result: { success: true, url: `${apiBaseUrl}/audio/${encodedPath}` } };
     case 'waveform':
       return { url: `${backendOrigin}/api/waveform?path=${encodedPath}` };
-    case 'audio-preload':
+    case 'waveform-by-id':
       return {
-        url: `${apiBaseUrl}/audio/preload/${encodedPath}`,
-        options: { method: 'POST' }
+        url: `${apiBaseUrl}/files/${encodeURIComponent(data.fileId)}/waveform?project_id=${encodeURIComponent(data.projectId || 'default')}`
       };
-    case 'audio-decoded':
-      return { url: `${apiBaseUrl}/audio/decoded/${encodedPath}` };
-    case 'audio-stream':
-      return { url: `${apiBaseUrl}/audio/stream/${encodedPath}`, responseType: 'binary' };
+    case 'waveforms-batch':
+      return {
+        url: `${apiBaseUrl}/waveforms/batch`,
+        options: {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            file_ids: Array.isArray(data.fileIds) ? data.fileIds : [],
+            project_id: data.projectId || 'default'
+          })
+        }
+      };
     case 'export-clip':
       return {
         url: `${backendOrigin}/api/export/clip`,
@@ -682,6 +1062,8 @@ function createBackendRequest(action, data = {}) {
  * 停止后端服务
  */
 async function stopBackend() {
+  for (const controller of activeBackendRequests.values()) controller.abort();
+  activeBackendRequests.clear();
   if (!backendProcess) {
     return { success: true };
   }
@@ -721,7 +1103,6 @@ function createWindow() {
     minWidth: 1200,
     minHeight: 700,
     title: 'SoundBot - AI 音效管理器',
-    icon: path.join(__dirname, 'assets', 'icon.png'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -865,9 +1246,15 @@ function setupIpcHandlers() {
 
   // 后端 API 代理
   ipcMain.handle('backend-api', async (event, action, data) => {
+    let requestConfig = null;
+    let requestKey = null;
+    let requestController = null;
     try {
       if (action === 'start-server') {
-        return await ensureBackendStarted();
+        const result = await ensureBackendStarted();
+        return result?.success === false
+          ? toBackendError(new Error(result.error || '后端启动失败'), { action, code: 'BACKEND_START_FAILED' })
+          : result;
       }
 
       if (action === 'stop-server') {
@@ -880,26 +1267,164 @@ function setupIpcHandlers() {
 
       const startupResult = await ensureBackendStarted();
       if (!startupResult.success) {
-        return startupResult;
+        return toBackendError(new Error(startupResult.error || '后端未就绪'), {
+          action,
+          code: 'BACKEND_NOT_READY'
+        });
       }
 
-      const requestConfig = createBackendRequest(action, data);
+      requestConfig = createBackendRequest(action, data);
       if (!requestConfig) {
-        return { success: false, error: `未知操作: ${action}` };
+        return toBackendError(new Error(`未知操作: ${action}`), {
+          action,
+          code: 'UNKNOWN_BACKEND_ACTION'
+        });
       }
 
       if (requestConfig.localOnly) {
         return requestConfig.result;
       }
 
-      if (requestConfig.responseType === 'binary') {
-        return await requestBackendBinary(requestConfig.url, requestConfig.options);
+      const requestId = data && typeof data === 'object'
+        ? String(data.requestId || '').trim()
+        : '';
+      if (requestId) {
+        requestKey = `${event.sender.id}:${requestId}`;
+        const previous = activeBackendRequests.get(requestKey);
+        if (previous) previous.abort();
+        requestController = new AbortController();
+        activeBackendRequests.set(requestKey, requestController);
+        requestConfig.options = {
+          ...(requestConfig.options || {}),
+          signal: requestController.signal
+        };
       }
 
       return await requestBackendJson(requestConfig.url, requestConfig.options);
     } catch (error) {
+      if (error?.name === 'AbortError') {
+        const cancelledError = new Error('请求已取消');
+        cancelledError.code = 'REQUEST_CANCELLED';
+        cancelledError.retryable = true;
+        cancelledError.details = { cancelled: true };
+        return toBackendError(cancelledError, {
+          action,
+          url: requestConfig?.url || null
+        });
+      }
       console.error('[IPC] Backend API error:', error);
-      return { success: false, error: error.message };
+      return toBackendError(error, { action, url: requestConfig?.url || null });
+    } finally {
+      if (requestKey && activeBackendRequests.get(requestKey) === requestController) {
+        activeBackendRequests.delete(requestKey);
+      }
+    }
+  });
+
+  ipcMain.handle('backend-api-cancel', (event, requestId) => {
+    const normalized = String(requestId || '').trim();
+    if (!normalized) return { success: false, cancelled: false };
+    const requestKey = `${event.sender.id}:${normalized}`;
+    const controller = activeBackendRequests.get(requestKey);
+    if (!controller) return { success: true, cancelled: false };
+    controller.abort();
+    activeBackendRequests.delete(requestKey);
+    return { success: true, cancelled: true };
+  });
+
+  // Credential-aware AI config proxy.  Plaintext keys never cross back from
+  // the Electron main process into the renderer and are never persisted by
+  // the Python backend.
+  ipcMain.handle('ai-config', async (event, action, payload = {}) => {
+    try {
+      const startupResult = await ensureBackendStarted();
+      if (!startupResult.success) {
+        return {
+          success: false,
+          code: 'BACKEND_NOT_READY',
+          error: startupResult.error || '后端未就绪'
+        };
+      }
+
+      if (action === 'get') {
+        const result = await requestBackendJson(`${apiBaseUrl}/ai/config`);
+        return overlaySecureSecretStatus(result);
+      }
+
+      if (!['save', 'test'].includes(action)) {
+        return { success: false, code: 'UNKNOWN_AI_CONFIG_ACTION', error: '未知 AI 配置操作' };
+      }
+
+      const prepared = prepareAIConfigRequest(payload);
+      const snapshot = action === 'save' ? snapshotSecretStore() : null;
+      try {
+        if (action === 'save') {
+          // Persist first, then roll back if the metadata/backend update fails.
+          // This makes the secure store and runtime configuration one logical
+          // transaction from the renderer's perspective.
+          applyPersistentSecretUpdates(prepared.updates);
+        }
+        const result = await requestBackendJson(
+          `${apiBaseUrl}/ai/config${action === 'test' ? '/test' : ''}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(prepared.body)
+          }
+        );
+        if (action === 'save') backendSecretsHydrated = true;
+        return result;
+      } catch (error) {
+        if (action === 'save') {
+          try {
+            restoreSecretStore(snapshot);
+          } catch (_) {
+          }
+        }
+        throw error;
+      }
+    } catch (error) {
+      console.error('[AI Config] Secure proxy request failed:', error?.code || error?.message);
+      return {
+        success: false,
+        code: error?.code || 'AI_CONFIG_FAILED',
+        error: error?.message || 'AI 配置请求失败',
+        status: Number.isInteger(error?.status) ? error.status : null
+      };
+    }
+  });
+
+  ipcMain.handle('secure-secret', async (event, action, payload = {}) => {
+    try {
+      if (action === 'status') {
+        return { success: true, ...getSafeStorageStatus() };
+      }
+
+      validateSecretKey(payload.key);
+      if (!isSecureStorageAvailable()) {
+        return { success: false, code: 'ENCRYPTION_UNAVAILABLE', error: '系统安全存储当前不可用' };
+      }
+
+      if (action === 'set') {
+        setStoredSecret(payload.key, payload.value);
+        return { success: true };
+      }
+
+      if (action === 'get' || action === 'has') {
+        // Deliberately expose existence only.  Renderer code must never be
+        // able to retrieve an already stored plaintext credential.
+        return { success: true, exists: hasEncryptedSecret(payload.key) };
+      }
+
+      if (action === 'delete') {
+        const existed = deleteStoredSecret(payload.key);
+        return { success: true, existed };
+      }
+
+      return { success: false, code: 'UNKNOWN_SECRET_ACTION', error: `未知密钥操作: ${action}` };
+    } catch (error) {
+      console.error('[Secrets] IPC error:', error);
+      return { success: false, code: 'SECRET_STORE_ERROR', error: error.message };
     }
   });
 
@@ -935,163 +1460,6 @@ function setupIpcHandlers() {
     return { success: true };
   });
 
-  ipcMain.handle('app-settings', async (event, { action, key, value } = {}) => {
-    try {
-      const settings = readAppSettings();
-
-      switch (action) {
-        case 'get':
-          return { success: true, value: key ? settings[key] : undefined };
-        case 'set':
-          settings[key] = value;
-          writeAppSettings(settings);
-          return { success: true };
-        case 'getAll':
-          return { success: true, settings };
-        default:
-          return { success: false, error: `未知设置操作: ${action}` };
-      }
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle('theme-manager', async (event, action, theme) => {
-    try {
-      const settings = readAppSettings();
-      const currentTheme = settings.theme || 'system';
-
-      if (action === 'get') {
-        return { success: true, theme: currentTheme };
-      }
-
-      if (action === 'set') {
-        settings.theme = theme || 'system';
-        writeAppSettings(settings);
-        return { success: true, theme: settings.theme };
-      }
-
-      if (action === 'toggle') {
-        settings.theme = currentTheme === 'dark' ? 'light' : 'dark';
-        writeAppSettings(settings);
-        return { success: true, theme: settings.theme };
-      }
-
-      return { success: false, error: `未知主题操作: ${action}` };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle('shortcuts-register', async (event, accelerator) => {
-    try {
-      if (!accelerator || typeof accelerator !== 'string') {
-        return { success: false, error: '无效的快捷键' };
-      }
-
-      if (registeredShortcuts.has(accelerator)) {
-        return { success: true, id: accelerator };
-      }
-
-      const registered = globalShortcut.register(accelerator, () => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send(`shortcut-${accelerator}`);
-        }
-      });
-
-      if (!registered) {
-        return { success: false, error: '快捷键注册失败' };
-      }
-
-      registeredShortcuts.add(accelerator);
-      return { success: true, id: accelerator };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle('shortcuts-unregister', async (event, id) => {
-    try {
-      if (id && registeredShortcuts.has(id)) {
-        globalShortcut.unregister(id);
-        registeredShortcuts.delete(id);
-      }
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle('file-operation', async (event, action, payload = {}) => {
-    try {
-      switch (action) {
-        case 'open': {
-          const result = await dialog.showOpenDialog(mainWindow, payload || {});
-          return { success: !result.canceled, canceled: result.canceled, filePaths: result.filePaths || [] };
-        }
-        case 'save': {
-          const result = await dialog.showSaveDialog(mainWindow, payload.options || {});
-          if (result.canceled || !result.filePath) {
-            return { success: false, canceled: true };
-          }
-
-          const data = typeof payload.data === 'string' ? payload.data : JSON.stringify(payload.data ?? {}, null, 2);
-          fs.writeFileSync(result.filePath, data, 'utf-8');
-          return { success: true, filePath: result.filePath };
-        }
-        case 'import': {
-          const result = await dialog.showOpenDialog(mainWindow, {
-            properties: ['openFile', 'multiSelections'],
-            ...(payload || {})
-          });
-          return { success: !result.canceled, canceled: result.canceled, filePaths: result.filePaths || [] };
-        }
-        case 'export': {
-          const result = await dialog.showSaveDialog(mainWindow, payload.options || {});
-          if (result.canceled || !result.filePath) {
-            return { success: false, canceled: true };
-          }
-
-          fs.writeFileSync(result.filePath, JSON.stringify(payload.data ?? {}, null, 2), 'utf-8');
-          return { success: true, filePath: result.filePath };
-        }
-        default:
-          return { success: false, error: `未知文件操作: ${action}` };
-      }
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle('audio-processing', async (event, action, payload) => {
-    try {
-      if (action === 'metadata') {
-        if (!payload || !fs.existsSync(payload)) {
-          return { success: false, error: '文件不存在' };
-        }
-        const stats = fs.statSync(payload);
-        return {
-          success: true,
-          path: payload,
-          filename: path.basename(payload),
-          size: stats.size,
-          extension: path.extname(payload).toLowerCase(),
-          modifiedAt: stats.mtimeMs
-        };
-      }
-
-      return { success: false, error: `音频操作暂未实现: ${action}` };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle('project-manager', async (event, action) => {
-    return { success: false, error: `项目管理操作请使用内置工程 API: ${action}` };
-  });
-
-  const supportedAudioExtensions = new Set(['.wav', '.mp3', '.flac', '.aiff', '.aif', '.ogg', '.m4a', '.aac', '.wma']);
-
   function toImportFileInfo(filePath) {
     const stats = fs.statSync(filePath);
     const extension = path.extname(filePath).toLowerCase();
@@ -1110,11 +1478,11 @@ function setupIpcHandlers() {
       switch (action) {
         case 'select-audio': {
           const result = await dialog.showOpenDialog(mainWindow, {
+            ...payload,
             properties: ['openFile', 'multiSelections'],
             filters: [
-              { name: 'Audio Files', extensions: ['wav', 'mp3', 'flac', 'aiff', 'aif', 'ogg', 'm4a', 'aac', 'wma'] }
-            ],
-            ...payload
+              { name: 'Audio Files', extensions: supportedAudioFilterExtensions }
+            ]
           });
 
           if (result.canceled) {
@@ -1135,8 +1503,8 @@ function setupIpcHandlers() {
         }
         case 'select-folder': {
           const result = await dialog.showOpenDialog(mainWindow, {
-            properties: ['openDirectory'],
-            ...payload
+            ...payload,
+            properties: ['openDirectory']
           });
 
           if (result.canceled) {
@@ -1189,63 +1557,6 @@ function setupIpcHandlers() {
     }
   });
 
-  ipcMain.handle('notification-show', async (event, { title, body, options } = {}) => {
-    try {
-      const notification = new Notification({
-        title: title || 'SoundBot',
-        body: body || '',
-        ...options
-      });
-      notification.show();
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  // 获取路径
-  ipcMain.handle('get-paths', () => {
-    return {
-      appRoot: getAppRootDir(),
-      userData: getUserDataDir(),
-      models: findModelsDir()
-    };
-  });
-
-  // 检查资源
-  ipcMain.handle('check-resources', () => {
-    const modelStatus = checkModels();
-    return {
-      models: modelStatus.exists,
-      modelsPath: modelStatus.path
-    };
-  });
-
-  // 打开下载页面
-  ipcMain.handle('open-download-page', () => {
-    shell.openExternal(`https://github.com/${GITHUB_REPO}/releases`);
-  });
-
-  // 读取音频文件
-  ipcMain.handle('read-audio-file', async (event, filePath) => {
-    try {
-      if (!filePath || !path.isAbsolute(filePath)) {
-        return { success: false, error: '无效的文件路径' };
-      }
-      if (!fs.existsSync(filePath)) {
-        return { success: false, error: '文件不存在' };
-      }
-
-      const buffer = fs.readFileSync(filePath);
-      return {
-        success: true,
-        data: Array.from(new Uint8Array(buffer))
-      };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  });
-
   // 拖拽文件
   ipcMain.handle('start-drag', async (event, filePath) => {
     try {
@@ -1267,30 +1578,6 @@ function setupIpcHandlers() {
     }
   });
 
-  // 调试信息
-  ipcMain.handle('get-backend-status', () => {
-    return {
-      isRunning: backendProcess !== null,
-      pid: backendProcess ? backendProcess.pid : null,
-      port: backendPort
-    };
-  });
-
-  ipcMain.handle('get-app-paths', () => {
-    return {
-      appRoot: getAppRootDir(),
-      userData: getUserDataDir(),
-      resourcesPath: process.resourcesPath,
-      backendExecutable: getBackendExecutable(),
-      modelsPath: findModelsDir()
-    };
-  });
-
-  ipcMain.handle('open-dev-tools', () => {
-    if (mainWindow) {
-      mainWindow.webContents.openDevTools();
-    }
-  });
 }
 
 // ==================== 应用生命周期 ====================
@@ -1438,8 +1725,7 @@ app.whenReady().then(async () => {
   });
 });
 
-app.on('window-all-closed', async () => {
-  await stopBackend();
+app.on('window-all-closed', () => {
   app.quit();
 });
 
@@ -1456,8 +1742,11 @@ app.on('activate', () => {
 });
 
 app.on('before-quit', async (event) => {
+  if (quitInProgress) {
+    return;
+  }
   event.preventDefault();
-  globalShortcut.unregisterAll();
+  quitInProgress = true;
   await stopBackend();
   app.exit(0);
 });

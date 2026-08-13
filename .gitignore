@@ -6,6 +6,7 @@ yarn-error.log*
 
 # Build output
 dist/
+dist-electron/
 !build/icon.icns
 !build/icon.ico
 !build/icon.png
@@ -102,6 +103,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
+.venv/
 env/
 venv/
 ENV/
@@ -115,6 +117,7 @@ venv.bak/
 *.db
 *.sqlite
 *.sqlite3
+chroma/
 
 # Backend specific
 backend/db/*.db
@@ -127,6 +130,7 @@ backend/temp_clips/
 
 # Models (too large for git)
 models/
+downloads/
 *.bin
 *.safetensors
 *.pt
@@ -143,6 +147,7 @@ ehthumbs.db
 Thumbs.db
 
 # IDE
+.cursor/
 .idea/
 .vscode/
 *.swp

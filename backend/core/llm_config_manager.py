@@ -26,14 +26,15 @@ LLM 和 Embedding 配置管理器
 import json
 import os
 import re
+import copy
+import logging
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, asdict
 from urllib.parse import urlparse
-import requests
+import httpx
 
 import config
-from utils.logger import get_logger
 
 
 def validate_url(url: str, allowed_schemes: List[str] = None, allow_local: bool = False) -> bool:
@@ -63,6 +64,10 @@ def validate_url(url: str, allowed_schemes: List[str] = None, allow_local: bool 
         
         # 检查是否有主机名
         if not parsed.hostname:
+            return False
+        if parsed.username or parsed.password:
+            return False
+        if re.search(r"(?:api[-_]?key|token|secret)=", parsed.query, re.IGNORECASE):
             return False
         
         # 默认禁止访问内网地址；本地模型服务会显式放开。
@@ -100,7 +105,57 @@ def validate_url(url: str, allowed_schemes: List[str] = None, allow_local: bool 
     except Exception:
         return False
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
+
+
+_SENSITIVE_HEADER_PATTERN = re.compile(
+    r"(?:authorization|api[-_]?key|access[-_]?token|secret)", re.IGNORECASE
+)
+
+
+def _contains_plaintext_secret(value: Any) -> bool:
+    """Return whether a config tree contains a non-empty credential value."""
+    if isinstance(value, dict):
+        for key, child in value.items():
+            normalized = str(key).lower()
+            if normalized == "api_key" and isinstance(child, str) and child:
+                return True
+            if normalized == "headers" and isinstance(child, dict):
+                if any(
+                    _SENSITIVE_HEADER_PATTERN.search(str(header)) and bool(header_value)
+                    for header, header_value in child.items()
+                ):
+                    return True
+            if _contains_plaintext_secret(child):
+                return True
+    elif isinstance(value, list):
+        return any(_contains_plaintext_secret(item) for item in value)
+    return False
+
+
+def _config_for_disk(value: Any, *, inside_headers: bool = False) -> Any:
+    """Deep-copy a configuration while removing every credential field.
+
+    Runtime clients still receive secrets from the in-memory configuration.  The
+    JSON file is metadata-only; Electron safeStorage is the sole persistent
+    credential source.
+    """
+    if isinstance(value, dict):
+        sanitized: Dict[str, Any] = {}
+        for key, child in value.items():
+            normalized = str(key).lower()
+            if normalized == "api_key":
+                continue
+            if inside_headers and _SENSITIVE_HEADER_PATTERN.search(str(key)):
+                continue
+            sanitized[key] = _config_for_disk(
+                child,
+                inside_headers=normalized == "headers",
+            )
+        return sanitized
+    if isinstance(value, list):
+        return [_config_for_disk(item, inside_headers=inside_headers) for item in value]
+    return copy.deepcopy(value)
 
 
 # ==================== 常量定义 ====================
@@ -122,7 +177,9 @@ class LLMProvider:
     # 自定义
     CUSTOM = "custom"
 
-    ALL = [LM_STUDIO, OLLAMA, OPENAI, AZURE, GEMINI, KIMI, KIMI_CODING, ANTHROPIC, DEEPSEEK, SILICONFLOW, CUSTOM]
+    # v0.2 exposes only providers with one verified OpenAI-compatible adapter.
+    ALL = [LM_STUDIO, OLLAMA, OPENAI, KIMI, DEEPSEEK, SILICONFLOW, CUSTOM]
+    LEGACY = [AZURE, GEMINI, KIMI_CODING, ANTHROPIC]
 
 
 # LLM 提供者元数据（显示名称、默认端点、API 版本等）
@@ -239,6 +296,9 @@ LLM_PROVIDER_META: Dict[str, Dict[str, Any]] = {
     },
 }
 
+for _provider_name, _provider_meta in LLM_PROVIDER_META.items():
+    _provider_meta["enabled"] = _provider_name in LLMProvider.ALL
+
 
 # Embedding 提供者类型
 class EmbeddingProvider:
@@ -327,7 +387,7 @@ DEFAULT_CONFIG = {
         "siliconflow": {
             "base_url": "https://api.siliconflow.cn/v1",
             "api_key": "",
-            "model": "BAAI/bge-m3",
+            "model": "Qwen/Qwen2.5-7B-Instruct",
         },
         "custom": {
             "base_url": "https://your-api.com/v1",
@@ -420,7 +480,17 @@ class LLMConfigManager:
                 with open(self._config_path, 'r', encoding='utf-8') as f:
                     loaded = json.load(f)
                     # 合并默认配置，确保所有字段都存在
-                    return self._merge_config(DEFAULT_CONFIG, loaded)
+                    merged = self._normalize_provider_selection(
+                        self._merge_config(DEFAULT_CONFIG, loaded)
+                    )
+                    if _contains_plaintext_secret(loaded):
+                        logger.warning(
+                            "检测到旧版明文 AI 密钥；已仅加载到当前进程内存并从 JSON 配置移除"
+                        )
+                    # Always rewrite through the redacting serializer.  This
+                    # also removes empty legacy api_key placeholders.
+                    self._save_config(merged)
+                    return merged
             except Exception as e:
                 logger.warning(f"加载配置文件失败: {e}，使用默认配置")
 
@@ -428,19 +498,44 @@ class LLMConfigManager:
             try:
                 with open(self._default_config_path, 'r', encoding='utf-8') as f:
                     loaded = json.load(f)
-                merged = self._merge_config(DEFAULT_CONFIG, loaded)
+                merged = self._normalize_provider_selection(
+                    self._merge_config(DEFAULT_CONFIG, loaded)
+                )
                 self._save_config(merged)
                 return merged
             except Exception as e:
                 logger.warning(f"加载默认 AI 配置失败: {e}，使用内置默认配置")
         
         # 创建默认配置文件
-        self._save_config(DEFAULT_CONFIG)
-        return DEFAULT_CONFIG.copy()
+        defaults = self._normalize_provider_selection(copy.deepcopy(DEFAULT_CONFIG))
+        self._save_config(defaults)
+        return defaults
+
+    def _normalize_provider_selection(self, value: dict) -> dict:
+        """Keep legacy config blocks but never select an unverified adapter."""
+        result = copy.deepcopy(value)
+        llm = result.setdefault("llm", {})
+        selected = llm.get("provider", LLMProvider.LM_STUDIO)
+        if selected not in LLMProvider.ALL:
+            llm["legacy_provider"] = selected
+            llm["provider"] = LLMProvider.LM_STUDIO
+            logger.warning(
+                "LLM 提供者 %s 在 v0.2 中未启用，已回退到 LM Studio；原配置仍保留",
+                selected,
+            )
+        # Older defaults accidentally selected an embedding-only model for
+        # SiliconFlow chat. Preserve custom choices but repair that known bad
+        # default during config migration.
+        siliconflow = llm.get(LLMProvider.SILICONFLOW, {})
+        if siliconflow.get("model") == "BAAI/bge-m3":
+            siliconflow["model"] = LLM_PROVIDER_META[LLMProvider.SILICONFLOW][
+                "default_model"
+            ]
+        return result
     
     def _merge_config(self, default: dict, loaded: dict) -> dict:
         """深度合并配置"""
-        result = default.copy()
+        result = copy.deepcopy(default)
         for key, value in loaded.items():
             if key in result and isinstance(result[key], dict) and isinstance(value, dict):
                 result[key] = self._merge_config(result[key], value)
@@ -449,24 +544,92 @@ class LLMConfigManager:
         return result
     
     def _save_config(self, config_data: dict):
-        """保存配置到文件"""
+        """Atomically persist non-sensitive metadata only."""
+        temporary_path = self._config_path.with_name(
+            f".{self._config_path.name}.tmp-{os.getpid()}"
+        )
         try:
-            with open(self._config_path, 'w', encoding='utf-8') as f:
-                json.dump(config_data, f, ensure_ascii=False, indent=4)
-            logger.info("AI 配置已保存")
+            disk_config = _config_for_disk(config_data)
+            self._config_dir.mkdir(parents=True, exist_ok=True)
+            with open(temporary_path, 'w', encoding='utf-8') as f:
+                json.dump(disk_config, f, ensure_ascii=False, indent=4)
+                f.flush()
+                os.fsync(f.fileno())
+            try:
+                os.chmod(temporary_path, 0o600)
+            except OSError:
+                pass
+            os.replace(temporary_path, self._config_path)
+            logger.info("AI 配置元数据已保存（密钥未写入磁盘）")
         except Exception as e:
             logger.error(f"保存配置文件失败: {e}")
+            try:
+                temporary_path.unlink(missing_ok=True)
+            except OSError:
+                pass
             raise
     
     # ==================== 配置访问方法 ====================
     
     def get_llm_config(self) -> dict:
         """获取完整的 LLM 配置"""
-        return self._config.get("llm", DEFAULT_CONFIG["llm"]).copy()
+        return copy.deepcopy(self._config.get("llm", DEFAULT_CONFIG["llm"]))
     
     def get_embedding_config(self) -> dict:
         """获取完整的 Embedding 配置"""
-        return self._config.get("embedding", DEFAULT_CONFIG["embedding"]).copy()
+        return copy.deepcopy(self._config.get("embedding", DEFAULT_CONFIG["embedding"]))
+
+    def get_public_llm_config(self) -> dict:
+        """Return settings safe for renderer/API responses."""
+        public = self.get_llm_config()
+        for provider in set(LLMProvider.ALL + LLMProvider.LEGACY):
+            provider_config = public.get(provider)
+            if not isinstance(provider_config, dict):
+                continue
+            has_key = bool(provider_config.pop("api_key", ""))
+            provider_config["has_api_key"] = has_key
+            # Custom headers can carry credentials too.
+            if isinstance(provider_config.get("headers"), dict):
+                provider_config["headers"] = _config_for_disk(
+                    provider_config["headers"], inside_headers=True
+                )
+        return public
+
+    def get_public_embedding_config(self) -> dict:
+        public = self.get_embedding_config()
+        for provider in (EmbeddingProvider.LOCAL, EmbeddingProvider.EXTERNAL):
+            provider_config = public.get(provider)
+            if isinstance(provider_config, dict):
+                provider_config["has_api_key"] = bool(provider_config.pop("api_key", ""))
+        return public
+
+    @staticmethod
+    def _merge_provider_config(current: dict, update: Optional[dict]) -> dict:
+        """Merge metadata while preserving an omitted runtime secret.
+
+        `api_key` omitted means keep, while an explicit empty string means
+        clear.  Renderer-only status fields are never retained.
+        """
+        merged = copy.deepcopy(current) if isinstance(current, dict) else {}
+        supplied = copy.deepcopy(update) if isinstance(update, dict) else {}
+        supplied.pop("has_api_key", None)
+        supplied.pop("secret_action", None)
+        if "api_key" in supplied and supplied["api_key"] is None:
+            supplied.pop("api_key")
+        merged.update(supplied)
+        return merged
+
+    def resolve_llm_provider_config(
+        self, provider: str, provider_config: Optional[dict]
+    ) -> dict:
+        current = self._config.get("llm", {}).get(provider, {})
+        return self._merge_provider_config(current, provider_config)
+
+    def resolve_embedding_provider_config(
+        self, provider: str, provider_config: Optional[dict]
+    ) -> dict:
+        current = self._config.get("embedding", {}).get(provider, {})
+        return self._merge_provider_config(current, provider_config)
     
     def get_llm_provider(self) -> str:
         """获取当前 LLM 提供者"""
@@ -520,6 +683,7 @@ class LLMConfigManager:
                 model_name=cfg.get("model", ""),
                 dimension=1536,  # 默认值
                 base_url=cfg.get("base_url", "http://localhost:1234/v1"),
+                api_key=cfg.get("api_key", ""),
                 local_type=cfg.get("type", "lm_studio")
             )
         else:  # external
@@ -536,39 +700,58 @@ class LLMConfigManager:
     
     def update_llm_config(self, provider: str, provider_config: dict):
         """更新 LLM 配置"""
-        self._config["llm"]["provider"] = provider
-
-        # 确保 provider 配置存在
-        if provider not in self._config["llm"]:
-            self._config["llm"][provider] = {}
-
-        self._config["llm"][provider].update(provider_config)
-        self._save_config(self._config)
+        if provider not in LLMProvider.ALL:
+            raise ValueError(f"当前版本未启用 LLM 提供者: {provider}")
+        previous = copy.deepcopy(self._config)
+        try:
+            self._config["llm"]["provider"] = provider
+            if provider not in self._config["llm"]:
+                self._config["llm"][provider] = {}
+            self._config["llm"][provider] = self.resolve_llm_provider_config(
+                provider, provider_config
+            )
+            self._save_config(self._config)
+        except Exception:
+            self._config = previous
+            raise
     
     def update_embedding_config(self, provider: str, provider_config: dict):
         """更新 Embedding 配置"""
-        self._config["embedding"]["provider"] = provider
-        
-        if provider == EmbeddingProvider.DEFAULT:
-            # 默认配置不需要额外参数
-            pass
-        elif provider == EmbeddingProvider.LOCAL:
-            self._config["embedding"]["local"].update(provider_config)
-        else:  # external
-            self._config["embedding"]["external"].update(provider_config)
-        
-        self._save_config(self._config)
+        if provider not in EmbeddingProvider.ALL:
+            raise ValueError(f"不支持的 Embedding 提供者: {provider}")
+        previous = copy.deepcopy(self._config)
+        try:
+            self._config["embedding"]["provider"] = provider
+            if provider != EmbeddingProvider.DEFAULT:
+                self._config["embedding"][provider] = self.resolve_embedding_provider_config(
+                    provider, provider_config
+                )
+            self._save_config(self._config)
+        except Exception:
+            self._config = previous
+            raise
     
     def save_full_config(self, llm_provider: str, llm_config: dict, 
                           embedding_provider: str, embedding_config: dict):
         """保存完整配置"""
-        self._config["llm"]["provider"] = llm_provider
-        self._config["llm"][llm_provider] = llm_config
-        
-        self._config["embedding"]["provider"] = embedding_provider
-        self._config["embedding"][embedding_provider] = embedding_config
-        
-        self._save_config(self._config)
+        if llm_provider not in LLMProvider.ALL:
+            raise ValueError(f"当前版本未启用 LLM 提供者: {llm_provider}")
+        if embedding_provider not in EmbeddingProvider.ALL:
+            raise ValueError(f"不支持的 Embedding 提供者: {embedding_provider}")
+        previous = copy.deepcopy(self._config)
+        try:
+            self._config["llm"]["provider"] = llm_provider
+            self._config["llm"][llm_provider] = self.resolve_llm_provider_config(
+                llm_provider, llm_config
+            )
+            self._config["embedding"]["provider"] = embedding_provider
+            self._config["embedding"][embedding_provider] = self.resolve_embedding_provider_config(
+                embedding_provider, embedding_config
+            )
+            self._save_config(self._config)
+        except Exception:
+            self._config = previous
+            raise
     
     # ==================== 连接测试 ====================
     
@@ -584,115 +767,81 @@ class LLMConfigManager:
         Returns:
             {"success": bool, "message": str, "models": List[str]}
         """
-        if provider is None:
-            provider = self.get_llm_provider()
-        
-        if provider_config is None:
-            llm_config = self.get_llm_config()
-            provider_config = llm_config.get(provider, {})
-        
-        base_url = provider_config.get("base_url", "")
-        api_key = provider_config.get("api_key", "")
-        model = provider_config.get("model", "")
-        
+        provider = provider or self.get_llm_provider()
+        if provider not in LLMProvider.ALL:
+            return {
+                "success": False,
+                "message": f"当前版本未启用提供者: {provider}",
+                "models": [],
+                "code": "unsupported_provider",
+                "retryable": False,
+            }
+        provider_config = self.resolve_llm_provider_config(provider, provider_config)
+
+        base_url = str(provider_config.get("base_url", "")).rstrip("/")
         if not base_url:
             return {"success": False, "message": "API 地址不能为空", "models": []}
-        
-        # 验证 URL 安全性，防止 SSRF 攻击
-        allow_local = provider in [LLMProvider.LM_STUDIO, LLMProvider.OLLAMA]
+        allow_local = provider in {
+            LLMProvider.LM_STUDIO,
+            LLMProvider.OLLAMA,
+            LLMProvider.CUSTOM,
+        }
         if not validate_url(base_url, allow_local=allow_local):
-            return {"success": False, "message": "API 地址不安全，请使用有效的 HTTP/HTTPS 地址", "models": []}
-        
+            return {"success": False, "message": "API 地址不安全", "models": []}
+
+        headers = {"Accept": "application/json"}
+        api_key = str(provider_config.get("api_key", ""))
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
         try:
-            # 尝试获取模型列表
-            headers = {"Content-Type": "application/json"}
-            if api_key:
-                headers["Authorization"] = f"Bearer {api_key}"
-            
-            # 合并自定义 headers（如 Kimi Coding 的 X-Kimi-Claw-ID）
-            custom_headers = provider_config.get("headers", {})
-            if custom_headers:
-                headers.update(custom_headers)
-            
-            # Kimi Coding 使用 Anthropic 格式，可能没有 /models 端点
-            # 尝试直接调用 /v1/messages 进行简单测试
-            if provider == "kimi_coding":
-                test_url = base_url.rstrip("/") + "/v1/messages"
-                test_payload = {
-                    "model": model or "k2p5",
-                    "messages": [{"role": "user", "content": "hi"}],
-                    "max_tokens": 1,
-                    "stream": False
-                }
-                response = requests.post(test_url, headers=headers, json=test_payload, timeout=10)
-                
-                # Anthropic 格式返回 200 或某些错误码都表示服务存在
-                if response.status_code == 200:
-                    return {
-                        "success": True,
-                        "message": "Kimi Coding 连接成功",
-                        "models": [model or "k2p5"]
-                    }
-                elif response.status_code in [400, 401, 403]:
-                    # 认证错误或参数错误，但服务是可用的
-                    return {
-                        "success": True,
-                        "message": "Kimi Coding 服务可用（可能需要检查 API Key）",
-                        "models": [model or "k2p5"]
-                    }
-                else:
-                    return {
-                        "success": False,
-                        "message": f"连接失败: HTTP {response.status_code}",
-                        "models": []
-                    }
-            
-            # LM Studio 和 Ollama 都支持 /models 端点
-            models_url = base_url.rstrip("/") + "/models"
-            
-            response = requests.get(models_url, headers=headers, timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                models = []
-                
-                # 解析不同格式
-                if "data" in data:  # OpenAI 格式
-                    models = [m.get("id", "") for m in data.get("data", [])]
-                elif "models" in data:  # Ollama 格式
-                    models = [m.get("name", "") for m in data.get("models", [])]
-                elif isinstance(data, list):  # 数组格式
-                    models = [m.get("id") or m.get("name") or str(m) for m in data]
-                
-                return {
-                    "success": True,
-                    "message": f"连接成功，找到 {len(models)} 个模型",
-                    "models": models
-                }
-            else:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
+                response = await client.get(f"{base_url}/models", headers=headers)
+            if response.status_code != 200:
+                retryable = response.status_code == 429 or response.status_code >= 500
                 return {
                     "success": False,
                     "message": f"连接失败: HTTP {response.status_code}",
-                    "models": []
+                    "models": [],
+                    "code": "provider_rejected",
+                    "retryable": retryable,
                 }
-                
-        except requests.exceptions.ConnectionError:
+            data = response.json()
+            if isinstance(data, dict) and "data" in data:
+                models = [str(item.get("id", "")) for item in data.get("data", [])]
+            elif isinstance(data, dict) and "models" in data:
+                models = [str(item.get("name", "")) for item in data.get("models", [])]
+            elif isinstance(data, list):
+                models = [str(item.get("id") or item.get("name") or item) for item in data]
+            else:
+                models = []
             return {
-                "success": False,
-                "message": f"无法连接到 {base_url}，请确保服务已启动",
-                "models": []
+                "success": True,
+                "message": f"连接成功，找到 {len(models)} 个模型",
+                "models": models,
             }
-        except requests.exceptions.Timeout:
+        except httpx.TimeoutException:
             return {
                 "success": False,
                 "message": "连接超时",
-                "models": []
+                "models": [],
+                "code": "timeout",
+                "retryable": True,
             }
-        except Exception as e:
+        except httpx.RequestError:
             return {
                 "success": False,
-                "message": f"测试失败: {str(e)}",
-                "models": []
+                "message": f"无法连接到 {base_url}",
+                "models": [],
+                "code": "connection_failed",
+                "retryable": True,
+            }
+        except Exception as exc:
+            return {
+                "success": False,
+                "message": f"测试失败: {exc}",
+                "models": [],
+                "code": "invalid_response",
+                "retryable": False,
             }
     
     async def test_embedding_connection(self, provider: str = None,
@@ -707,19 +856,23 @@ class LLMConfigManager:
         Returns:
             {"success": bool, "message": str}
         """
-        if provider is None:
-            provider = self.get_embedding_provider()
+        provider = provider or self.get_embedding_provider()
         
-        # 默认配置（CLAP）总是可用的
+        # CLAP is local, but it is not "always available": packaged installs
+        # are allowed to start before the optional model bundle is installed.
         if provider == EmbeddingProvider.DEFAULT:
+            from core.embedder import is_embedder_loaded
+
+            model_path = Path(config.get_clap_model_name())
+            available = model_path.exists() or is_embedder_loaded()
             return {
-                "success": True,
-                "message": "使用默认 CLAP 模型（本地）"
+                "success": available,
+                "message": "默认 CLAP 模型已就绪" if available else "CLAP 模型尚未安装或加载",
+                "code": None if available else "model_unavailable",
+                "retryable": not available,
             }
         
-        if provider_config is None:
-            emb_config = self.get_embedding_config()
-            provider_config = emb_config.get(provider, {})
+        provider_config = self.resolve_embedding_provider_config(provider, provider_config)
         
         base_url = provider_config.get("base_url", "")
         api_key = provider_config.get("api_key", "")
@@ -732,9 +885,7 @@ class LLMConfigManager:
             return {"success": False, "message": "API 地址不安全，请使用有效的 HTTP/HTTPS 地址"}
         
         try:
-            headers = {
-                "Content-Type": "application/json"
-            }
+            headers = {"Content-Type": "application/json"}
             if api_key:
                 headers["Authorization"] = f"Bearer {api_key}"
             
@@ -745,7 +896,8 @@ class LLMConfigManager:
             }
             
             embeddings_url = base_url.rstrip("/") + "/embeddings"
-            response = requests.post(embeddings_url, headers=headers, json=payload, timeout=30)
+            async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
+                response = await client.post(embeddings_url, headers=headers, json=payload)
             
             if response.status_code == 200:
                 return {
@@ -758,10 +910,14 @@ class LLMConfigManager:
                     "message": f"连接失败: HTTP {response.status_code}"
                 }
                 
-        except requests.exceptions.ConnectionError:
+        except httpx.TimeoutException:
+            return {"success": False, "message": "连接超时", "code": "timeout", "retryable": True}
+        except httpx.RequestError:
             return {
                 "success": False,
-                "message": f"无法连接到 {base_url}"
+                "message": f"无法连接到 {base_url}",
+                "code": "connection_failed",
+                "retryable": True,
             }
         except Exception as e:
             return {
@@ -808,23 +964,11 @@ class LLMConfigManager:
     
     def export_config(self) -> dict:
         """导出当前配置（不含敏感信息）"""
-        config = self._config.copy()
-
-        # 隐藏所有 provider 的 API Key
-        llm_providers = config.get("llm", {})
-        for provider_key in LLMProvider.ALL:
-            provider_cfg = llm_providers.get(provider_key, {})
-            if provider_cfg.get("api_key"):
-                provider_cfg["api_key"] = "***"
-
-        if config.get("embedding", {}).get("external", {}).get("api_key"):
-            config["embedding"]["external"]["api_key"] = "***"
-
-        return config
+        return _config_for_disk(self._config)
     
     def reset_to_defaults(self):
         """重置为默认配置"""
-        self._config = DEFAULT_CONFIG.copy()
+        self._config = copy.deepcopy(DEFAULT_CONFIG)
         self._save_config(self._config)
         logger.info("配置已重置为默认")
 
@@ -846,3 +990,4 @@ def reset_llm_config_manager():
     """重置配置管理器（用于测试或重新加载）"""
     global _config_manager
     _config_manager = None
+    LLMConfigManager._instance = None

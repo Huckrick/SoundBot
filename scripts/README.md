@@ -1,114 +1,33 @@
-# 构建脚本
+# SoundBot 构建与资源脚本
 
-此目录包含用于构建和发布的脚本。
+本目录只保留当前仍在使用的构建与资源脚本。应用安装包必须在目标系统的原生宿主上构建：Windows x64 使用 Windows runner，macOS arm64 使用 Apple Silicon runner。
 
-## 自动依赖管理
-
-**GitHub Actions 会自动处理所有依赖：**
-
-1. **Node.js 依赖** - 自动安装 (`npm ci`)
-2. **Python 依赖** - 自动安装并打包到 PyInstaller 后端
-3. **AI 模型** - 自动下载到 `models/` 目录
-
-应用安装包包含 Electron 前端和 PyInstaller 后端，AI 模型需要首次额外下载一次。
-
----
-
-## 脚本说明
-
-### download_models.py
-下载 AI 模型到本地 `models/` 目录。
+## 常用命令
 
 ```bash
-# 使用虚拟环境中的 Python 运行
-cd backend
-source venv/bin/activate  # macOS/Linux
-# 或 .\venv\Scripts\activate  # Windows
-cd ..
-python scripts/download_models.py
-```
+# 当前宿主的 PyInstaller 后端与 Electron 安装包
+python scripts/build.py
 
-### build_backend.py（可选）
-使用 PyInstaller 将 Python 后端打包为独立可执行文件。
+# 仅清理构建输出（跨平台）
+python scripts/build.py --clean
 
----
+# 静态检查 PyInstaller 环境；加 --build 执行真实冻结构建
+python scripts/test_pyinstaller.py
+python scripts/test_pyinstaller.py --build
 
-## 本地打包步骤
-
-### macOS
-
-```bash
-# 1. 安装 Node 依赖
-npm ci
-
-# 2. 创建 Python 虚拟环境并安装依赖
-cd backend
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-cd ..
-
-# 3. 下载 AI 模型
+# 下载开发用 CLAP 模型
 python scripts/download_models.py
 
-# 4. 打包（应用包包含 PyInstaller 后端，不包含 models）
-npm run build:mac
+# 验证开发/冻结环境的模型路径解析
+python scripts/verify_model_path.py
 
-# 输出: dist/SoundBot-0.1.0-alpha.dmg
+# 预览版本同步（默认不写文件）；确认后原子更新全部版本来源
+python scripts/bump_version.py --version 0.2.1
+python scripts/bump_version.py --version 0.2.1 --write
 ```
 
-### Windows
+版本工具只接受不带 `v` 前缀的 SemVer（如 `0.2.1` 或 `0.3.0-rc.1`），且拒绝降级或重复版本。它会先在内存中校验 `package.json`、`package-lock.json`、`backend/config.py`、双语 README、手动 Release 模板与 `CHANGELOG.md` 全部一致，再执行原子替换；若目标版本已存在更新日志区段则拒绝覆盖。
 
-```powershell
-# 1. 安装 Node 依赖
-npm ci
+`download_manager.py` 是源码仓库中的手动模型安装工具，当前不打入 Electron 安装包，也没有被桌面端自动调用。它会按当前应用版本请求精确的 GitHub Release tag，要求同时提供 `models.zip` 与 `models.zip.sha256`，并在原子安装前验证根级 `model-manifest.json`、固定模型 revision、逐文件 SHA-256 和压缩包路径安全。
 
-# 2. 创建 Python 虚拟环境并安装依赖
-cd backend
-python -m venv venv
-.\venv\Scripts\activate
-pip install -r requirements.txt
-cd ..
-
-# 3. 下载 AI 模型
-python scripts/download_models.py
-
-# 4. 打包
-npm run build:win
-
-# 输出: dist/SoundBot-0.1.0-alpha.exe
-```
-
----
-
-## 自动构建（GitHub Actions）
-
-推送标签自动触发构建：
-
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-GitHub Actions 会自动：
-1. ✅ 安装 Node.js 依赖
-2. ✅ 安装 Python 依赖并构建 PyInstaller 后端
-3. ✅ 下载 AI 模型
-4. ✅ 发布应用安装包与独立的 models.zip
-5. ✅ 发布到 GitHub Releases
-
-用户需下载安装包，并在首次启动前额外下载 models.zip。
-
----
-
-## 打包体积预估
-
-| 组件 | 大小 |
-|------|------|
-| Electron | ~150MB |
-| PyInstaller 后端 | ~300MB-800MB |
-| CLAP 模型 | ~744MB |
-| 应用代码 | ~10MB |
-| **总计** | **~1.2GB-1.6GB** |
-
-体积较大主要来自 PyInstaller 后端和 AI 模型，模型作为独立资源发布。
+完整环境要求、模型布局、发布门禁与故障诊断见仓库根目录的 `README.md` / `README.en.md`。

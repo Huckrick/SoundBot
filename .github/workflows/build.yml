@@ -7,96 +7,237 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release tag name (e.g. v0.1.4) — required for manual dispatch'
+        description: 'Release tag name (e.g. v0.2.0) — required for manual dispatch'
         required: true
-        default: 'v0.1.4'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: soundbot-release-${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
+  cancel-in-progress: false
 
 env:
   PYTHON_VERSION: '3.12'
   NODE_VERSION: '20'
+  PYINSTALLER_VERSION: '6.16.0'
+  CLAP_MODEL_REVISION: 'ada0c23a36c4e8582805bb38fec3905903f18b41'
 
 jobs:
-  build-models:
+  validate-release:
     runs-on: ubuntu-latest
+    timeout-minutes: 75
+    permissions:
+      contents: read
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+    outputs:
+      release_tag: ${{ steps.release-source.outputs.tag }}
+      release_sha: ${{ steps.release-source.outputs.sha }}
+      prerelease: ${{ steps.release-source.outputs.prerelease }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Bind release to an existing immutable tag
+        id: release-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Release tag must be v<semver>: $RELEASE_TAG"
+            exit 1
+          fi
+          git show-ref --verify --quiet "refs/tags/$RELEASE_TAG" || {
+            echo "::error::Release tag does not exist: $RELEASE_TAG"
+            exit 1
+          }
+          if ! git cat-file -t "refs/tags/$RELEASE_TAG" | grep -qx tag; then
+            echo "::error::Release tags must be annotated (or signed), not lightweight"
+            exit 1
+          fi
+          TAG_SHA="$(git rev-list -n 1 "$RELEASE_TAG")"
+          HEAD_SHA="$(git rev-parse HEAD)"
+          test "$TAG_SHA" = "$HEAD_SHA" || {
+            echo "::error::Checked-out source $HEAD_SHA does not match tag $TAG_SHA"
+            exit 1
+          }
+          git show-ref --verify --quiet "refs/remotes/origin/$DEFAULT_BRANCH" || {
+            echo "::error::Default branch was not fetched: origin/$DEFAULT_BRANCH"
+            exit 1
+          }
+          git merge-base --is-ancestor "$TAG_SHA" "origin/$DEFAULT_BRANCH" || {
+            echo "::error::Release tag is not reachable from $DEFAULT_BRANCH: $RELEASE_TAG"
+            exit 1
+          }
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "sha=$TAG_SHA" >> "$GITHUB_OUTPUT"
+          if [[ "$RELEASE_TAG" == "v0.2.0" || "$RELEASE_TAG" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install locked source-test dependencies
+        run: |
+          python -m pip install --only-binary=av -r backend/requirements.txt
+          npm ci --ignore-scripts --progress=false
+          python -m pip check
+
+      - name: Verify complete source, build, and renderer contracts
+        run: |
+          python -m unittest discover -s tests -p 'test_*.py' -v
+          node --check main.js
+          node --check preload.js
+          node --check assets/i18n.js
+          node tests/frontend/check_renderer_contract.js
+
+      - name: Verify version and bilingual changelog synchronization
+        run: >-
+          python tests/build/verify_release_metadata.py
+          --tag "${RELEASE_TAG}"
+
+  build-models:
+    needs: validate-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
     permissions:
       contents: read
       actions: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.validate-release.outputs.release_sha }}
+          persist-credentials: false
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
           cache-dependency-path: 'backend/requirements.txt'
 
       - name: Install dependencies
-        run: pip install transformers torch torchaudio huggingface_hub
+        run: >-
+          pip install
+          transformers==5.3.0
+          torch==2.10.0
+          huggingface_hub==1.7.1
 
-      - name: Download AI models
-        run: python scripts/download_models.py
-        env:
-          PYTHONIOENCODING: utf-8
+      - name: Download pinned model and generate manifest
+        run: |
+          python tests/build/create_model_manifest.py \
+            --models-dir models \
+            --model-id laion/larger_clap_general \
+            --revision "${CLAP_MODEL_REVISION}" \
+            --download
 
       - name: Create Models package
         run: |
           mkdir -p release
-          cd models
-          zip -r ../release/models.zip .
+          python tests/build/create_model_archive.py \
+            --source models \
+            --output release/models.zip
+          cd release
+          sha256sum models.zip > models.zip.sha256
+          sha256sum -c models.zip.sha256
           cd ..
           echo "Models package created:"
           ls -lh release/
 
       - name: Upload Models artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: models-package
-          path: release/models.zip
+          path: |
+            release/models.zip
+            release/models.zip.sha256
           if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
 
   build-macos:
-    runs-on: macos-latest
+    needs: validate-release
+    runs-on: macos-15
+    timeout-minutes: 150
     permissions:
       contents: read
       actions: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.validate-release.outputs.release_sha }}
+          persist-credentials: false
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
           cache-dependency-path: 'backend/requirements.txt'
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
+      - name: Enforce native macOS arm64 runner
+        run: |
+          test "$(uname -s)" = "Darwin"
+          test "$(uname -m)" = "arm64" || {
+            echo "::error::macOS release must be built on an arm64 runner"
+            exit 1
+          }
+
       - name: Cache Electron
-        uses: actions/cache@v4
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: |
             ${{ github.workspace }}/.cache/electron
             ${{ github.workspace }}/.cache/electron-builder
-          key: ${{ runner.os }}-electron-${{ hashFiles('package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-electron-
+          key: ${{ runner.os }}-${{ runner.arch }}-node-${{ env.NODE_VERSION }}-electron-${{ hashFiles('package-lock.json') }}
 
       - name: Install Python dependencies
         run: |
-          pip install pyinstaller
-          pip install -r backend/requirements.txt
+          pip install -r backend/requirements-build.txt
+          pip install --only-binary=av -r backend/requirements.txt
 
-      - name: Build PyInstaller backend
+      - name: Verify PyInstaller environment
         run: |
-          cd backend
-          pyinstaller main.spec --distpath ../dist/backend --workpath ../dist/build --noconfirm
+          python -m pip check
+          python scripts/test_pyinstaller.py
+
+      - name: Install Node dependencies
+        run: npm ci --progress=false
+
+      - name: Build backend and Electron with the canonical script
+        run: python scripts/build.py --platform macos --release-tag "$RELEASE_TAG" --skip-dependency-install
+        env:
+          RELEASE_TAG: ${{ needs.validate-release.outputs.release_tag }}
+          ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
+          ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
       - name: Verify backend build
         run: |
@@ -124,21 +265,30 @@ jobs:
             ls -la dist/backend/
             exit 1
           fi
+          python tests/build/verify_frozen_bundle.py \
+            --bundle dist/backend/soundbot-backend \
+            --platform macos \
+            --arch arm64
 
       - name: Test backend startup
+        env:
+          RELEASE_TAG: ${{ needs.validate-release.outputs.release_tag }}
         run: |
           echo "=== Testing backend can start ==="
           export SOUNDBOT_PORT=18765
           export PYTHONIOENCODING=utf-8
           export ENABLE_MODEL_PRELOAD=false
-          cd dist/backend/soundbot-backend
-          ./soundbot-backend > /tmp/backend_stdout.log 2>&1 &
+          export SOUNDBOT_MODELS_PATH="$RUNNER_TEMP/soundbot-models-intentionally-missing"
+          export SOUNDBOT_USER_DATA_DIR="$RUNNER_TEMP/soundbot-release-$GITHUB_RUN_ID-macos"
+          dist/backend/soundbot-backend/soundbot-backend > /tmp/backend_stdout.log 2>&1 &
           BACKEND_PID=$!
+          trap 'kill "$BACKEND_PID" 2>/dev/null || true; wait "$BACKEND_PID" 2>/dev/null || true' EXIT
 
           # 轮询健康端点，最多等待 120 秒（torch 冷启动可能较慢）
           STARTED=false
           for i in $(seq 1 120); do
-            if curl -sf http://127.0.0.1:18765/api/v1/health > /dev/null 2>&1; then
+            HEALTH_JSON="$(curl -sf http://127.0.0.1:18765/api/v1/health 2>/dev/null || true)"
+            if python -c 'import json,sys; p=json.loads(sys.argv[1]); assert p["status"] == "healthy" and p["version"] == sys.argv[2].removeprefix("v")' "$HEALTH_JSON" "$RELEASE_TAG" 2>/dev/null; then
               STARTED=true
               echo "[OK] Backend responded on attempt ${i}s"
               break
@@ -150,6 +300,13 @@ jobs:
             fi
             sleep 1
           done
+
+          if [ "$STARTED" = true ]; then
+            python "$GITHUB_WORKSPACE/tests/build/check_frozen_waveform.py" \
+              --base-url http://127.0.0.1:18765 \
+              --matrix \
+              --fixture-root "$RUNNER_TEMP/soundbot-macos-audio-fixtures"
+          fi
 
           kill $BACKEND_PID 2>/dev/null || true
           wait $BACKEND_PID 2>/dev/null || true
@@ -169,19 +326,6 @@ jobs:
           fi
           echo "[OK] Backend started and responded to health check"
 
-      - name: Install Node dependencies
-        run: npm ci --progress=false
-
-      - name: Build Electron (macOS)
-        run: |
-          ulimit -n 65536
-          npx electron-builder --mac
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
-          ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
-
       - name: Verify Electron build
         run: |
           echo "=== Verifying Electron build ==="
@@ -193,60 +337,128 @@ jobs:
             echo "[ERROR] DMG file not found"
             exit 1
           fi
+          DMG_PATH=$(find dist-electron -maxdepth 1 -type f -name '*.dmg' -print -quit)
+          hdiutil verify "$DMG_PATH"
+
+          APP_PATH=$(find dist-electron -type d -name 'SoundBot.app' -print -quit)
+          if [ -z "$APP_PATH" ]; then
+            echo "[ERROR] unpacked SoundBot.app not found"
+            exit 1
+          fi
+
+          BACKEND_PATH="$APP_PATH/Contents/Resources/backend/soundbot-backend/soundbot-backend"
+          test -x "$BACKEND_PATH" || { echo "[ERROR] packaged backend executable missing"; exit 1; }
+          file "$BACKEND_PATH" | grep -q 'Mach-O.*arm64' || { echo "[ERROR] packaged backend is not an arm64 Mach-O executable"; exit 1; }
+          python tests/build/verify_frozen_bundle.py \
+            --bundle "$APP_PATH/Contents/Resources/backend/soundbot-backend" \
+            --platform macos \
+            --arch arm64
+
+          APP_ASAR="$APP_PATH/Contents/Resources/app.asar"
+          test -f "$APP_ASAR" || { echo "[ERROR] app.asar missing"; exit 1; }
+          npx --no-install asar list "$APP_ASAR" > asar-contents.txt
+          for required in '/main.js' '/preload.js' '/index.html' '/assets/i18n.js'; do
+            grep -Fxq "$required" asar-contents.txt || { echo "[ERROR] missing packaged file: $required"; exit 1; }
+          done
+          if grep -Ei 'wavesurfer|(^|/)\.DS_Store$|(^|/)SoundBot\.png$' asar-contents.txt; then
+            echo "[ERROR] forbidden legacy/development asset found in app.asar"
+            exit 1
+          fi
 
       - name: Upload macOS artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: soundbot-macos
           path: dist-electron/*.dmg
           if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
 
   build-windows:
+    needs: [validate-release, build-models]
     runs-on: windows-latest
+    timeout-minutes: 210
     permissions:
       contents: read
       actions: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.validate-release.outputs.release_sha }}
+          persist-credentials: false
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
           cache-dependency-path: 'backend/requirements.txt'
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
+      - name: Enforce native Windows x64 runner
+        shell: powershell
+        run: |
+          if (-not [Environment]::Is64BitOperatingSystem -or $env:PROCESSOR_ARCHITECTURE -notmatch 'AMD64') {
+            Write-Host "::error::Windows release must be built on an x64 runner"
+            exit 1
+          }
+
+      - name: Download pinned model package for release smoke
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: models-package
+          path: model-release
+
+      - name: Verify and expand pinned model package
+        shell: powershell
+        run: |
+          $expected = ((Get-Content model-release/models.zip.sha256 -Raw).Trim() -split '\s+')[0].ToLowerInvariant()
+          $actual = (Get-FileHash model-release/models.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) { Write-Host "::error::models.zip checksum mismatch"; exit 1 }
+          Expand-Archive -Path model-release/models.zip -DestinationPath models -Force
+          if (-not (Test-Path models/model-manifest.json) -or -not (Test-Path models/clap)) {
+            Write-Host "::error::pinned model package layout is invalid"
+            exit 1
+          }
+          python -c "import sys; sys.path.insert(0, 'scripts'); from download_manager import verify_model_manifest; verify_model_manifest('models'); print('[OK] model manifest and every file hash verified')"
+          "SOUNDBOT_MODELS_PATH=$((Resolve-Path models).Path)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Cache Electron
-        uses: actions/cache@v4
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: |
             ${{ github.workspace }}/.cache/electron
             ${{ github.workspace }}/.cache/electron-builder
-          key: ${{ runner.os }}-electron-${{ hashFiles('package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-electron-
+          key: ${{ runner.os }}-${{ runner.arch }}-node-${{ env.NODE_VERSION }}-electron-${{ hashFiles('package-lock.json') }}
 
       - name: Install Python dependencies
         shell: powershell
         run: |
-          pip install pyinstaller
-          $lines = Get-Content backend/requirements.txt | Where-Object { $_ -notmatch 'uvloop' -and $_ -match '\S' }
-          $lines | Set-Content requirements-filtered.txt
-          pip install -r requirements-filtered.txt
-          Remove-Item requirements-filtered.txt
+          pip install -r backend/requirements-build.txt
+          pip install --only-binary=av -r backend/requirements.txt
 
-      - name: Build PyInstaller backend
+      - name: Verify PyInstaller environment
         shell: powershell
         run: |
-          cd backend
-          pyinstaller main.spec --distpath ../dist/backend --workpath ../dist/build --noconfirm
+          python -m pip check
+          python scripts/test_pyinstaller.py
+
+      - name: Install Node dependencies
+        run: npm ci --progress=false
+
+      - name: Build backend and Electron with the canonical script
+        shell: powershell
+        run: python scripts/build.py --platform windows --release-tag "$env:RELEASE_TAG" --skip-dependency-install
+        env:
+          RELEASE_TAG: ${{ needs.validate-release.outputs.release_tag }}
+          ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
+          ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
 
       - name: Verify backend build
         shell: powershell
@@ -281,14 +493,24 @@ jobs:
             Write-Host "[ERROR] Backend directory not found"
             exit 1
           }
+          python tests/build/verify_frozen_bundle.py `
+            --bundle dist/backend/soundbot-backend `
+            --platform windows `
+            --arch x64
 
-      - name: Test backend startup
+      - name: Test frozen backend with clean PATH and full audio/index matrix
         shell: powershell
+        env:
+          RELEASE_TAG: ${{ needs.validate-release.outputs.release_tag }}
         run: |
-          Write-Host "=== Testing backend can start ==="
+          Write-Host "=== Testing frozen backend without a system FFmpeg ==="
+          $pythonExe = (Get-Command python).Source
+          $originalPath = $env:PATH
+          $env:PATH = Join-Path $env:SystemRoot 'System32'
           $env:SOUNDBOT_PORT = "18765"
           $env:PYTHONIOENCODING = "utf-8"
-          $env:ENABLE_MODEL_PRELOAD = "false"
+          $env:ENABLE_MODEL_PRELOAD = "true"
+          $env:SOUNDBOT_USER_DATA_DIR = Join-Path $env:RUNNER_TEMP "soundbot-release-$env:GITHUB_RUN_ID-dist"
           $exePath = Resolve-Path 'dist\backend\soundbot-backend\soundbot-backend.exe'
           $proc = Start-Process -FilePath $exePath `
             -RedirectStandardOutput backend_stdout.log `
@@ -296,12 +518,14 @@ jobs:
             -WorkingDirectory (Split-Path $exePath) `
             -PassThru
 
-          # 轮询健康端点，最多等待 120 秒（torch 冷启动可能较慢）
+          # Poll health independently from the background model preload, then
+          # wait for CLAP before running the vector/index matrix.
           $started = $false
-          for ($i = 1; $i -le 120; $i++) {
+          $matrixSmokeFailed = $false
+          for ($i = 1; $i -le 180; $i++) {
             try {
-              $resp = Invoke-WebRequest -Uri 'http://127.0.0.1:18765/api/v1/health' -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
-              if ($resp.StatusCode -eq 200) {
+              $resp = Invoke-RestMethod -Uri 'http://127.0.0.1:18765/api/v1/health' -TimeoutSec 2 -ErrorAction Stop
+              if ($resp.status -eq 'healthy' -and $resp.version -eq ($env:RELEASE_TAG).TrimStart('v')) {
                 $started = $true
                 Write-Host "[OK] Backend responded on attempt ${i}s"
                 break
@@ -313,6 +537,41 @@ jobs:
               break
             }
             Start-Sleep -Seconds 1
+          }
+
+          if ($started) {
+            $modelLoaded = $false
+            for ($i = 1; $i -le 900; $i++) {
+              try {
+                $status = Invoke-RestMethod -Uri 'http://127.0.0.1:18765/api/v1/model/status' -TimeoutSec 3 -ErrorAction Stop
+                if ($status.model_status.loaded -eq $true -and $status.embedder_available -eq $true) {
+                  $modelLoaded = $true
+                  Write-Host "[OK] CLAP model loaded on attempt ${i}s"
+                  break
+                }
+                if ($status.model_status.error) {
+                  Write-Host "::error::CLAP model preload failed: $($status.model_status.error)"
+                  break
+                }
+              } catch {}
+              if ($proc.HasExited) { break }
+              Start-Sleep -Seconds 1
+            }
+            if (-not $modelLoaded) {
+              Write-Host "::error::CLAP model did not become ready within 900 seconds"
+              $matrixSmokeFailed = $true
+            }
+          }
+
+          if ($started -and -not $matrixSmokeFailed) {
+            & $pythonExe tests/build/check_frozen_audio_matrix.py `
+              --base-url 'http://127.0.0.1:18765' `
+              --fixture-root "$env:RUNNER_TEMP\soundbot-audio-fixtures-dist" `
+              --job-timeout 900
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "::error::Frozen backend audio/index matrix failed"
+              $matrixSmokeFailed = $true
+            }
           }
 
           if (!$proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
@@ -334,20 +593,12 @@ jobs:
           }
 
           if (-not $started) {
-            Write-Host "::error::Backend failed to respond to /api/v1/health within 120 seconds"
+            Write-Host "::error::Backend failed to respond to /api/v1/health within 180 seconds"
             exit 1
           }
-          Write-Host "[OK] Backend started and responded to health check"
-
-      - name: Install Node dependencies
-        run: npm ci --progress=false
-
-      - name: Build Electron (Windows)
-        run: npx electron-builder --win
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
-          ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
+          if ($matrixSmokeFailed) { exit 1 }
+          $env:PATH = $originalPath
+          Write-Host "[OK] PyAV decoded every format and CLAP/Chroma search passed without system FFmpeg"
 
       - name: Verify Electron build
         shell: powershell
@@ -355,29 +606,127 @@ jobs:
           Write-Host "=== Verifying Electron build ==="
           Get-ChildItem dist-electron/
 
-          $exeFiles = Get-ChildItem dist-electron/*.exe
+          $exeFiles = Get-ChildItem dist-electron/*.exe | Where-Object { $_.Length -gt 1MB }
           if ($exeFiles) {
             Write-Host "[OK] EXE file created"
           } else {
-            Write-Host "[ERROR] EXE file not found"
+            Write-Host "[ERROR] non-empty EXE installer not found"
+            exit 1
+          }
+
+          $unpacked = Get-ChildItem dist-electron -Directory | Where-Object { $_.Name -like '*unpacked*' } | Select-Object -First 1
+          if (-not $unpacked) { Write-Host "[ERROR] unpacked application directory not found"; exit 1 }
+
+          $resources = Join-Path $unpacked.FullName 'resources'
+          $packagedBackend = Join-Path $resources 'backend\soundbot-backend\soundbot-backend.exe'
+          if (-not (Test-Path $packagedBackend)) { Write-Host "[ERROR] packaged backend executable missing"; exit 1 }
+          [byte[]]$magic = Get-Content -Path $packagedBackend -Encoding Byte -TotalCount 2
+          if ($magic.Count -ne 2 -or $magic[0] -ne 0x4d -or $magic[1] -ne 0x5a) {
+            Write-Host "[ERROR] packaged backend is not a Windows PE executable"
+            exit 1
+          }
+
+          $appAsar = Join-Path $resources 'app.asar'
+          if (-not (Test-Path $appAsar)) { Write-Host "[ERROR] app.asar missing"; exit 1 }
+          $asarEntries = & npx --no-install asar list $appAsar
+          if ($LASTEXITCODE -ne 0) { Write-Host "[ERROR] failed to inspect app.asar"; exit 1 }
+          foreach ($required in @('/main.js', '/preload.js', '/index.html', '/assets/i18n.js')) {
+            if ($asarEntries -notcontains $required) { Write-Host "[ERROR] missing packaged file: $required"; exit 1 }
+          }
+          if (($asarEntries -join "`n") -match 'wavesurfer|\.DS_Store|SoundBot\.png') {
+            Write-Host "[ERROR] forbidden legacy/development asset found in app.asar"
+            exit 1
+          }
+
+          python tests/build/verify_frozen_bundle.py `
+            --bundle (Join-Path $resources 'backend\soundbot-backend') `
+            --platform windows `
+            --arch x64
+
+          $installer = $exeFiles | Select-Object -First 1
+          & 7z t $installer.FullName
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "[ERROR] NSIS installer failed its archive integrity test"
+            exit 1
+          }
+
+      - name: Start packaged win-unpacked backend
+        shell: powershell
+        env:
+          RELEASE_TAG: ${{ needs.validate-release.outputs.release_tag }}
+        run: |
+          $pythonExe = (Get-Command python).Source
+          $unpacked = Get-ChildItem dist-electron -Directory | Where-Object { $_.Name -like '*unpacked*' } | Select-Object -First 1
+          $packagedBackend = Join-Path $unpacked.FullName 'resources\backend\soundbot-backend\soundbot-backend.exe'
+          $env:PATH = Join-Path $env:SystemRoot 'System32'
+          $env:SOUNDBOT_PORT = '18766'
+          $env:ENABLE_MODEL_PRELOAD = 'false'
+          $env:SOUNDBOT_MODELS_PATH = Join-Path $env:RUNNER_TEMP 'soundbot-models-intentionally-missing'
+          $env:SOUNDBOT_USER_DATA_DIR = Join-Path $env:RUNNER_TEMP "soundbot-release-$env:GITHUB_RUN_ID-unpacked"
+          $proc = Start-Process -FilePath $packagedBackend `
+            -WorkingDirectory (Split-Path $packagedBackend) `
+            -RedirectStandardOutput packaged_stdout.log `
+            -RedirectStandardError packaged_stderr.log `
+            -PassThru
+
+          $started = $false
+          for ($i = 1; $i -le 180; $i++) {
+            try {
+              $response = Invoke-RestMethod -Uri 'http://127.0.0.1:18766/api/v1/health' -TimeoutSec 2 -ErrorAction Stop
+              if ($response.status -eq 'healthy' -and $response.version -eq ($env:RELEASE_TAG).TrimStart('v')) { $started = $true; break }
+            } catch {}
+            if ($proc.HasExited) { break }
+            Start-Sleep -Seconds 1
+          }
+          if ($started) {
+            & $pythonExe tests/build/check_frozen_waveform.py `
+              --base-url 'http://127.0.0.1:18766' `
+              --fixture "$env:RUNNER_TEMP\soundbot-win-unpacked-waveform.wav"
+            if ($LASTEXITCODE -ne 0) { $started = $false }
+          }
+          if (!$proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
+          if (Test-Path packaged_stdout.log) { Get-Content packaged_stdout.log | Select-Object -Last 80 }
+          if (Test-Path packaged_stderr.log) { Get-Content packaged_stderr.log | Select-Object -Last 80 }
+          if (-not $started) {
+            Write-Host "::error::win-unpacked backend failed packaged waveform smoke"
             exit 1
           }
 
       - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: soundbot-windows
           path: dist-electron/*.exe
           if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
 
   create-release:
-    needs: [build-models, build-macos, build-windows]
+    needs: [validate-release, build-models, build-macos, build-windows]
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: write
+      id-token: write
+      attestations: write
+    env:
+      RELEASE_TAG: ${{ needs.validate-release.outputs.release_tag }}
+      PRERELEASE: ${{ needs.validate-release.outputs.prerelease }}
     steps:
+      - name: Checkout code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.validate-release.outputs.release_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           path: artifacts
 
@@ -386,44 +735,88 @@ jobs:
           echo "=== Downloaded artifacts ==="
           find artifacts -type f -exec ls -lh {} \;
 
-      - name: Determine tag name
-        id: tag
+      - name: Generate release notes from synchronized changelog
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "name=${{ github.event.inputs.tag_name }}" >> $GITHUB_OUTPUT
-          else
-            echo "name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          python tests/build/verify_release_metadata.py \
+            --tag "$RELEASE_TAG" \
+            --write-release-notes release-notes.md
+
+      - name: Assemble and verify exact release assets
+        run: |
+          set -euo pipefail
+          mkdir release-assets
+          cp artifacts/models-package/models.zip release-assets/
+          cp artifacts/models-package/models.zip.sha256 release-assets/
+          cp artifacts/soundbot-macos/*.dmg release-assets/
+          cp artifacts/soundbot-windows/*.exe release-assets/
+          test "$(find release-assets -maxdepth 1 -type f -name '*.dmg' | wc -l | tr -d ' ')" = 1
+          test "$(find release-assets -maxdepth 1 -type f -name '*.exe' | wc -l | tr -d ' ')" = 1
+          test "$(find release-assets -maxdepth 1 -type f | wc -l | tr -d ' ')" = 4
+          (cd release-assets && sha256sum --check models.zip.sha256)
+          (cd release-assets && sha256sum models.zip *.dmg *.exe | sort -k2 > SHA256SUMS.txt)
+          (cd release-assets && sha256sum --check SHA256SUMS.txt)
+
+      - name: Attest release artifacts
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: release-assets/*
+
+      - name: Upload verified assets to a draft, then publish atomically
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG_SHA="$(git rev-list -n 1 "$RELEASE_TAG")"
+          test "$TAG_SHA" = "${{ needs.validate-release.outputs.release_sha }}"
+
+          if gh release view "$RELEASE_TAG" --json isDraft > release-state.json 2>/dev/null; then
+            echo "::error::A release or draft already exists for $RELEASE_TAG; refusing to overwrite assets"
+            exit 1
           fi
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ steps.tag.outputs.name }}
-          name: "SoundBot ${{ steps.tag.outputs.name }} Alpha"
-          body: |
-            ## 中文更新日志
+          RELEASE_CREATED=false
+          RELEASE_PUBLISHED=false
+          cleanup_draft() {
+            if [ "$RELEASE_CREATED" = "true" ] && [ "$RELEASE_PUBLISHED" != "true" ]; then
+              # The publish request may have succeeded even if the CLI lost
+              # its response. Delete only when GitHub explicitly confirms the
+              # release is still a draft; unknown/public state is preserved.
+              if DRAFT_STATE="$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft 2>/dev/null)"; then
+                if [ "$DRAFT_STATE" = "true" ]; then
+                  echo "Cleaning up incomplete draft for $RELEASE_TAG"
+                  gh release delete "$RELEASE_TAG" --yes || true
+                else
+                  echo "Release is no longer a draft; preserving $RELEASE_TAG"
+                fi
+              else
+                echo "::warning::Could not confirm draft state; preserving $RELEASE_TAG for manual inspection"
+              fi
+            fi
+          }
+          trap cleanup_draft EXIT
 
-            - 修复从数据库加载音频后波形字段未映射到前端绘制字段，导致波形不能立即正确显示的问题。
-            - 优化波形补载策略，只对当前可见列表项请求缺失波形，避免启动后批量扫描整个音频库。
-            - 优化播放链路，默认使用本地安全协议直读音频，避免通过 IPC 或后端转 WAV 搬运整文件。
-            - 修复后端健康检查触发 CLAP 模型同步加载的问题，减少 Windows 启动等待时间。
-            - 优化后端完整性检查，移除启动时递归统计 PyInstaller 目录大小的耗时操作。
-            - 保持 WAV 导出、片段裁切、淡入淡出和拖拽导出链路使用原始文件路径，避免播放优化影响导出功能。
+          CREATE_ARGS=(
+            "$RELEASE_TAG"
+            --verify-tag
+            --draft
+            --title "SoundBot $RELEASE_TAG"
+            --notes-file release-notes.md
+          )
+          if [ "$PRERELEASE" = "true" ]; then
+            CREATE_ARGS+=(--prerelease)
+          fi
+          gh release create "${CREATE_ARGS[@]}"
+          RELEASE_CREATED=true
 
-            ## English Changelog
-
-            - Fixed waveform field mapping from the database to the frontend renderer so cached waveforms display immediately.
-            - Limited missing-waveform loading to currently visible list items to avoid scanning the full library on startup.
-            - Optimized playback to use a local secure audio protocol by default, avoiding whole-file IPC transfers and backend WAV transcoding.
-            - Fixed the health check triggering synchronous CLAP model loading, reducing startup wait time on Windows.
-            - Optimized backend integrity checks by removing the recursive PyInstaller directory size scan at startup.
-            - Kept WAV export, clip extraction, fade processing, and drag export on original file paths so playback optimization does not affect export features.
-          files: |
-            artifacts/models-package/*.zip
-            artifacts/soundbot-macos/*.dmg
-            artifacts/soundbot-windows/*.exe
-          draft: false
-          prerelease: true
-          fail_on_unmatched_files: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          gh release upload "$RELEASE_TAG" release-assets/* --clobber
+          gh release view "$RELEASE_TAG" --json assets > remote-assets.json
+          python tests/build/verify_release_assets.py \
+            --directory release-assets \
+            --remote-json remote-assets.json
+          if [ "$PRERELEASE" = "true" ]; then
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease
+          else
+            gh release edit "$RELEASE_TAG" --draft=false --latest
+          fi
+          RELEASE_PUBLISHED=true
+          trap - EXIT

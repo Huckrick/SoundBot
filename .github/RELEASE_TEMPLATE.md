@@ -1,219 +1,97 @@
-# SoundBot v0.1.0-alpha Release Notes
+# SoundBot v0.2.0 — Release notes and verification / 发布说明与验证
 
-## 🎉 首次发布 / First Release
+> Release notes for tagged builds are generated automatically from the matching section of `CHANGELOG.md`. This file is the bilingual manual-release fallback and verification checklist; do not mark a gate as passed without its CI evidence. / Tag 构建的发布说明会从 `CHANGELOG.md` 对应版本自动生成。本文件是双语手动发布备选模板与验证清单；没有 CI 证据时不要把门禁标为已通过。
 
-**SoundBot** - AI-powered sound effect manager with semantic search
+**Status / 状态:** Prerelease / 预发布<br>
+**Version / 版本:** 0.2.0<br>
+**License / 许可:** GNU GPL v3
 
-**SoundBot** - AI 驱动的音效管理器，支持语义搜索
+## Downloads / 下载
 
----
+| Target / 目标 | Release asset / 发布文件 | Support / 支持状态 |
+| --- | --- | --- |
+| Windows 10/11 x64 | `SoundBot Setup 0.2.0*.exe` | Official target / 正式目标 |
+| macOS 14+ Apple Silicon arm64 | `SoundBot-0.2.0*.dmg` | Official target / 正式目标 |
+| Optional CLAP model / 可选 CLAP 模型 | `models.zip` + `models.zip.sha256` | Required only for semantic audio indexing / 仅语义音频索引需要 |
+| Release integrity / 发布完整性 | `SHA256SUMS.txt` + GitHub attestation | Covers the model archive, DMG, and EXE / 覆盖模型包、DMG 与 EXE |
 
-## 📥 下载 / Download
+Linux and Intel macOS are not built, tested, or supported in v0.2.0. Do not publish an artifact for those targets or relabel a foreign native build. / v0.2.0 不构建、不测试也不支持 Linux 和 Intel macOS。不得为这些目标发布文件，也不得把其他平台的原生构建改名冒充。
 
-### macOS
-- **Apple Silicon (M1/M2/M3)**: `SoundBot-0.1.0-alpha-arm64.dmg`
-- **Intel Mac**: `SoundBot-0.1.0-alpha-x64.dmg`
+## Highlights / 重点变化
 
-> 下载后双击 DMG 文件，将 SoundBot 拖到 Applications 文件夹
-> After downloading, double-click the DMG and drag SoundBot to Applications
+- A pinned PyAV runtime and its wheel-bundled FFmpeg libraries decode WAV, MP3, FLAC, AIFF, AIF, OGG, M4A, AAC, and WMA without a system FFmpeg installation. / 固定版本 PyAV 与 wheel 内置 FFmpeg 动态库统一解码 WAV、MP3、FLAC、AIFF、AIF、OGG、M4A、AAC 和 WMA，无需安装系统 FFmpeg。
+- Real waveforms now contain exactly 2,000 finite peaks in `[0,1]`; `null` means not loaded, and loading, failure, cancellation, and retry are explicit. / 真实波形固定包含 2,000 个位于 `[0,1]` 的有限峰值；`null` 表示未加载，并明确展示加载、失败、取消与重试状态。
+- Chromium-incompatible containers use a fingerprinted, LRU-limited WAV generated on demand while compatible formats keep direct Electron Audio playback. / Chromium 不兼容容器按需生成带指纹、受 LRU 限制的 WAV；兼容格式继续由 Electron Audio 直放。
+- SQLite v3 is the source of truth for files and artifact state, with a one-time migration snapshot, physical-path alias merging, and no automatic database reset. / SQLite v3 成为文件与 artifact 状态真相源，迁移前只生成一次快照，合并物理路径别名，并禁止自动重置数据库。
+- CLAP audio and text metadata use separate cosine indexes. Hybrid search weights audio 0.55, text 0.30, and keyword/UCS 0.15, renormalizing unavailable branches. / CLAP 音频与文本元数据使用独立 cosine 索引；混合搜索权重为音频 0.55、文本 0.30、关键词/UCS 0.15，不可用分支会重新归一化。
+- Repair is non-destructive, and full rebuilds use validated shadow collections with atomic activation so a failed rebuild retains the previous search index. / 修复操作非破坏性，完整重建使用经过验证的影子 collection 并原子激活，因此重建失败仍保留旧搜索索引。
+- Import, index maintenance, search, caches, and AI chat are project-scoped, and long-running operations expose persistent job status and cancellation. / 导入、索引维护、搜索、缓存和 AI 对话均按工程隔离，长任务提供持久化作业状态与取消能力。
+- LM Studio, Ollama, OpenAI, Kimi, DeepSeek, SiliconFlow, and custom OpenAI-compatible LLMs are enabled through a shared asynchronous client. / LM Studio、Ollama、OpenAI、Kimi、DeepSeek、SiliconFlow 和自定义 OpenAI-compatible LLM 通过共享异步客户端启用。
+- API keys use Electron `safeStorage`, never return to the renderer, and are hydrated into the Python backend in memory only; legacy plaintext migration is atomic and recoverable. / API 密钥使用 Electron `safeStorage`，不回传渲染层，仅注入 Python 后端内存；旧明文迁移具有原子性与可恢复性。
 
-### Windows
-- **64-bit**: `SoundBot Setup 0.1.0-alpha.exe`
+See the synchronized [Chinese README](https://github.com/Huckrick/SoundBot/blob/v0.2.0/README.md), [English README](https://github.com/Huckrick/SoundBot/blob/v0.2.0/README.en.md), and [changelog](https://github.com/Huckrick/SoundBot/blob/v0.2.0/CHANGELOG.md) for architecture, APIs, data locations, diagnostics, privacy boundaries, and known limitations. / 架构、API、数据位置、诊断、隐私边界和已知限制请参阅同步的[中文 README](https://github.com/Huckrick/SoundBot/blob/v0.2.0/README.md)、[英文 README](https://github.com/Huckrick/SoundBot/blob/v0.2.0/README.en.md)与[更新日志](https://github.com/Huckrick/SoundBot/blob/v0.2.0/CHANGELOG.md)。
 
-> 下载后运行安装程序，按提示完成安装
-> Run the installer and follow the prompts
+## Before upgrading / 升级前
 
-### Linux
-- **AppImage**: `SoundBot-0.1.0-alpha.AppImage`
+Quit SoundBot and back up the complete user-data directory if the library is important. On first launch, SQLite v3 creates `soundmind.db.pre-v<old>-to-v3.bak` beside the database, migrates in a transaction, and stops without clearing data if migration fails. Do not delete `soundmind.db` or Chroma directories to “repair” an index; use Repair missing items or Full rebuild. / 如果音效库数据重要，请先完全退出 SoundBot 并备份整个用户数据目录。首次启动时，SQLite v3 会在数据库旁创建 `soundmind.db.pre-v<旧版本>-to-v3.bak`，在事务中迁移，失败时停止且不会清数据。不要删除 `soundmind.db` 或 Chroma 目录来“修复”索引，应使用“修复缺失项”或“完整重建”。
 
-> 下载后赋予执行权限并运行
-> Download, make executable with `chmod +x`, and run
+Legacy squared-L2 vectors are not reused as cosine vectors. Existing metadata remains available while affected vectors are rebuilt through shadow collections. / 旧平方 L2 向量不会冒充 cosine 向量复用；受影响向量在影子 collection 重建期间，现有元数据仍然可用。
 
----
+## Installation / 安装
 
-## ✨ 主要功能 / Key Features
+### Windows x64
 
-### 🎯 语义搜索 / Semantic Search
-- **自然语言搜索** - 用描述性词语搜索音效（如"雨声"、"爆炸"、"科幻武器"）
-- **Natural Language Search** - Search sounds using descriptive words (e.g., "rain", "explosion", "sci-fi weapon")
+Download the NSIS `.exe`, run it, and select an installation directory. If Windows security software quarantines `soundbot-backend.exe`, restore the file only after verifying that the installer came from this release. A system FFmpeg install is not required. / 下载并运行 NSIS `.exe`，按提示选择安装目录。如果 Windows 安全软件隔离 `soundbot-backend.exe`，请先确认安装包来自本 Release 再恢复。无需安装系统 FFmpeg。
 
-### 🤖 AI 驱动 / AI Powered
-- **CLAP 模型** - 使用先进的音频-文本嵌入模型理解音频内容
-- **CLAP Model** - Advanced audio-text embedding model for understanding audio content
+### macOS arm64
 
-### 🎵 音频预览 / Audio Preview
-- **波形可视化** - 实时显示音频波形
-- **Waveform Visualization** - Real-time audio waveform display
-- **区域选择** - 选择特定片段循环播放
-- **Region Selection** - Select specific segments for loop playback
-- **选区截取** - 拖拽选区到 DAW 直接使用
-- **Clip Export** - Drag selected region to DAW for direct use
+On macOS 14 or later, open the `.dmg` and drag SoundBot to Applications. This release does not promise production signing or notarization unless explicitly stated; follow macOS security prompts only after verifying the download source. Intel Macs are unsupported. / 在 macOS 14 或更高版本中打开 `.dmg` 并把 SoundBot 拖到 Applications。除非明确说明，本版本不承诺生产级签名或公证；确认下载来源后再按 macOS 安全提示操作。不支持 Intel Mac。
 
-**⚠️ 存储空间提醒 / Storage Reminder:**
-- 默认临时文件存储在应用目录，可在设置中更改
-- Default temp files are stored in app directory, can be changed in settings
-- 定期清理临时文件以释放空间
-- Regularly clean temp files to free up space
-- **清理前请确保 DAW 工程不再引用这些文件**
-- **Ensure DAW projects no longer reference these files before cleaning**
+### Optional CLAP model / 可选 CLAP 模型
 
-### 📁 项目管理 / Project Management
-- **多项目管理** - 创建和管理多个音效库项目
-- **Multi-Project Management** - Create and manage multiple sound libraries
+Core library, decode, waveform, playback, and keyword search work without the model. For semantic audio search, download both model assets, verify `models.zip` against `models.zip.sha256`, and install this structure in SoundBot's user-data directory (or point `SOUNDBOT_MODELS_PATH` to it): / 没有模型仍可使用基础音效库、解码、波形、播放和关键词搜索。需要语义音频搜索时，请同时下载模型包与校验文件，以 `models.zip.sha256` 验证 `models.zip`，并把下列结构安装到 SoundBot 用户数据目录（或用 `SOUNDBOT_MODELS_PATH` 指向它）：
 
-### 🤖 AI 对话助手 / AI Chat Assistant
-- **多 LLM 支持** - 支持 OpenAI、Azure、Gemini、Kimi、Claude、DeepSeek、SiliconFlow 等
-- **Multi-LLM Support** - Support OpenAI, Azure, Gemini, Kimi, Claude, DeepSeek, SiliconFlow, etc.
-- **智能音效推荐** - 根据场景描述推荐合适的音效
-- **Smart Sound Recommendation** - Recommend suitable sounds based on scene descriptions
-- **音效知识问答** - 解答音效制作、UCS 分类等问题
-- **Sound Knowledge Q&A** - Answer sound production, UCS categorization questions
+```text
+models/
+├── model-manifest.json
+└── clap/
+    └── ...
+```
 
-### 🔧 高级功能 / Advanced Features
-- **音频处理** - 淡入淡出、片段导出
-- **Audio Processing** - Fade in/out, clip export
-- **LRU 缓存** - 智能缓存加速重复播放
-- **LRU Cache** - Smart caching for faster replay
-- **批量导入** - 支持文件夹批量导入和实时监控
-- **Batch Import** - Folder import with real-time monitoring
+The model manifest records an immutable revision and per-file SHA-256 hashes. The resource manager rejects traversal, Zip Slip, symlinks, malformed manifests, and hash mismatches before atomic replacement. / 模型 manifest 记录不可变 revision 与逐文件 SHA-256；资源管理器会在原子替换前拒绝目录穿越、Zip Slip、符号链接、异常 manifest 与哈希不匹配。
 
----
+## Privacy / 隐私
 
-## 🚀 快速开始 / Quick Start
+SoundBot has no cloud telemetry. Audio, waveforms, CLAP audio vectors, tags, and Chroma data stay local by default. Selecting an external LLM may send chat/search context or candidate metadata to that provider; selecting an external text Embedding endpoint sends metadata text but never uses it as an audio encoder. Provider pricing, retention, and compliance policies apply. / SoundBot 不含云端遥测。音频、波形、CLAP 音频向量、标签和 Chroma 数据默认留在本机。选择外部 LLM 后，聊天/搜索上下文或候选元数据可能发给 provider；选择外部文本 Embedding 后会发送元数据文本，但不会用它代替音频编码器。对应 provider 的费用、留存与合规政策仍然适用。
 
-### 1. 安装 / Install
-下载对应系统的安装包并安装  
-Download and install the package for your system
+Configuration reads expose only `has_api_key`. If OS secure storage is unavailable, SoundBot refuses to save a key instead of falling back to plaintext. / 配置读取只暴露 `has_api_key`；操作系统安全存储不可用时，SoundBot 会拒绝保存密钥，不会降级为明文。
 
-### 2. 首次启动 / First Launch
-应用会自动启动后端服务和加载 AI 模型（约需 10-30 秒）  
-The app will auto-start backend and load AI model (takes 10-30 seconds)
+## Required release evidence / 必需发布证据
 
-### 3. 配置 AI 助手（可选）/ Configure AI Assistant (Optional)
-点击"设置" → "AI 配置"添加你的 LLM API 密钥  
-Click "Settings" → "AI Config" to add your LLM API key
+Leave every item unchecked in the template. The native CI job is the evidence source. Release creation must depend on all jobs and must not run after any failed smoke test. / 模板中的每项默认保持未勾选，原生 CI 作业才是证据来源。Release 创建必须依赖全部作业，任一 smoke test 失败后都不得运行。
 
-**支持的 LLM 服务 / Supported LLM Services:**
-- OpenAI (GPT-4, GPT-3.5)
-- Azure OpenAI
-- Google Gemini
-- Moonshot Kimi
-- Anthropic Claude
-- DeepSeek
-- SiliconFlow
-- 自定义 API / Custom API
+- [ ] Version `0.2.0` matches `package.json`, `package-lock.json`, `backend/config.py`, tag `v0.2.0`, both READMEs, and the bilingual changelog. / 版本 `0.2.0` 与 `package.json`、`package-lock.json`、`backend/config.py`、tag `v0.2.0`、两份 README 和双语 changelog 一致。
+- [ ] The CLAP asset was downloaded from the pinned immutable revision, its per-file manifest passed, and `models.zip.sha256` matches. / CLAP 资源来自固定不可变 revision，逐文件 manifest 通过，且 `models.zip.sha256` 匹配。
+- [ ] The draft Release contains exactly the expected assets; remote names, sizes, SHA-256 digests, and `uploaded` states match, `SHA256SUMS.txt` verifies, and GitHub provenance attestations exist before publication. / 草稿 Release 仅包含预期资产，远端名称、大小、SHA-256 digest 与 `uploaded` 状态一致，`SHA256SUMS.txt` 校验通过，并在公开前生成 GitHub provenance 证明。
+- [ ] The macOS arm64 frozen backend starts, contains the PyAV/FFmpeg runtime and notices, the DMG passes integrity verification, and the packaged backend is arm64. / macOS arm64 冻结后端可启动，包含 PyAV/FFmpeg 运行时与许可证，DMG 通过完整性验证，且应用内后端为 arm64。
+- [ ] The Windows x64 frozen backend starts with a clean `PATH` and no system FFmpeg, then decodes WAV, MP3, FLAC, AIFF, AIF, OGG, M4A, AAC, and WMA from special-character paths into exact 2,000-point waveforms. / Windows x64 冻结后端在干净 `PATH`、无系统 FFmpeg 下启动，并从特殊字符路径解码 WAV、MP3、FLAC、AIFF、AIF、OGG、M4A、AAC、WMA，生成精确 2,000 点波形。
+- [ ] The same Windows matrix reaches ready waveform/audio/text artifacts, activates cosine CLAP and Chroma manifests, returns hybrid component scores, and produces a valid WMA playback WAV. / 同一 Windows 矩阵使波形/音频/文本 artifact 达到 ready，激活 cosine CLAP 与 Chroma manifest，返回混合搜索分项得分，并生成有效 WMA 播放 WAV。
+- [ ] The backend inside `win-unpacked` starts and passes a real waveform test, and the NSIS installer passes archive-integrity validation. / `win-unpacked` 内后端可启动并通过真实波形测试，NSIS 安装包通过归档完整性验证。
+- [ ] `app.asar` contains required Electron and renderer modules and excludes WaveSurfer, `.DS_Store`, root `SoundBot.png`, models, and source-only files. / `app.asar` 包含必要 Electron 与渲染模块，并排除 WaveSurfer、`.DS_Store`、根目录 `SoundBot.png`、模型和仅源码文件。
+- [ ] Release notes were generated from `CHANGELOG.md` only after every native, functional, model, metadata, package, and installer gate passed. / 全部原生、功能、模型、元数据、应用包与安装包门禁通过后，发布说明才从 `CHANGELOG.md` 生成。
 
-### 4. 导入音效 / Import Sounds
-点击"导入" → "导入文件夹"选择你的音效文件夹  
-Click "Import" → "Import Folder" to select your sound folder
+This checklist describes CI requirements; it does not claim that a Windows package was built on the maintainer's current machine. / 本清单描述 CI 要求，不表示维护者当前机器已经构建 Windows 包。
 
-### 5. 开始搜索 / Start Searching
-在搜索框输入描述（如"雨声"、"科幻"）查找音效  
-Type descriptions (e.g., "rain", "sci-fi") in the search box
+## Known limitations / 已知限制
 
-### 6. 使用 AI 助手 / Use AI Assistant
-点击右下角的 AI 助手图标，描述你需要的音效场景  
-Click the AI assistant icon at bottom right, describe your sound scene
+- This release does not promise production-grade signing, notarization, or automatic updates unless explicitly stated. / 除非明确说明，本版本不承诺生产级签名、公证或自动更新。
+- CLAP is a large model, and initial indexing or CPU inference can take time. / CLAP 模型体积较大，首次索引或 CPU 推理需要时间。
+- Missing models or unavailable external services leave affected artifacts pending/failed but do not remove files or tags. / 模型缺失或外部服务不可用时，相关 artifact 保持 pending/failed，但不会删除文件或标签。
+- AIFF/AIF, M4A, AAC, and WMA playback may consume temporary disk space because Electron uses an on-demand WAV fallback. / AIFF/AIF、M4A、AAC 和 WMA 播放可能占用临时磁盘空间，因为 Electron 使用按需 WAV 回退。
+- External LLM/Embedding availability, rates, costs, and data policies are controlled by their providers. / 外部 LLM/Embedding 的可用性、限流、费用和数据政策由对应 provider 控制。
 
----
+## Feedback and license / 反馈与许可
 
-## 🛠️ 系统要求 / System Requirements
+Report reproducible issues at [GitHub Issues](https://github.com/Huckrick/SoundBot/issues) after redacting API keys and private paths. / 请在脱敏 API 密钥与私人路径后，通过 [GitHub Issues](https://github.com/Huckrick/SoundBot/issues) 提交可复现问题。
 
-### macOS
-- macOS 11.0 (Big Sur) 或更高版本
-- Apple Silicon 或 Intel 处理器
-- 4GB+ RAM（推荐 8GB）
-- 2GB 可用磁盘空间
-
-### Windows
-- Windows 10/11 64-bit
-- 4GB+ RAM（推荐 8GB）
-- 2GB 可用磁盘空间
-
-### Linux
-- Ubuntu 20.04+ / Debian 11+ / Fedora 35+
-- 4GB+ RAM（推荐 8GB）
-- 2GB 可用磁盘空间
-
----
-
-## 📝 已知问题 / Known Issues
-
-- 首次启动需要加载 AI 模型，可能需要 10-30 秒
-- First launch requires loading AI model, may take 10-30 seconds
-- 大型音效库导入可能需要较长时间
-- Large sound libraries may take time to import
-
----
-
-## 🔒 许可证 / License
-
-本项目采用 **GNU General Public License v3.0 (GPL-3.0)**  
-This project is licensed under **GNU General Public License v3.0 (GPL-3.0)**
-
-- ✅ 自由使用、修改、分发
-- ✅ Free to use, modify, distribute
-- ⚠️ 修改后的版本必须开源
-- ⚠️ Modified versions must be open source
-- ❌ 不能闭源销售
-- ❌ Cannot be sold as closed-source
-
-详见 [LICENSE](../LICENSE) 文件  
-See [LICENSE](../LICENSE) file for details
-
----
-
-## 👨‍💻 开发者 / Developer
-
-**Nagisa_Huckrick (胡杨)**  
-📧 Email: Nagisa_Huckrick@yeah.net  
-🐙 GitHub: [@Nagisa_Huckrick](https://github.com/Nagisa_Huckrick)
-
-### 致谢 / Acknowledgments
-- 本项目开发过程中使用了 Trae 和 Cursor 等 AI 编程工具
-- This project was developed using AI programming tools including Trae and Cursor
-
----
-
-## 🤝 贡献 / Contributing
-
-欢迎提交 Issue 和 Pull Request！  
-Issues and Pull Requests are welcome!
-
-1. Fork 本仓库 / Fork this repository
-2. 创建特性分支 / Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 / Commit changes (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 / Push to branch (`git push origin feature/AmazingFeature`)
-5. 创建 Pull Request / Open a Pull Request
-
----
-
-## 📊 版本历史 / Version History
-
-### v0.1.0-alpha (2026-03-22)
-- 🎉 首次公开发布
-- 🎉 First public release
-- ✨ 完整的语义搜索功能
-- ✨ Full semantic search functionality
-- ✨ AI 对话助手集成
-- ✨ AI chat assistant integration
-- ✨ 多项目管理支持
-- ✨ Multi-project management support
-- ✨ 音频波形可视化
-- ✨ Audio waveform visualization
-
----
-
-## 💬 反馈 / Feedback
-
-遇到问题？请提交 Issue：  
-Having issues? Please submit an Issue:
-
-👉 [GitHub Issues](https://github.com/Nagisa_Huckrick/SoundBot/issues)
-
----
-
-**感谢使用 SoundBot！**  
-**Thank you for using SoundBot!**
-
-🎵 让音效管理更智能 / Make sound management smarter 🎵
+Copyright © 2026 Nagisa_Huckrick (胡杨), Nagisa_Huckrick@yeah.net. SoundBot is licensed under GNU GPL v3. / SoundBot 使用 GNU GPL v3 许可。

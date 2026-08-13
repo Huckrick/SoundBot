@@ -1,0 +1,14 @@
+{
+  "generator": "FFmpeg 8.0.1 sine=440Hz:sample_rate=48000:duration=0.35, stereo",
+  "files": {
+    "tone.aac": "106c9e2272aac1f4ab1de0d1d9f58eb62ef25fc1cdf32042adec26d73c40272b",
+    "tone.aif": "cf667df6312983c820978ac7d2cd698a820b138c20db2307f43d2ee7995cc574",
+    "tone.aiff": "cf667df6312983c820978ac7d2cd698a820b138c20db2307f43d2ee7995cc574",
+    "tone.flac": "64a57daa4a8df5c2bd1d9837a293b71d7c5a75522db1f7ad44f5589df76c013c",
+    "tone.m4a": "dedfb125f1ca3b46064b55fc304df3f05bc6c1749960507d8967d2061a23d7ce",
+    "tone.mp3": "a3602f00ec65106ba5a641dd94357fc09d570aca5eb1cfefff323dfff1fc1422",
+    "tone.ogg": "6f8d4725c2bbabd38c9a8b4ba5186d0891c078a735ccd8e4096ca6a185112878",
+    "tone.wav": "328d5289c6eed4f4a93a8b76a570912731ad4bb10762568dc55bae359a301dff",
+    "tone.wma": "943e7c9e4986d6828586e1884b3cf50274ba3329d20384cc5556670b284758d8"
+  }
+}

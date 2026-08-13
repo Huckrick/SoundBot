@@ -23,6 +23,7 @@ SoundBot 后端配置管理 - PyInstaller 适配版
 
 import os
 import sys
+import json
 from pathlib import Path
 
 # ==================== 动态路径解析 ====================
@@ -46,7 +47,10 @@ def get_user_data_dir() -> Path:
     - Windows: %APPDATA%/SoundBot
     - Linux: ~/.local/share/SoundBot
     """
-    if sys.platform == 'darwin':
+    override = os.environ.get('SOUNDBOT_USER_DATA_DIR')
+    if override:
+        data_dir = Path(override).expanduser()
+    elif sys.platform == 'darwin':
         data_dir = Path.home() / 'Library' / 'Application Support' / 'SoundBot'
     elif sys.platform == 'win32':
         appdata = os.environ.get('APPDATA') or os.environ.get('LOCALAPPDATA')
@@ -126,8 +130,24 @@ def get_temp_dir() -> Path:
 
 
 def get_chroma_db_path(project_id: str = "default") -> Path:
-    """获取 ChromaDB 存储路径"""
-    db_path = get_user_data_dir() / 'chroma_projects' / project_id
+    """获取受工程根目录约束的 ChromaDB 存储路径。"""
+    import re
+    value = str(project_id or "").strip()
+    reserved = {
+        "CON", "PRN", "AUX", "NUL",
+        *(f"COM{index}" for index in range(1, 10)),
+        *(f"LPT{index}" for index in range(1, 10)),
+    }
+    stem = value.split(".", 1)[0].upper()
+    if (
+        not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", value)
+        or value.endswith(".")
+        or stem in reserved
+    ):
+        raise ValueError("工程 ID 包含非法字符")
+    root = (get_user_data_dir() / 'chroma_projects').resolve(strict=False)
+    db_path = (root / value).resolve(strict=False)
+    db_path.relative_to(root)
     db_path.mkdir(parents=True, exist_ok=True)
     return db_path
 
@@ -135,7 +155,7 @@ def get_chroma_db_path(project_id: str = "default") -> Path:
 # ==================== 项目基础配置 ====================
 
 APP_NAME = "SoundBot"
-APP_VERSION = "0.1.4"
+APP_VERSION = "0.2.0"
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
 # ==================== 服务器配置 ====================
@@ -221,29 +241,22 @@ def get_clap_model_name() -> str:
     这是解决 PyInstaller 打包后路径问题的关键
     
     Returns:
-        模型路径字符串（本地路径或 HuggingFace 模型名）
+        本地模型目录路径；目录缺失时仍返回期望位置供调用方快速报错
     """
     # 每次都重新查找模型目录（绕过任何可能的缓存）
     models_dir = find_models_dir_runtime()
     clap_path = models_dir / 'clap'
     
-    if clap_path.exists():
-        return str(clap_path)
-    else:
-        # 回退到 HuggingFace
-        return os.getenv("CLAP_MODEL", "laion/larger_clap_general")
+    return str(clap_path)
 
 
 # 自动查找模型目录（使用运行时版本确保每次都读取最新环境变量）
 MODELS_DIR = str(find_models_dir_runtime())
 CLAP_MODEL_PATH = str(Path(MODELS_DIR) / 'clap')
 
-# 确定 CLAP 模型名称/路径（模块导入时执行一次，仅作为默认值）
-if Path(CLAP_MODEL_PATH).exists():
-    CLAP_MODEL_NAME = str(CLAP_MODEL_PATH)
-else:
-    # 回退到 HuggingFace
-    CLAP_MODEL_NAME = os.getenv("CLAP_MODEL", "laion/larger_clap_general")
+# 仅允许本地、经 manifest 校验安装的 CLAP 模型。模型缺失时应用仍可
+# 启动元数据功能，但绝不在请求路径隐式访问 Hugging Face。
+CLAP_MODEL_NAME = str(CLAP_MODEL_PATH)
 
 # 注意：在 PyInstaller 打包后的环境中，CLAP_MODEL_NAME 可能是错误的绝对路径
 # 应该使用 get_clap_model_name() 函数来获取正确的模型路径
@@ -252,9 +265,45 @@ CLAP_DEVICE = os.getenv("CLAP_DEVICE", "auto")
 MODEL_LOAD_TIMEOUT = int(os.getenv("MODEL_LOAD_TIMEOUT", "120"))
 ENABLE_MODEL_PRELOAD = os.getenv("ENABLE_MODEL_PRELOAD", "true").lower() == "true"
 
-# ==================== 音频扫描配置 ====================
+# ==================== 音频能力配置 ====================
 
-SUPPORTED_FORMATS = ['.wav', '.mp3', '.flac', '.aiff', '.ogg', '.m4a', '.aac', '.wma']
+def _load_audio_capabilities() -> dict:
+    """Load the one format manifest shared by Python and Electron."""
+    candidates = [
+        Path(__file__).resolve().parent.parent / 'config' / 'audio_capabilities.json',
+        Path(getattr(sys, '_MEIPASS', get_executable_dir()))
+        / 'config'
+        / 'audio_capabilities.json',
+    ]
+    for manifest_path in candidates:
+        if not manifest_path.is_file():
+            continue
+        payload = json.loads(manifest_path.read_text(encoding='utf-8'))
+        formats = payload.get('formats') if isinstance(payload, dict) else None
+        if not isinstance(formats, dict) or not formats:
+            raise RuntimeError(f'音频能力表无效: {manifest_path}')
+        for extension, capability in formats.items():
+            if (
+                not isinstance(extension, str)
+                or not extension.startswith('.')
+                or not isinstance(capability, dict)
+                or not isinstance(capability.get('mime_type'), str)
+                or not isinstance(capability.get('requires_playback_transcode'), bool)
+            ):
+                raise RuntimeError(f'音频能力条目无效: {extension!r}')
+        return formats
+    raise RuntimeError('缺少 config/audio_capabilities.json')
+
+
+AUDIO_FORMAT_CAPABILITIES = _load_audio_capabilities()
+
+SUPPORTED_FORMATS = tuple(AUDIO_FORMAT_CAPABILITIES)
+WAVEFORM_PEAK_COUNT = 2000
+WAVEFORM_VERSION = '2'
+PLAYBACK_WAV_CACHE_MAX_BYTES = int(
+    os.getenv('PLAYBACK_WAV_CACHE_MAX_BYTES', str(512 * 1024 * 1024))
+)
+PLAYBACK_WAV_CACHE_MAX_FILES = int(os.getenv('PLAYBACK_WAV_CACHE_MAX_FILES', '128'))
 MAX_AUDIO_DURATION = 300  # 最大处理 5 分钟音频
 
 # ==================== 临时文件配置 ====================

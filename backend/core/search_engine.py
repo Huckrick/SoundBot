@@ -36,11 +36,23 @@ from typing import List, Optional, Dict, Any, Tuple, Callable
 from dataclasses import dataclass, field
 from functools import lru_cache
 import hashlib
+import threading
+from pathlib import Path
 
 import config
-from core.embedder import get_embedder, is_embedder_available
-from core.indexer import get_chroma_client
-from core.searcher import SearchResult, AudioSearcher
+from core.embedder import (
+    peek_embedder,
+    get_embedder_fingerprint,
+    get_text_embedding_config_fingerprint,
+)
+from core.indexer import get_collection_revision, safe_project_chroma_path
+from core.searcher import (
+    SearchResult,
+    AudioSearcher,
+    MetadataTextSearcher,
+    build_chroma_where,
+    cosine_similarity_from_distance,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -72,8 +84,12 @@ class QueryCache:
 
     def _hash_query(self, query: str, **kwargs) -> str:
         """生成查询的哈希值"""
-        key = f"{query}:{sorted(kwargs.items())}"
-        return hashlib.md5(key.encode()).hexdigest()
+        # JSON canonicalisation keeps nested filters stable regardless of dict
+        # insertion order.  Project/revision/model context is supplied by the
+        # caller and therefore participates in every key.
+        payload = {"query": query, **kwargs}
+        key = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
+        return hashlib.sha256(key.encode("utf-8")).hexdigest()
 
     async def get(self, query: str, **kwargs) -> Optional[SearchCacheEntry]:
         """获取缓存结果"""
@@ -163,14 +179,27 @@ class OptimizedAudioSearcher(AudioSearcher):
     """
 
     def __init__(self, *args, **kwargs):
+        self.project_id = str(kwargs.pop("project_id", None) or config.CURRENT_PROJECT_ID)
+        self.index_revision = int(kwargs.pop("index_revision", 0))
+        self.model_fingerprint = kwargs.pop("model_fingerprint", None)
+        self.text_collection_name = kwargs.pop(
+            "text_collection_name", "text_metadata_embeddings"
+        )
         # 使用工程目录而非 db 目录
         persist_directory = kwargs.get('persist_directory')
         if persist_directory is None:
-            from config import get_chroma_db_path, CURRENT_PROJECT_ID
-            persist_directory = str(get_chroma_db_path(CURRENT_PROJECT_ID))
+            persist_directory = str(safe_project_chroma_path(self.project_id))
         kwargs['persist_directory'] = persist_directory
+        kwargs['project_id'] = self.project_id
+        kwargs['index_revision'] = self.index_revision
+        kwargs['model_fingerprint'] = self.model_fingerprint
 
         super().__init__(*args, **kwargs)
+        self._text_searcher = MetadataTextSearcher(
+            persist_directory=persist_directory,
+            collection_name=self.text_collection_name,
+            project_id=self.project_id,
+        )
         self._query_cache = QueryCache(max_size=100, ttl=3600)
         self._text_processor = ChineseTextProcessor()
         # 加载配置
@@ -299,19 +328,27 @@ class OptimizedAudioSearcher(AudioSearcher):
                 match_level = "weak"
 
         # 4. 元数据标签匹配（ID3标签、BWF标签等）
-        metadata_tags_str = metadata.get("metadata_tags", "{}")
+        raw_metadata_tags = metadata.get("metadata_tags", {})
         try:
-            metadata_tags = json.loads(metadata_tags_str) if metadata_tags_str else {}
-            for key, value in metadata_tags.items():
-                if isinstance(value, str):
-                    value_lower = value.lower()
-                    if query_lower in value_lower:
-                        scores.append(0.75)
-                        if match_level == "none":
-                            match_level = "partial"
-                        break
-        except:
-            pass
+            metadata_tags = (
+                json.loads(raw_metadata_tags)
+                if isinstance(raw_metadata_tags, str) and raw_metadata_tags.strip()
+                else raw_metadata_tags
+            )
+        except (TypeError, json.JSONDecodeError):
+            metadata_tags = raw_metadata_tags
+        if isinstance(metadata_tags, dict):
+            searchable_tags = [*metadata_tags.keys(), *metadata_tags.values()]
+        elif isinstance(metadata_tags, (list, tuple, set)):
+            searchable_tags = list(metadata_tags)
+        elif metadata_tags:
+            searchable_tags = [metadata_tags]
+        else:
+            searchable_tags = []
+        if any(query_lower in str(value).lower() for value in searchable_tags):
+            scores.append(0.75)
+            if match_level == "none":
+                match_level = "partial"
 
         # 5. 文件名分词匹配
         parsed_name = metadata.get("parsed_name", "")
@@ -336,9 +373,7 @@ class OptimizedAudioSearcher(AudioSearcher):
             db_manager = get_db_manager()
             
             # 获取当前工程的文件记录，避免关键词搜索跨工程串数据
-            import config
-            current_project_id = getattr(config, 'CURRENT_PROJECT_ID', 'default')
-            all_records = db_manager.get_files_by_project(current_project_id)
+            all_records = db_manager.get_files_by_project(self.project_id)
             
             # 转换为与 ChromaDB 元数据兼容的格式
             all_files = []
@@ -348,6 +383,7 @@ class OptimizedAudioSearcher(AudioSearcher):
                 file_ext = filename.split('.')[-1].lower() if '.' in filename else ""
                 
                 metadata = {
+                    "file_id": record.file_uuid,
                     "file_path": record.path,
                     "filename": filename,
                     "duration": record.duration,
@@ -406,14 +442,15 @@ class OptimizedAudioSearcher(AudioSearcher):
                     results = self.collection.get(
                         limit=batch_size,
                         offset=offset,
-                        where=filters if filters else None
+                        where=build_chroma_where(filters)
                     )
                     
                     if not results or not results.get("ids"):
                         break
                     
                     for i, file_id in enumerate(results["ids"]):
-                        metadata = results["metadatas"][i]
+                        metadata = dict(results["metadatas"][i] or {})
+                        metadata["file_id"] = str(file_id)
                         all_files.append(metadata)
                     
                     if len(results["ids"]) < batch_size:
@@ -434,7 +471,8 @@ class OptimizedAudioSearcher(AudioSearcher):
     def _exact_keyword_search(
         self,
         query: str,
-        filters: Optional[Dict[str, Any]] = None
+        filters: Optional[Dict[str, Any]] = None,
+        files_snapshot: Optional[List[Dict[str, Any]]] = None,
     ) -> List[SearchResult]:
         """
         第1层：精确关键词搜索
@@ -447,7 +485,7 @@ class OptimizedAudioSearcher(AudioSearcher):
         if not query or not query.strip():
             return []
 
-        all_files = self._get_all_files(filters)
+        all_files = files_snapshot if files_snapshot is not None else self._get_all_files(filters)
         results = []
 
         for metadata in all_files:
@@ -482,7 +520,9 @@ class OptimizedAudioSearcher(AudioSearcher):
     def _expanded_keyword_search(
         self,
         query: str,
-        filters: Optional[Dict[str, Any]] = None
+        filters: Optional[Dict[str, Any]] = None,
+        files_snapshot: Optional[List[Dict[str, Any]]] = None,
+        expanded_queries: Optional[List[str]] = None,
     ) -> List[SearchResult]:
         """
         第2层：分词扩展搜索
@@ -493,7 +533,11 @@ class OptimizedAudioSearcher(AudioSearcher):
             return []
 
         # 获取扩展查询词
-        expanded_queries = self._text_processor.expand_query(query)
+        expanded_queries = list(
+            expanded_queries
+            if expanded_queries is not None
+            else self._text_processor.expand_query(query)
+        )
 
         # 如果扩展结果很少（只有原始查询），也尝试使用扩展词本身
         # 这样可以搜索文件名包含查询词的文件
@@ -504,7 +548,7 @@ class OptimizedAudioSearcher(AudioSearcher):
                 expanded_queries.extend(tokens)
             # 不再直接返回空列表，而是继续使用原始查询进行搜索
 
-        all_files = self._get_all_files(filters)
+        all_files = files_snapshot if files_snapshot is not None else self._get_all_files(filters)
         results = []
 
         # 使用集合跟踪已处理的文件，避免重复
@@ -557,6 +601,52 @@ class OptimizedAudioSearcher(AudioSearcher):
         results.sort(key=lambda x: x.similarity, reverse=True)
         return results
 
+    def _keyword_search_from_snapshot(
+        self,
+        query: str,
+        filters: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[List[str], List[SearchResult], List[SearchResult]]:
+        """Expand and match a query against one immutable metadata snapshot.
+
+        The caller may run this entire method in a worker thread so both the
+        SQLite read and O(files × expanded terms) matching stay off the event
+        loop.  Exact and expanded branches intentionally share the same list.
+        """
+        expanded_queries = list(self._text_processor.expand_query(query))
+        if query not in expanded_queries:
+            expanded_queries.insert(0, query)
+        files_snapshot = self._get_all_files(filters)
+        exact_results = self._exact_keyword_search(
+            query, filters, files_snapshot=files_snapshot
+        )
+        expanded_results = self._expanded_keyword_search(
+            query,
+            filters,
+            files_snapshot=files_snapshot,
+            expanded_queries=expanded_queries,
+        )
+        return expanded_queries, exact_results, expanded_results
+
+    def _ready_vector_results(
+        self,
+        results: List[SearchResult],
+        kind: str,
+    ) -> List[SearchResult]:
+        """Exclude Chroma rows SQLite has marked pending/failed/stale."""
+        if not results:
+            return []
+        from core.database import get_db_manager
+
+        ready = get_db_manager().get_ready_artifact_ids(
+            self.project_id,
+            kind,
+            (result.metadata.get("file_id") for result in results),
+        )
+        return [
+            result for result in results
+            if str(result.metadata.get("file_id") or "") in ready
+        ]
+
     def _semantic_search(
         self,
         query_embedding: np.ndarray,
@@ -577,10 +667,13 @@ class OptimizedAudioSearcher(AudioSearcher):
             min_similarity: 最小相似度阈值
             filters: 过滤条件
         """
-        where_clause = filters if filters else None
+        where_clause = build_chroma_where(filters)
 
         # 获取更多结果用于筛选
-        search_k = min(top_k * 3, 500)
+        collection_count = int(self.collection.count())
+        if collection_count <= 0 or self.needs_rebuild:
+            return []
+        search_k = min(top_k * 3, 500, collection_count)
 
         results = self.collection.query(
             query_embeddings=[query_embedding.tolist()],
@@ -596,10 +689,10 @@ class OptimizedAudioSearcher(AudioSearcher):
 
             for i, file_id in enumerate(ids):
                 distance = distances[i]
-                # 使用高斯核函数转换距离为相似度
-                semantic_sim = np.exp(-(distance ** 2) / 2.0)
+                semantic_sim = cosine_similarity_from_distance(distance)
 
-                metadata = metadatas[i]
+                metadata = dict(metadatas[i] or {})
+                metadata["file_id"] = str(file_id)
                 filename = metadata.get("filename", "")
 
                 # 计算文件名匹配分数（基于原始查询）
@@ -710,13 +803,13 @@ class OptimizedAudioSearcher(AudioSearcher):
         """
         all_results = []
 
-        # 第1层：精确关键词搜索（使用原始查询）
-        exact_results = self._exact_keyword_search(query, filters)
+        # Both keyword layers share one SQLite/Chroma metadata snapshot.
+        _, exact_results, expanded_results = self._keyword_search_from_snapshot(
+            query, filters
+        )
         all_results.extend(exact_results)
         logger.debug(f"第1层(精确关键词): 找到 {len(exact_results)} 个结果")
 
-        # 第2层：分词扩展搜索（使用原始查询，让它内部扩展）
-        expanded_results = self._expanded_keyword_search(query, filters)
         all_results.extend(expanded_results)
         logger.debug(f"第2层(分词扩展): 找到 {len(expanded_results)} 个结果")
 
@@ -747,11 +840,15 @@ class OptimizedAudioSearcher(AudioSearcher):
         与 _semantic_search 不同，这里不应用自适应评分，
         直接使用原始语义相似度
         """
-        where_clause = filters if filters else None
+        where_clause = build_chroma_where(filters)
+
+        collection_count = int(self.collection.count())
+        if collection_count <= 0 or self.needs_rebuild:
+            return []
 
         results = self.collection.query(
             query_embeddings=[query_embedding.tolist()],
-            n_results=top_k,
+            n_results=min(top_k, collection_count),
             where=where_clause
         )
 
@@ -763,13 +860,13 @@ class OptimizedAudioSearcher(AudioSearcher):
 
             for i, file_id in enumerate(ids):
                 distance = distances[i]
-                # 使用高斯核函数转换距离为相似度
-                semantic_sim = np.exp(-(distance ** 2) / 2.0)
+                semantic_sim = cosine_similarity_from_distance(distance)
 
                 if semantic_sim < min_similarity:
                     continue
 
-                metadata = metadatas[i]
+                metadata = dict(metadatas[i] or {})
+                metadata["file_id"] = str(file_id)
 
                 search_results.append(SearchResult(
                     file_path=metadata.get("file_path", ""),
@@ -787,6 +884,101 @@ class OptimizedAudioSearcher(AudioSearcher):
 
         return search_results
 
+    @staticmethod
+    def _configured_text_fingerprint() -> str:
+        """Fingerprint provider/model configuration without hashing secrets."""
+        try:
+            return get_text_embedding_config_fingerprint()
+        except Exception:
+            return "text-config:unknown"
+
+    def _weighted_merge_results(
+        self,
+        keyword_results: List[SearchResult],
+        audio_results: List[SearchResult],
+        text_results: List[SearchResult],
+        *,
+        top_k: int,
+        min_similarity: float,
+        audio_available: bool,
+        text_available: bool,
+    ) -> Tuple[List[SearchResult], Dict[str, float]]:
+        """Merge branches using the v0.2 weights and expose component scores."""
+        configured = {"audio": 0.55, "text": 0.30, "keyword": 0.15}
+        enabled = {
+            "audio": audio_available,
+            "text": text_available,
+            "keyword": True,
+        }
+        weight_total = sum(configured[name] for name, active in enabled.items() if active)
+        weights = {
+            name: (configured[name] / weight_total if active and weight_total else 0.0)
+            for name, active in enabled.items()
+        }
+
+        candidates: Dict[str, Dict[str, Any]] = {}
+
+        def add(result: SearchResult, component: str, score: float) -> None:
+            key = result.file_path or f"filename:{result.filename}"
+            entry = candidates.setdefault(
+                key,
+                {
+                    "result": result,
+                    "audio": 0.0,
+                    "text": 0.0,
+                    "keyword": 0.0,
+                },
+            )
+            entry[component] = max(entry[component], max(0.0, float(score)))
+            # Prefer the richer record while preserving all score metadata.
+            if len(result.metadata) > len(entry["result"].metadata):
+                entry["result"] = result
+            else:
+                entry["result"].metadata.update(result.metadata)
+
+        for result in keyword_results:
+            add(
+                result,
+                "keyword",
+                result.metadata.get("keyword_score", result.similarity),
+            )
+        for result in audio_results:
+            add(
+                result,
+                "audio",
+                result.metadata.get("audio_score", result.metadata.get("semantic_score", result.similarity)),
+            )
+        for result in text_results:
+            add(result, "text", result.metadata.get("text_score", result.similarity))
+
+        merged: List[SearchResult] = []
+        for entry in candidates.values():
+            score = sum(entry[name] * weights[name] for name in weights)
+            if score < min_similarity:
+                continue
+            source: SearchResult = entry["result"]
+            metadata = dict(source.metadata)
+            metadata.update(
+                {
+                    "audio_score": entry["audio"],
+                    "text_score": entry["text"],
+                    "keyword_score": entry["keyword"],
+                    "score_weights": weights,
+                }
+            )
+            merged.append(
+                SearchResult(
+                    file_path=source.file_path,
+                    filename=source.filename,
+                    similarity=float(np.clip(score, 0.0, 1.0)),
+                    duration=source.duration,
+                    format=source.format,
+                    metadata=metadata,
+                )
+            )
+        merged.sort(key=lambda result: result.similarity, reverse=True)
+        return merged[:top_k], weights
+
     async def search_async(
         self,
         query: str,
@@ -794,26 +986,19 @@ class OptimizedAudioSearcher(AudioSearcher):
         min_similarity: Optional[float] = None,
         filters: Optional[Dict[str, Any]] = None,
         use_cache: bool = True,
-        progress_callback: Optional[Callable[[str, float], None]] = None
+        progress_callback: Optional[Callable[[str, float], None]] = None,
+        offset: int = 0,
     ) -> Tuple[List[SearchResult], Dict[str, Any]]:
-        """
-        异步搜索（带缓存和进度回调）
-
-        Args:
-            query: 查询文本
-            top_k: 返回结果数量
-            min_similarity: 最小相似度阈值
-            filters: 过滤条件
-            use_cache: 是否使用缓存
-            progress_callback: 进度回调函数 (stage, progress)
-
-        Returns:
-            (搜索结果列表, 搜索统计信息)
-        """
+        """Run project-isolated keyword + audio + metadata-text retrieval."""
         if top_k is None:
             top_k = config.TOP_K_RESULTS
         if min_similarity is None:
             min_similarity = config.SIMILARITY_THRESHOLD
+        offset = max(0, int(offset))
+        fetch_k = int(top_k) + offset
+        query = str(query or "").strip()
+        if not query:
+            return [], {"cache_hit": False, "total_found": 0, "returned": 0}
 
         start_time = time.time()
         stats = {
@@ -822,151 +1007,161 @@ class OptimizedAudioSearcher(AudioSearcher):
             "layers": {"exact": 0, "expanded": 0, "semantic": 0}
         }
 
-        # 步骤 1: 检查缓存
-        if progress_callback:
-            await progress_callback("checking_cache", 0.1)
+        async def report(stage: str, progress: float) -> None:
+            if progress_callback:
+                returned = progress_callback(stage, progress)
+                if hasattr(returned, "__await__"):
+                    await returned
+
+        # Request paths may use only a model that background preload/indexing
+        # has already made ready.  Never synchronously initialize CLAP here.
+        embedder = peek_embedder()
+        audio_fingerprint = (
+            getattr(embedder, "fingerprint", None)
+            or get_embedder_fingerprint(load=False)
+            or self.model_fingerprint
+        )
+        self.model_fingerprint = audio_fingerprint
+        cache_context = {
+            "top_k": int(top_k),
+            "offset": offset,
+            "min_similarity": float(min_similarity),
+            "filters": filters or {},
+            "project_id": self.project_id,
+            "index_revision": self.index_revision,
+            "audio_collection_revision": get_collection_revision(
+                self.persist_directory, self.collection_name
+            ),
+            "text_collection_revision": get_collection_revision(
+                self.persist_directory, self._text_searcher.collection_name
+            ),
+            "model_fingerprint": audio_fingerprint,
+            "text_fingerprint": self._configured_text_fingerprint(),
+        }
+
+        await report("checking_cache", 0.1)
 
         if use_cache:
-            cached = await self._query_cache.get(query, top_k=top_k, min_similarity=min_similarity)
+            cached = await self._query_cache.get(query, **cache_context)
             if cached:
                 stats["cache_hit"] = True
                 stats["duration"] = time.time() - start_time
+                stats["total_found"] = cached.total_count
+                stats["returned"] = len(cached.results)
                 return cached.results, stats
 
-        # 步骤 2: 检查 embedder
-        if progress_callback:
-            await progress_callback("loading_model", 0.2)
+        await report("preparing_query", 0.2)
 
-        embedder = get_embedder()
-        
-        # 步骤 3: 获取查询扩展
-        expanded_queries = self._text_processor.expand_query(query)
+        await report("keyword_searching", 0.3)
+        expanded_queries, exact_results, expanded_results = await asyncio.to_thread(
+            self._keyword_search_from_snapshot, query, filters
+        )
         if len(expanded_queries) > 1:
             stats["query_expansion"] = True
             stats["expanded_queries"] = expanded_queries
-
-        all_results = []
-
-        # 步骤 4: 执行搜索
-        # 先执行不依赖 embedder 的关键词搜索（第1层和第2层）
-        if progress_callback:
-            await progress_callback("keyword_searching", 0.3)
-        
-        # 第1层：精确关键词搜索
-        exact_results = self._exact_keyword_search(query, filters)
-        all_results.extend(exact_results)
         stats["layers"]["exact"] = len(exact_results)
-        logger.info(f"第1层(精确关键词): 找到 {len(exact_results)} 个结果, 查询='{query}'")
-        
-        # 第2层：分词扩展搜索
-        expanded_results = self._expanded_keyword_search(query, filters)
-        all_results.extend(expanded_results)
         stats["layers"]["expanded"] = len(expanded_results)
-        logger.info(f"第2层(分词扩展): 找到 {len(expanded_results)} 个结果, 查询='{query}'")
-        
-        # 如果 embedder 不可用，只返回关键词搜索结果
-        if embedder is None:
-            logger.warning("Embedder 不可用，仅使用关键词搜索")
-            
-            # 合并去重并排序
-            seen_paths = {}
-            for r in all_results:
-                if r.file_path not in seen_paths or r.similarity > seen_paths[r.file_path].similarity:
-                    seen_paths[r.file_path] = r
-            
-            unique_results = sorted(
-                seen_paths.values(),
-                key=lambda x: x.similarity,
-                reverse=True
-            )
-            final_results = unique_results[:top_k]
-            
-            stats["duration"] = time.time() - start_time
-            stats["total_found"] = len(unique_results)
-            stats["returned"] = len(final_results)
-            stats["embedder_available"] = False
-            
-            return final_results, stats
-        
-        # 步骤 5: 执行语义搜索（第3层，需要 embedder）
-        if progress_callback:
-            await progress_callback("generating_embedding", 0.5)
+        keyword_results = exact_results + expanded_results
 
-        for i, q in enumerate(expanded_queries):
-            try:
-                # 在线程池中执行 embedding 生成，避免阻塞事件循环
-                import asyncio
-                loop = asyncio.get_event_loop()
-                query_embedding = await loop.run_in_executor(
-                    None, embedder.text_to_embedding, q
-                )
+        from core.database import get_db_manager
 
-                if progress_callback:
-                    progress = 0.5 + (i * 0.3 / len(expanded_queries))
-                    await progress_callback(f"semantic_searching_{i+1}", progress)
-
-                # 第3层：语义搜索
-                results = self._semantic_search(
-                    query_embedding=query_embedding,
-                    query=q,
-                    top_k=top_k,
-                    min_similarity=min_similarity,
-                    filters=filters
-                )
-
-                # 标记结果来源
-                for r in results:
-                    r.metadata["matched_query"] = q
-
-                all_results.extend(results)
-
-                # 更新统计
-                for r in results:
-                    layer = r.metadata.get("search_layer", 3)
-                    if layer == 1:
-                        stats["layers"]["exact"] += 1
-                    elif layer == 2:
-                        stats["layers"]["expanded"] += 1
-                    else:
-                        stats["layers"]["semantic"] += 1
-
-            except Exception as e:
-                logger.warning(f"查询 '{q}' 失败: {e}")
-
-        # 步骤 6: 合并去重和排序
-        if progress_callback:
-            await progress_callback("ranking_results", 0.85)
-
-        # 合并所有结果并去重
-        seen_paths = {}
-        for r in all_results:
-            if r.file_path not in seen_paths or r.similarity > seen_paths[r.file_path].similarity:
-                seen_paths[r.file_path] = r
-
-        # 按分数排序
-        unique_results = sorted(
-            seen_paths.values(),
-            key=lambda x: x.similarity,
-            reverse=True
+        artifact_counts = await asyncio.to_thread(
+            get_db_manager().get_artifact_counts, self.project_id
         )
-        final_results = unique_results[:top_k]
 
-        # 步骤 7: 缓存结果
-        if progress_callback:
-            await progress_callback("caching", 0.95)
+        audio_results: List[SearchResult] = []
+        audio_available = bool(
+            embedder is not None
+            and not self.needs_rebuild
+            and int(self.collection.count()) > 0
+            and artifact_counts["audio_vector"]["ready"] > 0
+            and self.is_compatible_with(audio_fingerprint)
+        )
+        if audio_available:
+            await report("generating_embedding", 0.5)
+            for index, expanded_query in enumerate(expanded_queries):
+                try:
+                    query_embedding = await asyncio.to_thread(
+                        embedder.text_to_embedding, expanded_query
+                    )
+                    await report(
+                        f"semantic_searching_{index + 1}",
+                        0.5 + (index * 0.2 / max(1, len(expanded_queries))),
+                    )
+                    found = await asyncio.to_thread(
+                        self._semantic_search,
+                        query_embedding,
+                        expanded_query,
+                        fetch_k,
+                        0.0,
+                        filters,
+                    )
+                    for result in found:
+                        result.metadata["matched_query"] = expanded_query
+                        result.metadata["audio_score"] = result.metadata.get(
+                            "semantic_score", result.similarity
+                        )
+                    audio_results.extend(found)
+                except Exception as exc:
+                    logger.warning("音频语义查询 '%s' 失败: %s", expanded_query, exc)
+            audio_results = await asyncio.to_thread(
+                self._ready_vector_results, audio_results, "audio_vector"
+            )
+            stats["layers"]["semantic"] = len(audio_results)
 
-        if use_cache and final_results:
+        await report("text_metadata_searching", 0.75)
+        text_results: List[SearchResult] = []
+        text_available = bool(
+            not self._text_searcher.needs_rebuild
+            and int(self._text_searcher.collection.count()) > 0
+            and artifact_counts["text_vector"]["ready"] > 0
+        )
+        if text_available:
+            try:
+                text_results = await self._text_searcher.search(
+                    query=query,
+                    top_k=max(fetch_k * 3, fetch_k),
+                    min_similarity=0.0,
+                    filters=filters,
+                )
+            except Exception as exc:
+                text_available = False
+                logger.warning("文本元数据索引查询失败，按可用分支降级: %s", exc)
+        if text_results:
+            text_results = await asyncio.to_thread(
+                self._ready_vector_results, text_results, "text_vector"
+            )
+        stats["layers"]["text"] = len(text_results)
+
+        await report("ranking_results", 0.85)
+        merged_results, weights = self._weighted_merge_results(
+            keyword_results,
+            audio_results,
+            text_results,
+            top_k=fetch_k,
+            min_similarity=min_similarity,
+            audio_available=audio_available,
+            text_available=text_available,
+        )
+        final_results = merged_results[offset : offset + int(top_k)]
+
+        await report("caching", 0.95)
+        if use_cache:
             await self._query_cache.set(
-                query, final_results, len(unique_results),
-                top_k=top_k, min_similarity=min_similarity
+                query,
+                final_results,
+                len(merged_results),
+                **cache_context,
             )
 
-        if progress_callback:
-            await progress_callback("complete", 1.0)
+        await report("complete", 1.0)
 
         stats["duration"] = time.time() - start_time
-        stats["total_found"] = len(unique_results)
+        stats["total_found"] = len(merged_results)
         stats["returned"] = len(final_results)
+        stats["embedder_available"] = audio_available
+        stats["text_index_available"] = text_available
+        stats["weights"] = weights
 
         return final_results, stats
 
@@ -978,11 +1173,15 @@ class OptimizedAudioSearcher(AudioSearcher):
         filters: Optional[Dict[str, Any]] = None
     ) -> List[SearchResult]:
         """执行向量搜索"""
-        where_clause = filters if filters else None
+        where_clause = build_chroma_where(filters)
+
+        collection_count = int(self.collection.count())
+        if collection_count <= 0 or self.needs_rebuild:
+            return []
 
         results = self.collection.query(
             query_embeddings=[query_embedding.tolist()],
-            n_results=top_k,
+            n_results=min(top_k, collection_count),
             where=where_clause
         )
 
@@ -994,12 +1193,13 @@ class OptimizedAudioSearcher(AudioSearcher):
 
             for i, file_id in enumerate(ids):
                 distance = distances[i]
-                similarity = np.exp(-(distance ** 2) / 2.0)
+                similarity = cosine_similarity_from_distance(distance)
 
                 if similarity < min_similarity:
                     continue
 
-                metadata = metadatas[i]
+                metadata = dict(metadatas[i] or {})
+                metadata["file_id"] = str(file_id)
 
                 search_results.append(SearchResult(
                     file_path=metadata.get("file_path", ""),
@@ -1047,43 +1247,109 @@ class OptimizedAudioSearcher(AudioSearcher):
             return []
 
 
-# 全局优化的搜索器实例
-_optimized_searcher: Optional[OptimizedAudioSearcher] = None
-_searcher_lock = asyncio.Lock()
+# 全局优化的搜索器实例（按工程/collection 隔离）
+_optimized_searchers: Dict[str, OptimizedAudioSearcher] = {}
+_searcher_locks: Dict[str, asyncio.Lock] = {}
+_optimized_sync_lock = threading.RLock()
+
+
+def _optimized_key(
+    persist_directory: Optional[str],
+    collection_name: str,
+    text_collection_name: str,
+    project_id: Optional[str],
+) -> str:
+    resolved_project = str(project_id or config.CURRENT_PROJECT_ID)
+    resolved_path = persist_directory or str(safe_project_chroma_path(resolved_project))
+    return json.dumps(
+        {
+            "project": resolved_project,
+            "path": os.path.normcase(str(Path(resolved_path).resolve(strict=False))),
+            "collection": collection_name,
+            "text_collection": text_collection_name,
+        },
+        sort_keys=True,
+    )
 
 
 async def get_optimized_searcher(
     persist_directory: Optional[str] = None,
-    collection_name: str = "audio_embeddings"
+    collection_name: str = "audio_embeddings",
+    project_id: Optional[str] = None,
+    index_revision: int = 0,
+    model_fingerprint: Optional[str] = None,
+    text_collection_name: str = "text_metadata_embeddings",
 ) -> OptimizedAudioSearcher:
     """获取优化的搜索器单例（线程安全）"""
-    global _optimized_searcher
-    if _optimized_searcher is None:
-        async with _searcher_lock:
-            # 双重检查锁定模式
-            if _optimized_searcher is None:
-                _optimized_searcher = OptimizedAudioSearcher(
-                    persist_directory=persist_directory,
-                    collection_name=collection_name
-                )
-    return _optimized_searcher
+    key = _optimized_key(
+        persist_directory, collection_name, text_collection_name, project_id
+    )
+    lock = _searcher_locks.setdefault(key, asyncio.Lock())
+    async with lock:
+        searcher = _optimized_searchers.get(key)
+        if (
+            searcher is None
+            or searcher.index_revision != int(index_revision)
+            or (
+                model_fingerprint is not None
+                and searcher.model_fingerprint != model_fingerprint
+            )
+        ):
+            searcher = OptimizedAudioSearcher(
+                persist_directory=persist_directory,
+                collection_name=collection_name,
+                text_collection_name=text_collection_name,
+                project_id=project_id,
+                index_revision=index_revision,
+                model_fingerprint=model_fingerprint,
+            )
+            with _optimized_sync_lock:
+                _optimized_searchers[key] = searcher
+        return searcher
 
 
 def get_optimized_searcher_sync(
     persist_directory: Optional[str] = None,
-    collection_name: str = "audio_embeddings"
+    collection_name: str = "audio_embeddings",
+    project_id: Optional[str] = None,
+    index_revision: int = 0,
+    model_fingerprint: Optional[str] = None,
+    text_collection_name: str = "text_metadata_embeddings",
 ) -> OptimizedAudioSearcher:
     """获取优化的搜索器单例（同步版本，用于非异步上下文）"""
-    global _optimized_searcher
-    if _optimized_searcher is None:
-        _optimized_searcher = OptimizedAudioSearcher(
-            persist_directory=persist_directory,
-            collection_name=collection_name
-        )
-    return _optimized_searcher
+    key = _optimized_key(
+        persist_directory, collection_name, text_collection_name, project_id
+    )
+    with _optimized_sync_lock:
+        searcher = _optimized_searchers.get(key)
+        if (
+            searcher is None
+            or searcher.index_revision != int(index_revision)
+            or (
+                model_fingerprint is not None
+                and searcher.model_fingerprint != model_fingerprint
+            )
+        ):
+            searcher = OptimizedAudioSearcher(
+                persist_directory=persist_directory,
+                collection_name=collection_name,
+                text_collection_name=text_collection_name,
+                project_id=project_id,
+                index_revision=index_revision,
+                model_fingerprint=model_fingerprint,
+            )
+            _optimized_searchers[key] = searcher
+        return searcher
 
 
-def reset_optimized_searcher() -> None:
+def reset_optimized_searcher(project_id: Optional[str] = None) -> None:
     """重置优化的搜索器单例"""
-    global _optimized_searcher
-    _optimized_searcher = None
+    with _optimized_sync_lock:
+        if project_id is None:
+            _optimized_searchers.clear()
+            _searcher_locks.clear()
+            return
+        for key, searcher in list(_optimized_searchers.items()):
+            if searcher.project_id == project_id:
+                del _optimized_searchers[key]
+                _searcher_locks.pop(key, None)

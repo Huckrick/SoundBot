@@ -236,6 +236,24 @@ const i18n = {
             
             // 波形
             'waveform.empty.state': '请导入或选择一个音频文件',
+            'waveform.loading': '正在加载波形…',
+            'waveform.error': '无法加载波形',
+            'waveform.invalid': '后端返回了空的或无效的波形数据',
+            'waveform.retry': '重试',
+            'waveform.path.missing': '音频文件路径缺失',
+            'waveform.api.unavailable': '波形服务不可用',
+
+            // 导入
+            'import.backend.unavailable': '后端文件导入服务不可用',
+            'import.path.required': '没有可导入的本地文件路径',
+            'import.job.invalid': '后端未返回有效的导入任务',
+            'import.started': '已提交 {{count}} 个文件，正在后台导入',
+            'import.failed': '导入失败',
+            'import.electron.required': '网页预览不支持本地导入，请使用 Electron 桌面应用',
+
+            // AI 配置
+            'settings.ai.provider.unavailable': '当前保存的提供商（{{provider}}）在此版本中不可用；配置已保留，请选择受支持的提供商后再保存。',
+            'settings.ai.key.saved': '密钥已安全保存；留空表示保持不变',
             
             // 模型状态
             'model.loading': '模型加载中...',
@@ -485,6 +503,24 @@ const i18n = {
             
             // Waveform
             'waveform.empty.state': 'Please import or select an audio file',
+            'waveform.loading': 'Loading waveform…',
+            'waveform.error': 'Unable to load waveform',
+            'waveform.invalid': 'The backend returned empty or invalid waveform data',
+            'waveform.retry': 'Retry',
+            'waveform.path.missing': 'The audio file path is missing',
+            'waveform.api.unavailable': 'The waveform service is unavailable',
+
+            // Import
+            'import.backend.unavailable': 'The backend file import service is unavailable',
+            'import.path.required': 'No local file paths were provided for import',
+            'import.job.invalid': 'The backend did not return a valid import job',
+            'import.started': 'Submitted {{count}} files for background import',
+            'import.failed': 'Import failed',
+            'import.electron.required': 'Local import is unavailable in the web preview; use the Electron desktop app',
+
+            // AI configuration
+            'settings.ai.provider.unavailable': 'The saved provider ({{provider}}) is unavailable in this version. Its configuration is preserved; select a supported provider before saving.',
+            'settings.ai.key.saved': 'A key is securely stored; leave blank to keep it unchanged',
             
             // Model status
             'model.loading': 'Loading model...',
