@@ -27,7 +27,7 @@
   "license": "GPL-3.0",
   "devDependencies": {
     "electron": "28.3.3",
-    "electron-builder": "26.8.1"
+    "electron-builder": "26.15.3"
   },
   "build": {
     "appId": "com.soundbot.app",
