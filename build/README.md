@@ -80,4 +80,4 @@ python tests/build/verify_frozen_bundle.py \
 
 Packages must not contain `.DS_Store`, the root `SoundBot.png`, WaveSurfer, source model directories, or a foreign-platform backend. Any failed build or functional smoke test must block publication.
 
-Copyright © 2026 Nagisa_Huckrick（胡杨）。项目使用 [GNU GPL v3](../LICENSE)。 / Licensed under the [GNU GPL v3](../LICENSE).
+Copyright © 2026 Nagisa_Huckrick（胡杨）。项目使用 [GNU GPL v3 或更高版本](../LICENSE)。 / Licensed under the [GNU GPL v3 or later](../LICENSE).

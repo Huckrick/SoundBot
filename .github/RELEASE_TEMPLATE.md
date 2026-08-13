@@ -4,7 +4,7 @@
 
 **Status / 状态:** Prerelease / 预发布<br>
 **Version / 版本:** 0.2.0<br>
-**License / 许可:** GNU GPL v3
+**License / 许可:** GNU GPL v3 or later / GNU GPL v3 或更高版本
 
 ## Downloads / 下载
 
@@ -94,4 +94,4 @@ This checklist describes CI requirements; it does not claim that a Windows packa
 
 Issues and Pull Requests are disabled for this repository. After removing API keys, private paths, and database content, send test-release feedback to **Nagisa_Huckrick@yeah.net**. / 本仓库未开放 Issues 与 Pull Requests；请先移除 API 密钥、私人路径和数据库内容，再将测试版反馈发送到 **Nagisa_Huckrick@yeah.net**。
 
-Copyright © 2026 Nagisa_Huckrick (胡杨), Nagisa_Huckrick@yeah.net. SoundBot is licensed under GNU GPL v3. / SoundBot 使用 GNU GPL v3 许可。
+Copyright © 2026 Nagisa_Huckrick (胡杨), Nagisa_Huckrick@yeah.net. SoundBot is licensed under GNU GPL v3 or later. / SoundBot 使用 GNU GPL v3 或更高版本许可。

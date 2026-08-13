@@ -1,7 +1,6 @@
 name: Validate
 
 on:
-  pull_request:
   push:
     branches:
       - main
@@ -45,6 +44,66 @@ jobs:
           python -m pip install -r backend/requirements-build.txt
           npm ci --ignore-scripts --progress=false
           python -m pip check
+
+      - name: Verify repository hygiene
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+
+          tracked_ignored = subprocess.check_output(
+              ["git", "ls-files", "-ci", "--exclude-standard"],
+              text=True,
+          ).splitlines()
+          if tracked_ignored:
+              raise SystemExit(
+                  "Ignored files are still tracked:\n" + "\n".join(tracked_ignored)
+              )
+
+          tracked = subprocess.check_output(
+              ["git", "ls-files"],
+              text=True,
+          ).splitlines()
+          forbidden_names = {".DS_Store", "indexed_files_meta.json"}
+          forbidden_prefixes = (
+              "backend/db/",
+              "temp_clips/",
+              "test_audio/",
+          )
+          forbidden_paths = {"config/user_config.json"}
+          unsafe = [
+              path
+              for path in tracked
+              if Path(path).name in forbidden_names
+              or path in forbidden_paths
+              or path.startswith(forbidden_prefixes)
+          ]
+          if unsafe:
+              raise SystemExit(
+                  "Private runtime files are tracked:\n" + "\n".join(unsafe)
+              )
+
+          config = json.loads(Path("config/ai_config.json").read_text(encoding="utf-8"))
+
+          def nonempty_api_keys(value, prefix=""):
+              if isinstance(value, dict):
+                  for key, child in value.items():
+                      child_prefix = f"{prefix}.{key}" if prefix else key
+                      if key.lower() == "api_key" and child:
+                          yield child_prefix
+                      yield from nonempty_api_keys(child, child_prefix)
+              elif isinstance(value, list):
+                  for index, child in enumerate(value):
+                      yield from nonempty_api_keys(child, f"{prefix}[{index}]")
+
+          exposed = list(nonempty_api_keys(config))
+          if exposed:
+              raise SystemExit(
+                  "Default AI configuration contains non-empty API keys at: "
+                  + ", ".join(exposed)
+              )
+          PY
 
       - name: Run Python contracts
         run: python -m unittest discover -s tests -p 'test_*.py' -v

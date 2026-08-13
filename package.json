@@ -1,7 +1,7 @@
 {
   "name": "soundbot",
   "version": "0.2.0",
-  "description": "SoundBot - AI 音效管理器桌面版 (PyInstaller 一体化版本)",
+  "description": "SoundBot - local-first AI sound effect manager with semantic search",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -24,7 +24,7 @@
     "pyinstaller"
   ],
   "author": "Nagisa_Huckrick (胡杨) <Nagisa_Huckrick@yeah.net>",
-  "license": "GPL-3.0",
+  "license": "GPL-3.0-or-later",
   "devDependencies": {
     "electron": "28.3.3",
     "electron-builder": "26.8.1"

@@ -1,11 +1,11 @@
 # 🎵 SoundBot - AI 音效管理器 / AI Sound Effect Manager
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![License: GPL v3+](https://img.shields.io/badge/License-GPLv3%2B-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Version](https://img.shields.io/badge/version-v0.2.0--prerelease-orange.svg)](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.0)
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![Electron](https://img.shields.io/badge/electron-28.3.3-9feaf9.svg)](https://www.electronjs.org/)
 
-[English](README.en.md) · [更新日志](CHANGELOG.md) · [版本发布](https://github.com/Huckrick/SoundBot/releases) · [GPL-3.0](LICENSE)
+[English](README.en.md) · [更新日志](CHANGELOG.md) · [版本发布](https://github.com/Huckrick/SoundBot/releases) · [GPL-3.0-or-later](LICENSE)
 
 > 用自然语言找到你想要的声音——本地优先、AI 驱动的桌面音效管理器。
 
@@ -439,11 +439,11 @@ SoundBot/
 - 项目方向：本地优先的音效资产管理、波形预览、语义检索与可选 AI 助手
 - 开发方式：产品构思、交互设计与测试由作者负责，代码实现使用 AI 编程工具辅助完成
 
-> 作者并非专业程序员。本项目的公开测试版本以实际自动构建、冻结运行时测试和校验资产为准；未经过门禁验证的“已修复”描述不会作为发布结论。
+> 项目质量以可复现的自动构建、冻结运行时测试和经过校验的发布资产为准；未通过发布门禁的“已修复”描述不会作为发布结论。
 
 ## 📄 许可证
 
-SoundBot 使用 [GNU General Public License v3.0](LICENSE)。
+SoundBot 使用 [GNU General Public License v3.0 或更高版本](LICENSE)。
 
 ```text
 Copyright (C) 2026 Nagisa_Huckrick (胡杨)

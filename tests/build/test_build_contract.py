@@ -56,6 +56,16 @@ class NativeBuildContractTests(unittest.TestCase):
     def test_release_targets_and_audio_runtime_are_pinned(self) -> None:
         root = MODULE_PATH.parents[1]
         package = json.loads((root / "package.json").read_text(encoding="utf-8"))
+        lock = json.loads((root / "package-lock.json").read_text(encoding="utf-8"))
+        release_template = (root / ".github" / "RELEASE_TEMPLATE.md").read_text(
+            encoding="utf-8"
+        )
+        license_text = (root / "LICENSE").read_text(encoding="utf-8")
+        self.assertEqual(package["license"], "GPL-3.0-or-later")
+        self.assertEqual(lock["packages"][""]["license"], "GPL-3.0-or-later")
+        self.assertIn("GNU GPL v3 or later", release_template)
+        self.assertIn("Everyone is permitted to copy and distribute verbatim copies", license_text)
+        self.assertNotIn("Additional permissions and notices", license_text)
         self.assertNotIn("linux", package["build"])
         self.assertNotIn("build:linux", package["scripts"])
         self.assertEqual(package["build"]["mac"]["target"][0]["arch"], ["arm64"])

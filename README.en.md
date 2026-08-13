@@ -1,11 +1,11 @@
 # 🎵 SoundBot - AI 音效管理器 / AI Sound Effect Manager
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![License: GPL v3+](https://img.shields.io/badge/License-GPLv3%2B-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Version](https://img.shields.io/badge/version-v0.2.0--prerelease-orange.svg)](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.0)
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![Electron](https://img.shields.io/badge/electron-28.3.3-9feaf9.svg)](https://www.electronjs.org/)
 
-[中文](README.md) · [Changelog](CHANGELOG.md) · [Releases](https://github.com/Huckrick/SoundBot/releases) · [GPL-3.0](LICENSE)
+[中文](README.md) · [Changelog](CHANGELOG.md) · [Releases](https://github.com/Huckrick/SoundBot/releases) · [GPL-3.0-or-later](LICENSE)
 
 > Find the sound you want using natural language—a local-first, AI-powered desktop sound-effects manager.
 
@@ -439,11 +439,11 @@ SoundBot/
 - Project focus: local-first sound-asset management, waveform preview, semantic search, and an optional AI assistant
 - Development approach: the author leads product concepts, interaction design, and testing, with implementation assisted by AI coding tools
 
-> The author is not a professional programmer. Public test releases are defined by actual automated builds, frozen-runtime tests, and verified assets; an unverified “fixed” claim is not treated as a release result.
+> Project quality is defined by reproducible automated builds, frozen-runtime tests, and verified release assets; a “fixed” claim that has not passed the release gates is not treated as a release result.
 
 ## 📄 License
 
-SoundBot is licensed under the [GNU General Public License v3.0](LICENSE).
+SoundBot is licensed under the [GNU General Public License v3.0 or later](LICENSE).
 
 ```text
 Copyright (C) 2026 Nagisa_Huckrick (胡杨)

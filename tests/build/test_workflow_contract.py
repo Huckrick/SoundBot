@@ -109,8 +109,8 @@ class ValidationWorkflowContractTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.text = VALIDATE_WORKFLOW.read_text(encoding="utf-8")
 
-    def test_runs_before_tags_on_pull_requests_and_main(self) -> None:
-        self.assertRegex(self.text, r"(?m)^  pull_request:$")
+    def test_runs_on_main_push_without_a_disabled_pr_trigger(self) -> None:
+        self.assertNotRegex(self.text, r"(?m)^  pull_request:$")
         self.assertRegex(self.text, r"(?m)^  push:$")
         self.assertIn("- main", self.text)
         self.assertIn("cancel-in-progress: true", self.text)
@@ -128,6 +128,14 @@ class ValidationWorkflowContractTests(unittest.TestCase):
         self.assertIn("unittest discover -s tests", self.text)
         self.assertIn("node tests/frontend/check_renderer_contract.js", self.text)
         self.assertIn("npm ci --ignore-scripts", self.text)
+
+    def test_rejects_private_or_ignored_repository_files(self) -> None:
+        self.assertIn("Verify repository hygiene", self.text)
+        self.assertIn('"git", "ls-files", "-ci", "--exclude-standard"', self.text)
+        self.assertIn('"backend/db/"', self.text)
+        self.assertIn('"temp_clips/"', self.text)
+        self.assertIn('"config/user_config.json"', self.text)
+        self.assertIn('key.lower() == "api_key" and child', self.text)
 
 
 if __name__ == "__main__":

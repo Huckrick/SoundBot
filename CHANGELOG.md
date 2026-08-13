@@ -4,9 +4,17 @@ All notable changes to SoundBot are documented here. The format follows [Keep a 
 
 ## [Unreleased] / 未发布
 
-### Notes / 说明
+### Changed / 变更
 
-- No unreleased changes yet. / 暂无未发布变更。
+- Replaced the incomplete custom license summary with the official GNU GPLv3 text, aligned package metadata to `GPL-3.0-or-later`, and tightened the bilingual project presentation without changing the established README layout. / 使用 GNU GPLv3 官方全文替换不完整的自定义许可证摘要，将软件包元数据统一为 `GPL-3.0-or-later`，并在保持既有 README 排版的前提下完善双语项目介绍。
+
+### Removed / 移除
+
+- Removed tracked macOS metadata, an empty user-specific runtime configuration, an obsolete one-off copyright script, and an unused audio-import placeholder from the public source tree. Local user files remain ignored and are not deleted. / 从公开源码树移除已跟踪的 macOS 元数据、空的用户运行时配置、过时的一次性版权脚本与无用音频导入占位文件；本地用户文件仅被忽略，不会被删除。
+
+### Security / 安全
+
+- Added repository-hygiene CI gates that reject ignored runtime files, databases, temporary audio, user configuration, and non-empty default API keys; expanded ignore rules to prevent these artifacts from being committed again without hiding `backend/models` source files. / 新增仓库卫生 CI 门禁，拒绝被忽略的运行时文件、数据库、临时音频、用户配置与非空默认 API 密钥；同时扩充忽略规则以防止这些内容再次提交，并避免误隐藏 `backend/models` 源码。
 
 ## [0.2.0] - 2026-08-12 (Prerelease / 预发布)
 
