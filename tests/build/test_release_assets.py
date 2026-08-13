@@ -15,7 +15,7 @@ class ReleaseAssetTests(unittest.TestCase):
             "models.zip": b"models",
             "models.zip.sha256": b"hash  models.zip\n",
             "SoundBot-0.2.0-arm64.dmg": b"dmg",
-            "SoundBot.Setup.0.2.0.exe": b"exe",
+            "SoundBot-Setup-0.2.0.exe": b"exe",
             "SHA256SUMS.txt": b"checksums",
         }
         for name, payload in payloads.items():
@@ -69,6 +69,26 @@ class ReleaseAssetTests(unittest.TestCase):
             remote.write_text(json.dumps({"assets": assets}), encoding="utf-8")
             self.addCleanup(remote.unlink, missing_ok=True)
             with self.assertRaises(ValueError):
+                verify_release_assets(root, remote)
+
+    def test_rejects_an_unstable_windows_installer_name(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            inventory = self.make_assets(root)
+            stable = root / "SoundBot-Setup-0.2.0.exe"
+            unstable = root / "SoundBot Setup 0.2.0.exe"
+            stable.rename(unstable)
+            metadata = inventory.pop(stable.name)
+            inventory[unstable.name] = metadata
+            remote = root.parent / f"{root.name}-remote.json"
+            remote.write_text(
+                json.dumps({"assets": [
+                    {"name": name, **asset} for name, asset in inventory.items()
+                ]}),
+                encoding="utf-8",
+            )
+            self.addCleanup(remote.unlink, missing_ok=True)
+            with self.assertRaisesRegex(ValueError, "stable SoundBot-Setup"):
                 verify_release_assets(root, remote)
 
 

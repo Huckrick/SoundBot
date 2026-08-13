@@ -90,6 +90,19 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("refusing to overwrite", self.text)
         self.assertNotIn("prerelease: true", self.text)
 
+    def test_windows_release_asset_has_a_stable_remote_name(self) -> None:
+        self.assertIn("mapfile -d '' WINDOWS_INSTALLERS", self.text)
+        self.assertIn('test "${#WINDOWS_INSTALLERS[@]}" = 1', self.text)
+        self.assertIn(
+            'WINDOWS_RELEASE_NAME="SoundBot-Setup-${RELEASE_TAG#v}.exe"',
+            self.text,
+        )
+        self.assertIn(
+            'cp "${WINDOWS_INSTALLERS[0]}" "release-assets/$WINDOWS_RELEASE_NAME"',
+            self.text,
+        )
+        self.assertNotIn("cp artifacts/soundbot-windows/*.exe release-assets/", self.text)
+
 
 class ValidationWorkflowContractTests(unittest.TestCase):
     @classmethod

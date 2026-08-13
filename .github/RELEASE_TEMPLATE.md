@@ -10,7 +10,7 @@
 
 | Target / 目标 | Release asset / 发布文件 | Support / 支持状态 |
 | --- | --- | --- |
-| Windows 10/11 x64 | `SoundBot Setup 0.2.0*.exe` | Official target / 正式目标 |
+| Windows 10/11 x64 | `SoundBot-Setup-0.2.0.exe` | Official target / 正式目标 |
 | macOS 14+ Apple Silicon arm64 | `SoundBot-0.2.0*.dmg` | Official target / 正式目标 |
 | Optional CLAP model / 可选 CLAP 模型 | `models.zip` + `models.zip.sha256` | Required only for semantic audio indexing / 仅语义音频索引需要 |
 | Release integrity / 发布完整性 | `models.zip.sha256` + `SHA256SUMS.txt` + GitHub attestations | The checksum files verify the model archive, DMG, and EXE; attestations cover all five assets / 校验文件验证模型包、DMG 与 EXE，证明覆盖全部五个资产 |

@@ -56,6 +56,7 @@ All notable changes to SoundBot are documented here. The format follows [Keep a 
 
 ### Fixed / 修复
 
+- Fixed GitHub Release upload-name normalization by publishing the Windows installer as the stable `SoundBot-Setup-<version>.exe` asset, keeping the local filename, checksum manifest, provenance subject, and remote inventory identical. / 修复 GitHub Release 上传时对安装包名称的自动规范化问题，Windows 安装包现统一发布为稳定的 `SoundBot-Setup-<版本>.exe`，确保本地文件名、校验清单、provenance 对象与远端资产清单完全一致。
 - Fixed empty arrays being accepted as valid waveform data, the primary renderer condition behind blank waveform areas in packaged Windows builds. / 修复空数组被当作有效波形数据的问题，该条件是 Windows 打包版波形区域空白的主要渲染层原因。
 - Fixed packaged Windows decoding for compressed containers by removing the dependency on a system FFmpeg executable and collecting the complete PyAV runtime. / 通过移除系统 FFmpeg 可执行文件依赖并收集完整 PyAV 运行时，修复 Windows 打包版压缩容器解码。
 - Fixed waveform cache reuse after a source file changed by validating both source and waveform-engine fingerprints before serving stored peaks. / 通过在返回缓存峰值前同时验证源文件与波形引擎指纹，修复源文件变化后继续复用旧波形的问题。

@@ -748,7 +748,13 @@ jobs:
           cp artifacts/models-package/models.zip release-assets/
           cp artifacts/models-package/models.zip.sha256 release-assets/
           cp artifacts/soundbot-macos/*.dmg release-assets/
-          cp artifacts/soundbot-windows/*.exe release-assets/
+          mapfile -d '' WINDOWS_INSTALLERS < <(
+            find artifacts/soundbot-windows -maxdepth 1 -type f -name '*.exe' -print0
+          )
+          test "${#WINDOWS_INSTALLERS[@]}" = 1
+          WINDOWS_RELEASE_NAME="SoundBot-Setup-${RELEASE_TAG#v}.exe"
+          cp "${WINDOWS_INSTALLERS[0]}" "release-assets/$WINDOWS_RELEASE_NAME"
+          test -f "release-assets/SoundBot-Setup-${RELEASE_TAG#v}.exe"
           test "$(find release-assets -maxdepth 1 -type f -name '*.dmg' | wc -l | tr -d ' ')" = 1
           test "$(find release-assets -maxdepth 1 -type f -name '*.exe' | wc -l | tr -d ' ')" = 1
           test "$(find release-assets -maxdepth 1 -type f | wc -l | tr -d ' ')" = 4

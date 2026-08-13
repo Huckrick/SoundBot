@@ -6,11 +6,16 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 
 
 REQUIRED_EXACT = {"models.zip", "models.zip.sha256", "SHA256SUMS.txt"}
 REQUIRED_SUFFIX_COUNTS = {".dmg": 1, ".exe": 1}
+WINDOWS_INSTALLER_NAME = re.compile(
+    r"^SoundBot-Setup-(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)"
+    r"(?:-[0-9A-Za-z.-]+)?\.exe$"
+)
 
 
 def _sha256(path: Path) -> str:
@@ -31,6 +36,12 @@ def local_inventory(directory: Path) -> dict[str, dict[str, object]]:
         actual = sum(path.suffix.lower() == suffix for path in files)
         if actual != expected:
             raise ValueError(f"expected {expected} {suffix} asset, found {actual}")
+    windows_installers = [path.name for path in files if path.suffix.lower() == ".exe"]
+    if not WINDOWS_INSTALLER_NAME.fullmatch(windows_installers[0]):
+        raise ValueError(
+            "Windows release asset must use the stable "
+            f"SoundBot-Setup-<version>.exe name: {windows_installers[0]!r}"
+        )
     if len(files) != 5:
         raise ValueError(f"expected exactly 5 release assets, found {len(files)}: {sorted(names)}")
     empty = [path.name for path in files if path.stat().st_size <= 0]
