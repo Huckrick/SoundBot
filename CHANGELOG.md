@@ -6,6 +6,7 @@ All notable changes to SoundBot are documented here. The format follows [Keep a 
 
 ### Changed / 变更
 
+- Expanded the mirrored Chinese and English acknowledgments to distinguish AI development collaborators—including OpenAI Codex, Kimi, and Anthropic Claude—from the verified runtime, indexing, audio, UI, and release technology stack. / 扩充中英文镜像致谢，明确区分 OpenAI Codex、Kimi、Anthropic Claude 等 AI 开发协作工具与经仓库核实的运行时、索引、音频、界面及发布技术栈。
 - Replaced the incomplete custom license summary with the official GNU GPLv3 text, aligned package metadata to `GPL-3.0-or-later`, and tightened the bilingual project presentation without changing the established README layout. / 使用 GNU GPLv3 官方全文替换不完整的自定义许可证摘要，将软件包元数据统一为 `GPL-3.0-or-later`，并在保持既有 README 排版的前提下完善双语项目介绍。
 - Documented SoundBot as a public source and release mirror that does not accept external issues, pull requests, discussions, projects, support requests, private reports, code, or data submissions; removed the public support email from repository and release guidance. / 明确 SoundBot 是不接收外部 Issue、Pull Request、Discussion、Project、支持请求、私密报告、代码或数据提交的公开源码与发布镜像，并从仓库及发布说明中移除公开支持邮箱。
 

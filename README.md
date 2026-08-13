@@ -451,12 +451,29 @@ Copyright (C) 2026 Nagisa_Huckrick (胡杨)
 
 ## 🙏 致谢
 
-- [LAION](https://laion.ai/)：CLAP 预训练模型
-- [Chroma](https://www.trychroma.com/)：本地向量数据库
-- [FastAPI](https://fastapi.tiangolo.com/)：本地 API 后端
-- [Electron](https://www.electronjs.org/)：桌面应用运行时
-- [PyAV](https://pyav.org/) 与 [PyInstaller](https://pyinstaller.org/)：统一音频解码与原生后端冻结
-- [Trae](https://www.trae.ai/) 与 [Cursor](https://cursor.sh/)：AI 编程辅助工具
+### AI 开发协作
+
+SoundBot 的产品方向、技术取舍、代码验收与最终发布由维护者负责。感谢以下 AI 工具在不同阶段参与研究、实现、审查或测试；列名仅表示曾用于开发协作，不代表对应厂商对本项目背书、共同署名或承担维护责任：
+
+- [OpenAI Codex](https://openai.com/codex/)：代码库审计、实现、测试、跨平台构建与发布流程协作
+- [Kimi](https://www.kimi.com/)（Moonshot AI）：研究、方案梳理与开发协作
+- [Claude](https://www.anthropic.com/claude)（Anthropic）：代码分析、审查与开发协作
+- [Trae](https://www.trae.ai/) 与 [Cursor](https://www.cursor.com/)：AI 编程环境与早期实现辅助
+
+### 核心技术与工程工具链
+
+- [Electron](https://www.electronjs.org/)（Chromium + Node.js）、[Tailwind CSS](https://tailwindcss.com/) 与 [Lucide](https://lucide.dev/)：桌面运行时、界面样式与图标
+- [Python](https://www.python.org/)、[FastAPI](https://fastapi.tiangolo.com/)、[Uvicorn](https://www.uvicorn.org/)、[Pydantic](https://docs.pydantic.dev/) 与 [HTTPX](https://www.python-httpx.org/)：类型化本地 API 与异步服务层
+- [SQLite](https://www.sqlite.org/) 与 [Chroma](https://www.trychroma.com/)：本地元数据、任务状态与项目隔离向量索引
+- [PyTorch](https://pytorch.org/)、[Hugging Face Transformers](https://huggingface.co/docs/transformers/) 与 [LAION CLAP](https://huggingface.co/laion/larger_clap_general)：音频/文本向量编码与语义检索
+- [NumPy](https://numpy.org/)、[PyAV](https://pyav.org/) 与 [FFmpeg](https://ffmpeg.org/)：音频解码、重采样、波形和播放回退
+- [Mutagen](https://mutagen.readthedocs.io/)、[TinyTag](https://github.com/tinytag/tinytag) 与 [jieba](https://github.com/fxsjy/jieba)：音频元数据与中文关键词处理
+- [PyInstaller](https://pyinstaller.org/)、[electron-builder](https://www.electron.build/) 与 [GitHub Actions](https://github.com/features/actions)：原生后端冻结、桌面安装包与可复现发布门禁
+
+### 分类体系与资料
+
+- [Universal Category System](https://universalcategorysystem.com/)（UCS）社区：音效分类与命名体系
+- Bilibili 作者[宇宙人和太空人](https://www.bilibili.com/read/cv23153650/)：仓库内 UCS 音效分类中英文对照表的注明来源；资料权利仍归原作者与 UCS 社区所有
 
 ## 🔒 仓库政策
 

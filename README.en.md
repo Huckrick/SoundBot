@@ -451,12 +451,29 @@ Copyright (C) 2026 Nagisa_Huckrick (胡杨)
 
 ## 🙏 Acknowledgments
 
-- [LAION](https://laion.ai/): the pretrained CLAP model
-- [Chroma](https://www.trychroma.com/): the local vector database
-- [FastAPI](https://fastapi.tiangolo.com/): the local API backend
-- [Electron](https://www.electronjs.org/): the desktop application runtime
-- [PyAV](https://pyav.org/) and [PyInstaller](https://pyinstaller.org/): unified audio decoding and native backend freezing
-- [Trae](https://www.trae.ai/) and [Cursor](https://cursor.sh/): AI-assisted coding tools
+### AI development collaborators
+
+The maintainer remains responsible for SoundBot's product direction, technical decisions, code acceptance, and final releases. The following AI tools assisted with research, implementation, review, or testing at different stages. Inclusion indicates development use only; it does not imply vendor endorsement, co-authorship, or maintenance responsibility:
+
+- [OpenAI Codex](https://openai.com/codex/): repository auditing, implementation, testing, cross-platform builds, and release workflow assistance
+- [Kimi](https://www.kimi.com/) by Moonshot AI: research, solution planning, and development assistance
+- [Claude](https://www.anthropic.com/claude) by Anthropic: code analysis, review, and development assistance
+- [Trae](https://www.trae.ai/) and [Cursor](https://www.cursor.com/): AI coding environments and early implementation assistance
+
+### Core technology and engineering toolchain
+
+- [Electron](https://www.electronjs.org/) (Chromium + Node.js), [Tailwind CSS](https://tailwindcss.com/), and [Lucide](https://lucide.dev/): desktop runtime, interface styling, and icons
+- [Python](https://www.python.org/), [FastAPI](https://fastapi.tiangolo.com/), [Uvicorn](https://www.uvicorn.org/), [Pydantic](https://docs.pydantic.dev/), and [HTTPX](https://www.python-httpx.org/): the typed local API and asynchronous service layer
+- [SQLite](https://www.sqlite.org/) and [Chroma](https://www.trychroma.com/): local metadata, job state, and project-isolated vector indexes
+- [PyTorch](https://pytorch.org/), [Hugging Face Transformers](https://huggingface.co/docs/transformers/), and [LAION CLAP](https://huggingface.co/laion/larger_clap_general): audio/text embeddings and semantic retrieval
+- [NumPy](https://numpy.org/), [PyAV](https://pyav.org/), and [FFmpeg](https://ffmpeg.org/): audio decoding, resampling, waveforms, and playback fallback
+- [Mutagen](https://mutagen.readthedocs.io/), [TinyTag](https://github.com/tinytag/tinytag), and [jieba](https://github.com/fxsjy/jieba): audio metadata and Chinese keyword processing
+- [PyInstaller](https://pyinstaller.org/), [electron-builder](https://www.electron.build/), and [GitHub Actions](https://github.com/features/actions): native backend freezing, desktop installers, and reproducible release gates
+
+### Taxonomy and reference data
+
+- The [Universal Category System](https://universalcategorysystem.com/) (UCS) community: the sound-effect classification and naming system
+- Bilibili author [宇宙人和太空人](https://www.bilibili.com/read/cv23153650/): the attributed source of the bundled Chinese–English UCS sound-category reference; data rights remain with the original author and the UCS community
 
 ## 🔒 Repository policy
 
