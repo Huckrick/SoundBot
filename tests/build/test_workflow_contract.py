@@ -21,6 +21,10 @@ class WorkflowContractTests(unittest.TestCase):
         unpinned = [value for value in uses if not re.fullmatch(r"[^@]+@[0-9a-f]{40}", value)]
         self.assertEqual(unpinned, [])
 
+    def test_windows_python_output_is_forced_to_utf8(self) -> None:
+        self.assertRegex(self.text, r"(?m)^  PYTHONUTF8: '1'$")
+        self.assertRegex(self.text, r"(?m)^  PYTHONIOENCODING: 'utf-8'$")
+
     def test_every_job_checks_out_validated_release_source(self) -> None:
         self.assertIn("release_tag: ${{ steps.release-source.outputs.tag }}", self.text)
         self.assertIn("release_sha: ${{ steps.release-source.outputs.sha }}", self.text)
