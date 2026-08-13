@@ -101,6 +101,7 @@ jobs:
 
       - name: Verify complete source, build, and renderer contracts
         run: |
+          python tests/build/verify_repository_hygiene.py
           python -m unittest discover -s tests -p 'test_*.py' -v
           node --check main.js
           node --check preload.js

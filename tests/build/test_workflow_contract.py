@@ -131,11 +131,11 @@ class ValidationWorkflowContractTests(unittest.TestCase):
 
     def test_rejects_private_or_ignored_repository_files(self) -> None:
         self.assertIn("Verify repository hygiene", self.text)
-        self.assertIn('"git", "ls-files", "-ci", "--exclude-standard"', self.text)
-        self.assertIn('"backend/db/"', self.text)
-        self.assertIn('"temp_clips/"', self.text)
-        self.assertIn('"config/user_config.json"', self.text)
-        self.assertIn('key.lower() == "api_key" and child', self.text)
+        self.assertIn("python tests/build/verify_repository_hygiene.py", self.text)
+
+    def test_release_rechecks_repository_hygiene(self) -> None:
+        release = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("python tests/build/verify_repository_hygiene.py", release)
 
 
 if __name__ == "__main__":

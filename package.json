@@ -23,7 +23,7 @@
     "clap",
     "pyinstaller"
   ],
-  "author": "Nagisa_Huckrick (胡杨) <Nagisa_Huckrick@yeah.net>",
+  "author": "Nagisa_Huckrick (胡杨)",
   "license": "GPL-3.0-or-later",
   "devDependencies": {
     "electron": "28.3.3",

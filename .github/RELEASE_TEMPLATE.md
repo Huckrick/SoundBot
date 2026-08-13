@@ -90,8 +90,8 @@ This checklist describes CI requirements; it does not claim that a Windows packa
 - AIFF/AIF, M4A, AAC, and WMA playback may consume temporary disk space because Electron uses an on-demand WAV fallback. / AIFF/AIF、M4A、AAC 和 WMA 播放可能占用临时磁盘空间，因为 Electron 使用按需 WAV 回退。
 - External LLM/Embedding availability, rates, costs, and data policies are controlled by their providers. / 外部 LLM/Embedding 的可用性、限流、费用和数据政策由对应 provider 控制。
 
-## Feedback and license / 反馈与许可
+## Repository policy and license / 仓库政策与许可
 
-Issues and Pull Requests are disabled for this repository. After removing API keys, private paths, and database content, send test-release feedback to **Nagisa_Huckrick@yeah.net**. / 本仓库未开放 Issues 与 Pull Requests；请先移除 API 密钥、私人路径和数据库内容，再将测试版反馈发送到 **Nagisa_Huckrick@yeah.net**。
+Issues, Pull Requests, Discussions, Projects, private vulnerability reports, and other external submissions are disabled. Do not send code, credentials, audio, databases, logs, or personal data. / 本仓库关闭 Issue、Pull Request、Discussion、Project、私密漏洞报告及其他外部提交；请勿发送代码、凭据、音频、数据库、日志或个人数据。
 
-Copyright © 2026 Nagisa_Huckrick (胡杨), Nagisa_Huckrick@yeah.net. SoundBot is licensed under GNU GPL v3 or later. / SoundBot 使用 GNU GPL v3 或更高版本许可。
+Copyright © 2026 Nagisa_Huckrick (胡杨). SoundBot is licensed under GNU GPL v3 or later. / SoundBot 使用 GNU GPL v3 或更高版本许可。

@@ -7,6 +7,7 @@ All notable changes to SoundBot are documented here. The format follows [Keep a 
 ### Changed / 变更
 
 - Replaced the incomplete custom license summary with the official GNU GPLv3 text, aligned package metadata to `GPL-3.0-or-later`, and tightened the bilingual project presentation without changing the established README layout. / 使用 GNU GPLv3 官方全文替换不完整的自定义许可证摘要，将软件包元数据统一为 `GPL-3.0-or-later`，并在保持既有 README 排版的前提下完善双语项目介绍。
+- Documented SoundBot as a public source and release mirror that does not accept external issues, pull requests, discussions, projects, support requests, private reports, code, or data submissions; removed the public support email from repository and release guidance. / 明确 SoundBot 是不接收外部 Issue、Pull Request、Discussion、Project、支持请求、私密报告、代码或数据提交的公开源码与发布镜像，并从仓库及发布说明中移除公开支持邮箱。
 
 ### Removed / 移除
 
@@ -15,6 +16,7 @@ All notable changes to SoundBot are documented here. The format follows [Keep a 
 ### Security / 安全
 
 - Added repository-hygiene CI gates that reject ignored runtime files, databases, temporary audio, user configuration, and non-empty default API keys; expanded ignore rules to prevent these artifacts from being committed again without hiding `backend/models` source files. / 新增仓库卫生 CI 门禁，拒绝被忽略的运行时文件、数据库、临时音频、用户配置与非空默认 API 密钥；同时扩充忽略规则以防止这些内容再次提交，并避免误隐藏 `backend/models` 源码。
+- Added a reusable current-tree privacy scanner for credentials, private keys, credential-bearing URLs, personal absolute paths, sensitive JSON fields, and runtime artifacts, and made both main validation and tag releases run it before testing or packaging. / 新增可复用的当前源码树隐私扫描器，检查凭据、私钥、带认证信息的 URL、个人绝对路径、敏感 JSON 字段与运行时产物，并要求 main 验证及标签发布都在测试或打包前执行。
 
 ## [0.2.0] - 2026-08-12 (Prerelease / 预发布)
 

@@ -267,7 +267,7 @@ If a file exists but has no waveform or search result:
 5. call `/api/v1/health` and `/api/v1/model/status` to distinguish backend startup from model availability;
 6. on Windows, verify that security software did not quarantine `soundbot-backend.exe`. A system FFmpeg installation is not required.
 
-Do not paste real API keys, complete private paths, or the full user database into a public issue. Redact diagnostic material before sharing it.
+This repository does not accept diagnostic files, audio samples, databases, API keys, or private paths. Do not submit such material through any public or private GitHub channel.
 
 ***
 
@@ -458,13 +458,13 @@ Copyright (C) 2026 Nagisa_Huckrick (胡杨)
 - [PyAV](https://pyav.org/) and [PyInstaller](https://pyinstaller.org/): unified audio decoding and native backend freezing
 - [Trae](https://www.trae.ai/) and [Cursor](https://cursor.sh/): AI-assisted coding tools
 
-## 📞 Contact
+## 🔒 Repository policy
 
-- Email: **Nagisa_Huckrick@yeah.net**
 - Downloads: [GitHub Releases](https://github.com/Huckrick/SoundBot/releases)
 - Release history: [CHANGELOG.md](CHANGELOG.md)
+- Policy: [CONTRIBUTING.md](.github/CONTRIBUTING.md) · [SECURITY.md](.github/SECURITY.md)
 
-Issues and Pull Requests are disabled for this repository. To report a test-release problem, remove API keys, private paths, and database content before contacting the author by email.
+This repository is a public source, audit, and release mirror. Issues, Pull Requests, Discussions, Projects, private vulnerability reports, and other external submission channels are disabled. Support requests, code, diagnostics, and personal data are not accepted. Forking and modification remain permitted under GPL-3.0-or-later, but forks have no write access to this repository.
 
 ***
 

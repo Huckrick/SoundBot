@@ -267,7 +267,7 @@ SoundBot/
 5. 调用 `/api/v1/health` 与 `/api/v1/model/status` 区分后端启动和模型可用性；
 6. Windows 上确认安全软件没有隔离 `soundbot-backend.exe`，但不需要安装系统 FFmpeg。
 
-请不要把真实 API 密钥、完整私人文件路径或整个用户数据库直接粘贴到公开 Issue。提交诊断信息前先脱敏。
+本仓库不接收诊断文件、音频样本、数据库、API 密钥或私人路径；请勿通过任何 GitHub 公共或私密入口提交这些内容。
 
 ***
 
@@ -458,13 +458,13 @@ Copyright (C) 2026 Nagisa_Huckrick (胡杨)
 - [PyAV](https://pyav.org/) 与 [PyInstaller](https://pyinstaller.org/)：统一音频解码与原生后端冻结
 - [Trae](https://www.trae.ai/) 与 [Cursor](https://cursor.sh/)：AI 编程辅助工具
 
-## 📞 联系方式
+## 🔒 仓库政策
 
-- 邮箱：**Nagisa_Huckrick@yeah.net**
 - 版本下载：[GitHub Releases](https://github.com/Huckrick/SoundBot/releases)
 - 更新记录：[CHANGELOG.md](CHANGELOG.md)
+- 政策文件：[CONTRIBUTING.md](.github/CONTRIBUTING.md) · [SECURITY.md](.github/SECURITY.md)
 
-当前仓库不开放 Issues 和 Pull Requests；如需反馈测试版问题，请先移除 API 密钥、私人路径和数据库内容，再通过邮箱联系作者。
+本仓库用于公开源码、审计和发布，不开放 Issue、Pull Request、Discussion、Project、私密漏洞报告或其他外部提交入口，也不接收支持请求、代码、诊断数据和个人数据。依据 GPL-3.0-or-later 可以 fork 和修改，但 fork 不拥有本仓库写权限。
 
 ***
 
