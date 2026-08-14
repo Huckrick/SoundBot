@@ -6,7 +6,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.build.verify_release_assets import verify_release_assets
+from tests.build.verify_release_assets import (
+    MAX_RELEASE_ASSET_BYTES,
+    local_inventory,
+    verify_release_assets,
+)
 
 
 class ReleaseAssetTests(unittest.TestCase):
@@ -90,6 +94,18 @@ class ReleaseAssetTests(unittest.TestCase):
             self.addCleanup(remote.unlink, missing_ok=True)
             with self.assertRaisesRegex(ValueError, "stable SoundBot-Setup"):
                 verify_release_assets(root, remote)
+
+    def test_rejects_any_local_asset_at_or_above_two_gib(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_assets(root)
+            model_archive = root / "models.zip"
+            with model_archive.open("wb") as handle:
+                handle.seek(MAX_RELEASE_ASSET_BYTES - 1)
+                handle.write(b"\0")
+
+            with self.assertRaisesRegex(ValueError, "below 2 GiB"):
+                local_inventory(root)
 
 
 if __name__ == "__main__":

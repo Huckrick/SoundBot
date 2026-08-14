@@ -4009,25 +4009,31 @@
 
             return new Promise((resolve) => {
                 let settled = false;
+                let socket = null;
                 const finish = (connected) => {
                     if (settled) return;
                     settled = true;
                     resolve(connected);
                 };
-                const timeout = setTimeout(() => finish(false), 3000);
+                const timeout = setTimeout(() => {
+                    if (socket && socket.readyState !== WebSocket.OPEN) socket.close();
+                    if (scanWebSocket === socket) scanWebSocket = null;
+                    finish(false);
+                }, 3000);
 
                 try {
                     if (scanWebSocket) scanWebSocket.close();
-                    scanWebSocket = new WebSocket(endpoint);
+                    socket = new WebSocket(endpoint);
+                    scanWebSocket = socket;
 
-                    scanWebSocket.onopen = () => {
+                    socket.onopen = () => {
                         clearTimeout(timeout);
                         console.log('[DEBUG] WebSocket 连接已建立');
-                        scanWebSocket.send(JSON.stringify({type: 'ping'}));
+                        socket.send(JSON.stringify({type: 'ping'}));
                         finish(true);
                     };
 
-                    scanWebSocket.onmessage = (event) => {
+                    socket.onmessage = (event) => {
                         try {
                             const message = JSON.parse(event.data);
                             console.log('[DEBUG] WebSocket 收到消息:', message);
@@ -4037,15 +4043,15 @@
                         }
                     };
 
-                    scanWebSocket.onerror = (error) => {
+                    socket.onerror = (error) => {
                         clearTimeout(timeout);
                         console.error('[DEBUG] WebSocket 错误:', error);
                         finish(false);
                     };
 
-                    scanWebSocket.onclose = () => {
+                    socket.onclose = () => {
                         console.log('[DEBUG] WebSocket 连接已关闭');
-                        scanWebSocket = null;
+                        if (scanWebSocket === socket) scanWebSocket = null;
                     };
                 } catch (error) {
                     clearTimeout(timeout);
@@ -4053,6 +4059,41 @@
                     finish(false);
                 }
             });
+        }
+
+        // WebSocket is a progress enhancement, not the source of truth for a
+        // durable import job. Poll the job endpoint when the socket cannot be
+        // established so a firewall/CSP issue cannot leave a successful import
+        // looking permanently stuck in the UI.
+        async function monitorImportJobWithoutWebSocket(jobId) {
+            try {
+                const job = await rendererProjects.waitForJob(jobId, {
+                    intervalMs: 750,
+                    timeoutMs: 30 * 60 * 1000,
+                    onUpdate: update => updateScanProgress({
+                        status: update?.stage || 'processing',
+                        scanned: Number(update?.processed || 0),
+                        total: Number(update?.total || 0),
+                        progress: Number(update?.progress || (
+                            update?.total ? (Number(update.processed || 0) / Number(update.total)) * 100 : 0
+                        ))
+                    })
+                });
+                if (currentScanTaskId !== jobId) return;
+                if (job?.state === 'completed') {
+                    const processed = Number(job.processed || 0);
+                    const total = Number(job.total || processed);
+                    handleScanComplete({ added: processed, skipped: Math.max(0, total - processed) });
+                } else {
+                    handleScanError({
+                        error: job?.error_message || `任务状态: ${job?.state || 'unknown'}`
+                    });
+                }
+            } catch (error) {
+                if (currentScanTaskId === jobId) {
+                    handleScanError({ error: error?.message || '无法读取导入任务状态' });
+                }
+            }
         }
 
         // 处理扫描消息
@@ -5677,35 +5718,24 @@
                 console.log('window.electronAPI.fileImport:', window.electronAPI?.fileImport);
                 
                 try {
-                    if (!window.electronAPI) {
-                        console.warn('window.electronAPI 不存在，使用浏览器原生选择');
-                        // 浏览器环境 - 使用原生文件选择
-                        const input = document.createElement('input');
-                        input.type = 'file';
-                        input.accept = '.wav,.mp3,.flac,.aiff,.aif,.ogg,.m4a,.aac,.wma';
-                        input.multiple = true;
-                        input.onchange = (e) => {
-                            const files = Array.from(e.target.files);
-                            handleBrowserFiles(files);
-                        };
-                        input.click();
-                        return;
-                    }
-                    
-                    if (!window.electronAPI.fileImport) {
-                        console.warn('window.electronAPI.fileImport 不存在');
-                        showNotification('文件导入 API 不可用', 'error');
+                    if (!window.electronAPI?.fileImport) {
+                        console.error('[Import] Electron desktop bridge is unavailable');
+                        showNotification(i18n.t('import.electron.required'), 'error');
                         return;
                     }
                     
                     console.log('调用 fileImport.selectAudioFiles...');
+                    const importProjectId = currentProject?.id;
+                    if (!importProjectId) {
+                        throw new Error('当前工程尚未就绪，请稍后重试');
+                    }
                     const result = await window.electronAPI.fileImport.selectAudioFiles({
                         title: '选择音频文件'
                     });
                     console.log('选择结果:', result);
 
                     if (result.success && result.files) {
-                        await handleImportedFiles(result.files);
+                        await handleImportedFiles(result.files, importProjectId);
                     } else if (result.canceled) {
                         console.log('用户取消了文件选择');
                     } else {
@@ -5724,9 +5754,14 @@
                 console.log('[DEBUG] 点击导入文件夹按钮');
 
                 try {
-                    if (!window.electronAPI || !window.electronAPI.fileImport || !window.electronAPI.backendAPI) {
-                        console.error('[DEBUG] Electron API 不可用');
-                        showNotification('Electron API 不可用', 'error');
+                    // Folder selection is an Electron/main-process capability
+                    // and does not depend on backend readiness. Check the
+                    // backend only after the user has selected a directory so
+                    // a partial service failure can never suppress the native
+                    // chooser itself.
+                    if (!window.electronAPI?.fileImport) {
+                        console.error('[Import] Electron desktop bridge is unavailable');
+                        showNotification(i18n.t('import.electron.required'), 'error');
                         return;
                     }
 
@@ -5737,7 +5772,16 @@
 
                     if (folderResult.success && folderResult.folder) {
                         const folderPath = folderResult.folder;
+                        const importProjectId = currentProject?.id;
                         console.log('[DEBUG] 选择的文件夹路径:', folderPath);
+
+                        if (!importProjectId) {
+                            throw new Error('当前工程尚未就绪，请稍后重试');
+                        }
+
+                        if (!window.electronAPI?.backendAPI?.importFolderAsync) {
+                            throw new Error(i18n.t('import.backend.unavailable'));
+                        }
 
                         const clientId = `client_${Date.now()}`;
                         console.log('[DEBUG] 生成 clientId:', clientId);
@@ -5748,7 +5792,7 @@
                             document.body.appendChild(scanProgressModal);
                         }
 
-                        await connectScanWebSocket(clientId);
+                        const websocketConnected = await connectScanWebSocket(clientId);
 
                         try {
                             console.log('[DEBUG] 调用 importFolderAsync API');
@@ -5756,20 +5800,28 @@
                                 folderPath,
                                 true,
                                 clientId,
-                                currentProject?.id
+                                importProjectId
                             );
                             console.log('[DEBUG] importFolderAsync 返回:', result);
 
                             if (result && result.task_id) {
                                 currentScanTaskId = result.task_id;
                                 showNotification('正在导入音频文件...', 'info');
+                                if (!websocketConnected) {
+                                    monitorImportJobWithoutWebSocket(currentScanTaskId);
+                                }
                             } else {
-                                console.error('[DEBUG] 启动导入任务失败，无 task_id');
-                                showNotification('启动导入任务失败', 'error');
+                                throw new Error('启动导入任务失败：后端未返回任务 ID');
                             }
                         } catch (error) {
                             console.error('[DEBUG] importFolderAsync 异常:', error);
                             showNotification('导入启动失败: ' + error.message, 'error');
+
+                            if (scanProgressModal) {
+                                scanProgressModal.remove();
+                                scanProgressModal = null;
+                            }
+                            currentScanTaskId = null;
 
                             // 关闭 WebSocket
                             if (scanWebSocket) {
@@ -5830,7 +5882,7 @@
             }
 
             // 处理导入的文件
-            async function handleImportedFiles(files) {
+            async function handleImportedFiles(files, importProjectId) {
                 try {
                     if (!window.electronAPI?.backendAPI?.importFiles) {
                         throw new Error(i18n.t('import.backend.unavailable'));
@@ -5840,18 +5892,21 @@
                     if (filePaths.length === 0) {
                         throw new Error(i18n.t('import.path.required'));
                     }
+                    if (!importProjectId) {
+                        throw new Error('当前工程尚未就绪，请稍后重试');
+                    }
 
                     const clientId = `files_${Date.now()}`;
                     if (!scanProgressModal) {
                         scanProgressModal = createScanProgressModal();
                         document.body.appendChild(scanProgressModal);
                     }
-                    await connectScanWebSocket(clientId);
+                    const websocketConnected = await connectScanWebSocket(clientId);
 
                     const result = await window.electronAPI.backendAPI.importFiles(
                         filePaths,
                         clientId,
-                        currentProject?.id
+                        importProjectId
                     );
                     currentScanTaskId = result?.job_id || null;
                     if (!currentScanTaskId) {
@@ -5859,6 +5914,9 @@
                     }
 
                     showNotification(i18n.t('import.started', { count: result.total ?? filePaths.length }), 'info');
+                    if (!websocketConnected) {
+                        monitorImportJobWithoutWebSocket(currentScanTaskId);
+                    }
                 } catch (error) {
                     console.error('处理导入文件时出错:', error);
                     if (scanProgressModal) {
@@ -5873,11 +5931,6 @@
                 }
             }
 
-            // 浏览器环境文件处理
-            function handleBrowserFiles(files) {
-                console.warn('[Import] 浏览器 File 对象没有可交给本地后端的绝对路径。');
-                showNotification(i18n.t('import.electron.required'), 'error');
-            }
         });
     </script>
     

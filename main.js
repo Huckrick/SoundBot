@@ -33,10 +33,80 @@ let apiBaseUrl = `${backendOrigin}/api/v1`;
 let secureSecretsCache = null;
 let backendSecretsHydrated = false;
 let audioProtocolRegistered = false;
+let rendererBridgeReady = false;
+let rendererPreloadFailure = null;
 const activeBackendRequests = new Map();
 let quitInProgress = false;
+let pendingSplashState = {
+  status: '正在启动服务…',
+  progress: '初始化中',
+  isError: false
+};
+let nativeOpenDialogActive = false;
 const BACKEND_ERROR_SENTINEL = '__soundbotBackendError';
 const SECRET_KEY_PATTERN = /^(llm|embedding)\.[a-z0-9_-]+\.api_key$/;
+const MAIN_LOG_MAX_BYTES = 5 * 1024 * 1024;
+let mainLogPath = null;
+
+function redactDiagnosticText(value) {
+  return String(value)
+    .replace(
+      /((?:["']?api[_-]?key["']?|["']?access[_-]?token["']?|["']?secret["']?)\s*[=:]\s*["']?)[^"',;\s}&\]]+/gi,
+      '$1[REDACTED]'
+    )
+    .replace(
+      /(["']?authorization["']?\s*[=:]\s*["']?bearer\s+)[^"',;\s}&\]]+/gi,
+      '$1[REDACTED]'
+    )
+    .replace(/\b(sk-[A-Za-z0-9_-]{12,}|github_pat_[A-Za-z0-9_]{20,})\b/g, '[REDACTED]');
+}
+
+function formatDiagnosticValue(value) {
+  if (value instanceof Error) {
+    return `${value.name}: ${value.message}${value.stack ? `\n${value.stack}` : ''}`;
+  }
+  if (typeof value === 'string') return value;
+  try {
+    return JSON.stringify(value);
+  } catch (_error) {
+    return String(value);
+  }
+}
+
+function initializeMainLogging() {
+  const original = {
+    log: console.log.bind(console),
+    warn: console.warn.bind(console),
+    error: console.error.bind(console)
+  };
+  try {
+    app.setAppLogsPath();
+    const logDir = app.getPath('logs');
+    fs.mkdirSync(logDir, { recursive: true });
+    mainLogPath = path.join(logDir, 'soundbot-main.log');
+    if (fs.existsSync(mainLogPath) && fs.statSync(mainLogPath).size > MAIN_LOG_MAX_BYTES) {
+      const previous = `${mainLogPath}.1`;
+      if (fs.existsSync(previous)) fs.unlinkSync(previous);
+      fs.renameSync(mainLogPath, previous);
+    }
+    const stream = fs.createWriteStream(mainLogPath, { flags: 'a', encoding: 'utf8' });
+    for (const level of ['log', 'warn', 'error']) {
+      console[level] = (...args) => {
+        original[level](...args);
+        const message = args.map(formatDiagnosticValue).join(' ');
+        stream.write(
+          `${new Date().toISOString()} | ${level.toUpperCase()} | ${redactDiagnosticText(message)}\n`
+        );
+      };
+    }
+    process.on('uncaughtExceptionMonitor', error => {
+      console.error('[Main] Uncaught exception:', error);
+    });
+    console.log(`[Main] Persistent diagnostics enabled: ${mainLogPath}`);
+  } catch (error) {
+    original.error('[Main] Failed to initialize persistent diagnostics:', error);
+  }
+}
 
 // ==================== 路径辅助函数 ====================
 
@@ -387,13 +457,18 @@ function verifyBackendIntegrity(backendDir) {
  * 优先级：环境变量 > 应用目录 > 用户数据目录 > 开发目录
  */
 function findModelsDir() {
-  const possiblePaths = [];
-
-  // 1. 环境变量（最高优先级）
+  // An explicit override is authoritative, including when it intentionally
+  // points at a missing directory for diagnostics. Falling through to the
+  // bundled model would make configuration mistakes and missing-model tests
+  // look healthy.
   const envPath = process.env.SOUNDBOT_MODELS_PATH;
   if (envPath) {
-    possiblePaths.push(envPath);
+    const explicitPath = path.resolve(envPath);
+    console.log(`[Models] Using explicit model directory: ${explicitPath}`);
+    return explicitPath;
   }
+
+  const possiblePaths = [];
 
   // 2. 应用资源目录
   possiblePaths.push(path.join(process.resourcesPath, 'models'));
@@ -492,20 +567,12 @@ async function startBackend() {
   // 获取后端可执行文件
   const backendExe = getBackendExecutable();
   if (!backendExe) {
-    dialog.showErrorBox(
-      '错误', 
-      '未找到后端可执行文件，请重新安装应用。\n\n【重要提示】：如果您使用的是 Windows 系统，这很可能是因为 Windows Defender 或其他杀毒软件误报并将核心文件(soundbot-backend.exe)隔离或删除了。请尝试将软件安装目录加入杀毒软件白名单后，重新安装。'
-    );
     return { success: false, error: '未找到后端可执行文件' };
   }
 
   // 验证后端目录完整性
   const backendDir = path.dirname(backendExe);
   if (!verifyBackendIntegrity(backendDir)) {
-    dialog.showErrorBox(
-      '错误', 
-      '后端文件不完整，请重新安装应用。\n\n【重要提示】：如果您使用的是 Windows 系统，这很可能是因为 Windows Defender 或其他杀毒软件误报并将部分核心文件隔离或删除了。请尝试将软件安装目录加入杀毒软件白名单后，重新安装。'
-    );
     return { success: false, error: '后端文件不完整' };
   }
 
@@ -529,7 +596,11 @@ async function startBackend() {
       env,
       cwd: backendDir,
       stdio: ['pipe', 'pipe', 'pipe'],
-      detached: false
+      detached: false,
+      // Keep the console-mode PyInstaller executable (stdout carries the
+      // authoritative BOUND_PORT handshake) without flashing a separate
+      // console window in the installed Windows application.
+      windowsHide: true
     });
 
     // The Python process performs a final bind check and announces the actual
@@ -629,7 +700,18 @@ async function waitForBackendHealth(timeoutMs = 120000) {
       const res = await fetch(`${apiBaseUrl}/health`, { signal: controller.signal });
       if (res.ok) {
         const payload = await res.json().catch(() => null);
-        if (payload?.status === 'healthy' && typeof payload?.version === 'string') {
+        if (payload?.status === 'degraded' && payload?.audio_decoder_available === false) {
+          return {
+            success: false,
+            error: '安装包内置音频解码器不可用',
+            code: 'AUDIO_RUNTIME_UNAVAILABLE'
+          };
+        }
+        if (
+          payload?.status === 'healthy'
+          && payload?.audio_decoder_available === true
+          && payload?.version === app.getVersion()
+        ) {
           return { success: true };
         }
       }
@@ -1097,6 +1179,8 @@ async function stopBackend() {
 // ==================== 窗口管理 ====================
 
 function createWindow() {
+  rendererBridgeReady = false;
+  rendererPreloadFailure = null;
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -1106,6 +1190,7 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
       preload: path.join(__dirname, 'preload.js'),
       webSecurity: true,
       allowRunningInsecureContent: false
@@ -1113,6 +1198,22 @@ function createWindow() {
     titleBarStyle: 'default',
     show: false,
     backgroundColor: '#0a0a0a'
+  });
+
+  // A preload failure removes every desktop API from the renderer while the
+  // HTML can still look healthy. Capture it explicitly instead of allowing a
+  // browser-only fallback to masquerade as a working installed application.
+  mainWindow.webContents.on('preload-error', (_event, preloadPath, error) => {
+    rendererPreloadFailure = {
+      preloadPath,
+      message: error?.message || 'Unknown preload error'
+    };
+    console.error('[Renderer] Preload failed:', preloadPath, error);
+  });
+  mainWindow.webContents.on('ipc-message', (_event, channel, payload) => {
+    if (channel === 'renderer-bridge-ready' && payload?.version === 1) {
+      rendererBridgeReady = true;
+    }
   });
 
   // 设置 CSP
@@ -1205,9 +1306,41 @@ function createMenu() {
   Menu.setApplicationMenu(menu);
 }
 
+async function showOwnedOpenDialog(event, options = {}) {
+  if (nativeOpenDialogActive) {
+    const error = new Error('已有文件选择窗口正在打开');
+    error.code = 'DIALOG_BUSY';
+    throw error;
+  }
+
+  const owner = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+  if (!owner || owner.isDestroyed()) {
+    const error = new Error('主窗口当前不可用');
+    error.code = 'WINDOW_UNAVAILABLE';
+    throw error;
+  }
+
+  nativeOpenDialogActive = true;
+  try {
+    if (owner.isMinimized()) owner.restore();
+    if (!owner.isVisible()) owner.show();
+    owner.focus();
+    return await dialog.showOpenDialog(owner, options);
+  } finally {
+    nativeOpenDialogActive = false;
+    if (!owner.isDestroyed()) owner.focus();
+  }
+}
+
 // ==================== IPC 处理 ====================
 
 function setupIpcHandlers() {
+  ipcMain.handle('audio-capabilities', () => ({
+    version: audioCapabilityManifest.version || 1,
+    formats: audioCapabilityManifest.formats || {},
+    extensions: [...supportedAudioExtensions]
+  }));
+
   // 窗口控制
   ipcMain.handle('window-control', (event, action) => {
     if (!mainWindow) return;
@@ -1233,7 +1366,7 @@ function setupIpcHandlers() {
 
   // 文件对话框
   ipcMain.handle('dialog-open', async (event, options) => {
-    return await dialog.showOpenDialog(mainWindow, options);
+    return await showOwnedOpenDialog(event, options);
   });
 
   ipcMain.handle('dialog-save', async (event, options) => {
@@ -1438,6 +1571,11 @@ function setupIpcHandlers() {
   });
 
   ipcMain.handle('get-runtime-config', () => getRuntimeConfig());
+  ipcMain.handle('open-log-directory', async () => {
+    const logDir = app.getPath('logs');
+    const error = await shell.openPath(logDir);
+    return { success: !error, error: error || null, path: logDir };
+  });
   ipcMain.handle('get-app-path', () => getAppRootDir());
   ipcMain.handle('check-full-disk-access', async () => {
     if (process.platform !== 'darwin') {
@@ -1477,7 +1615,7 @@ function setupIpcHandlers() {
     try {
       switch (action) {
         case 'select-audio': {
-          const result = await dialog.showOpenDialog(mainWindow, {
+          const result = await showOwnedOpenDialog(event, {
             ...payload,
             properties: ['openFile', 'multiSelections'],
             filters: [
@@ -1502,7 +1640,7 @@ function setupIpcHandlers() {
           };
         }
         case 'select-folder': {
-          const result = await dialog.showOpenDialog(mainWindow, {
+          const result = await showOwnedOpenDialog(event, {
             ...payload,
             properties: ['openDirectory']
           });
@@ -1553,7 +1691,16 @@ function setupIpcHandlers() {
           return { success: false, error: `未知文件导入操作: ${action}` };
       }
     } catch (error) {
-      return { success: false, error: error.message };
+      const code = error?.code || 'FILE_IMPORT_FAILED';
+      const message = error?.message || '文件导入操作失败';
+      console.error('[FileImport] IPC action failed:', { action, code, message });
+      return {
+        success: false,
+        error: message,
+        code,
+        retryable: code === 'DIALOG_BUSY',
+        details: { action }
+      };
     }
   });
 
@@ -1588,89 +1735,51 @@ let splashWindow = null;
 function createSplashWindow() {
   splashWindow = new BrowserWindow({
     width: 400,
-    height: 300,
+    height: 240,
     frame: false,
     alwaysOnTop: true,
-    transparent: true,
+    transparent: false,
+    resizable: false,
     backgroundColor: '#0a0a0a',
     webPreferences: {
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
+      sandbox: true
     }
   });
 
-  // 加载简单的启动页面
-  const splashHtml = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <style>
-        body {
-          margin: 0;
-          padding: 0;
-          width: 400px;
-          height: 300px;
-          background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          color: #e5e5e5;
-        }
-        .logo {
-          font-size: 28px;
-          font-weight: 600;
-          margin-bottom: 20px;
-          background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-        }
-        .status {
-          font-size: 14px;
-          color: #a3a3a3;
-          margin-bottom: 30px;
-        }
-        .spinner {
-          width: 40px;
-          height: 40px;
-          border: 3px solid rgba(255,255,255,0.1);
-          border-top-color: #667eea;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        .progress {
-          margin-top: 20px;
-          font-size: 12px;
-          color: #666;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="logo">SoundBot</div>
-      <div class="status" id="status">正在启动服务...</div>
-      <div class="spinner"></div>
-      <div class="progress" id="progress">初始化中</div>
-    </body>
-    </html>
-  `;
-  
-  splashWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHtml)}`);
+  splashWindow.loadFile(path.join(__dirname, 'splash.html'));
+  splashWindow.webContents.on('will-navigate', (event, targetUrl) => {
+    if (targetUrl.startsWith('soundbot-action://open-logs')) {
+      event.preventDefault();
+      shell.openPath(app.getPath('logs')).then((error) => {
+        if (error) console.error('[Splash] Failed to open log directory:', error);
+      });
+    }
+  });
+  splashWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  splashWindow.webContents.once('did-finish-load', () => {
+    applySplashState();
+  });
   return splashWindow;
 }
 
+function applySplashState() {
+  if (!splashWindow || splashWindow.isDestroyed() || splashWindow.webContents.isLoading()) return;
+  const payload = JSON.stringify(pendingSplashState);
+  splashWindow.webContents.executeJavaScript(
+    `window.setSoundBotSplashStatus(${payload})`
+  ).catch(() => {});
+}
+
 // 更新启动窗口状态
-function updateSplashStatus(status, progress) {
-  if (splashWindow && !splashWindow.isDestroyed()) {
-    splashWindow.webContents.executeJavaScript(`
-      document.getElementById('status').textContent = '${status}';
-      document.getElementById('progress').textContent = '${progress}';
-    `).catch(() => {});
-  }
+function updateSplashStatus(status, progress, isError = false) {
+  pendingSplashState = {
+    status: String(status || ''),
+    progress: String(progress || ''),
+    isError: Boolean(isError)
+  };
+  applySplashState();
 }
 
 // 关闭启动窗口
@@ -1682,6 +1791,7 @@ function closeSplashWindow() {
 }
 
 app.whenReady().then(async () => {
+  initializeMainLogging();
   registerAudioProtocol();
 
   // 创建启动窗口
@@ -1693,16 +1803,11 @@ app.whenReady().then(async () => {
   
   if (!result.success) {
     console.error('[App] Backend startup failed:', result.error);
-    updateSplashStatus('启动失败', result.error || '未知错误');
-    
-    // 显示错误对话框
-    dialog.showErrorBox(
+    updateSplashStatus(
       '启动失败',
-      `无法启动后端服务：${result.error || '未知错误'}\n\n请检查：\n1. 模型文件是否正确放置\n2. 端口 8000 是否被占用\n3. 重新安装应用`
+      `${result.error || '未知错误'} · 请重新安装或查看应用日志`,
+      true
     );
-    
-    closeSplashWindow();
-    app.quit();
     return;
   }
   
@@ -1713,6 +1818,18 @@ app.whenReady().then(async () => {
   
   // 等待主窗口准备好后关闭启动窗口
   mainWindow.once('ready-to-show', () => {
+    if (rendererPreloadFailure || !rendererBridgeReady) {
+      const reason = rendererPreloadFailure
+        ? '桌面桥接组件加载失败'
+        : '桌面桥接组件未完成初始化';
+      console.error('[Renderer] Bridge startup assertion failed:', {
+        rendererBridgeReady,
+        rendererPreloadFailure
+      });
+      updateSplashStatus('界面加载失败', `${reason} · 请重新安装应用`, true);
+      mainWindow.destroy();
+      return;
+    }
     closeSplashWindow();
     mainWindow.show();
     

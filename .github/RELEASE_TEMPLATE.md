@@ -1,21 +1,21 @@
-# SoundBot v0.2.0 — Release notes and verification / 发布说明与验证
+# SoundBot v0.2.1-beta.1 — Release notes and verification / 发布说明与验证
 
 > Release publishing starts only when an existing annotated `v*` tag is pushed, and its notes are generated automatically from the matching section of `CHANGELOG.md`. This file is a bilingual human-verification and incident-recovery reference, not an alternate manual publishing path; do not mark a gate as passed without its CI evidence. / 只有推送既有的 annotated `v*` tag 才会启动发布，发布说明会从 `CHANGELOG.md` 对应版本自动生成。本文件仅是双语人工核验与故障恢复参考，不是备用的手动发布入口；没有 CI 证据时不要把门禁标为已通过。
 
 **Status / 状态:** Prerelease / 预发布<br>
-**Version / 版本:** 0.2.0<br>
+**Version / 版本:** 0.2.1-beta.1<br>
 **License / 许可:** GNU GPL v3 or later / GNU GPL v3 或更高版本
 
 ## Downloads / 下载
 
 | Target / 目标 | Release asset / 发布文件 | Support / 支持状态 |
 | --- | --- | --- |
-| Windows 10/11 x64 | `SoundBot-Setup-0.2.0.exe` | Official target / 正式目标 |
-| macOS 14+ Apple Silicon arm64 | `SoundBot-0.2.0*.dmg` | Official target / 正式目标 |
-| Optional CLAP model / 可选 CLAP 模型 | `models.zip` + `models.zip.sha256` | Required only for semantic audio indexing / 仅语义音频索引需要 |
+| Windows 10/11 x64 | `SoundBot-Setup-0.2.1-beta.1.exe` | Official target / 正式目标 |
+| macOS 14+ Apple Silicon arm64 | `SoundBot-0.2.1-beta.1*.dmg` | Official target / 正式目标 |
+| CLAP repair/development bundle / CLAP 修复与开发资源 | `models.zip` + `models.zip.sha256` | Exact-version recovery and source-build asset; already embedded in both installers / 同版本修复与源码构建资源；两个安装包均已内置 |
 | Release integrity / 发布完整性 | `models.zip.sha256` + `SHA256SUMS.txt` + GitHub attestations | The checksum files verify the model archive, DMG, and EXE; attestations cover all five assets / 校验文件验证模型包、DMG 与 EXE，证明覆盖全部五个资产 |
 
-Linux and Intel macOS are not built, tested, or supported in v0.2.0. Do not publish an artifact for those targets or relabel a foreign native build. / v0.2.0 不构建、不测试也不支持 Linux 和 Intel macOS。不得为这些目标发布文件，也不得把其他平台的原生构建改名冒充。
+Linux and Intel macOS are not built, tested, or supported in v0.2.1-beta.1. Do not publish an artifact for those targets or relabel a foreign native build. / v0.2.1-beta.1 不构建、不测试也不支持 Linux 和 Intel macOS。不得为这些目标发布文件，也不得把其他平台的原生构建改名冒充。
 
 ## Highlights / 重点变化
 
@@ -28,8 +28,10 @@ Linux and Intel macOS are not built, tested, or supported in v0.2.0. Do not publ
 - Import, index maintenance, search, caches, and AI chat are project-scoped, and long-running operations expose persistent job status and cancellation. / 导入、索引维护、搜索、缓存和 AI 对话均按工程隔离，长任务提供持久化作业状态与取消能力。
 - LM Studio, Ollama, OpenAI, Kimi, DeepSeek, SiliconFlow, and custom OpenAI-compatible LLMs are enabled through a shared asynchronous client. / LM Studio、Ollama、OpenAI、Kimi、DeepSeek、SiliconFlow 和自定义 OpenAI-compatible LLM 通过共享异步客户端启用。
 - API keys use Electron `safeStorage`, never return to the renderer, and are hydrated into the Python backend in memory only; legacy plaintext migration is atomic and recoverable. / API 密钥使用 Electron `safeStorage`，不回传渲染层，仅注入 Python 后端内存；旧明文迁移具有原子性与可恢复性。
+- The sandboxed preload now imports only Electron-supported APIs and obtains shared capabilities through IPC, restoring native file/folder import and waveform access in the installed Windows application. / 沙箱化 preload 现在只导入 Electron 支持的 API，并通过 IPC 获取共享能力，恢复 Windows 安装版的原生文件/文件夹导入与波形访问。
+- Both installers include the pinned CLAP model, per-file manifest, and Apache-2.0 notice; a normal user installs one package and does not separately download model files. / 两个平台安装包均包含固定 CLAP 模型、逐文件 manifest 与 Apache-2.0 说明；普通用户只需安装一个软件包，无需另行下载模型文件。
 
-See the synchronized [Chinese README](https://github.com/Huckrick/SoundBot/blob/v0.2.0/README.md), [English README](https://github.com/Huckrick/SoundBot/blob/v0.2.0/README.en.md), and [changelog](https://github.com/Huckrick/SoundBot/blob/v0.2.0/CHANGELOG.md) for architecture, APIs, data locations, diagnostics, privacy boundaries, and known limitations. / 架构、API、数据位置、诊断、隐私边界和已知限制请参阅同步的[中文 README](https://github.com/Huckrick/SoundBot/blob/v0.2.0/README.md)、[英文 README](https://github.com/Huckrick/SoundBot/blob/v0.2.0/README.en.md)与[更新日志](https://github.com/Huckrick/SoundBot/blob/v0.2.0/CHANGELOG.md)。
+See the synchronized [Chinese README](https://github.com/Huckrick/SoundBot/blob/v0.2.1-beta.1/README.md), [English README](https://github.com/Huckrick/SoundBot/blob/v0.2.1-beta.1/README.en.md), and [changelog](https://github.com/Huckrick/SoundBot/blob/v0.2.1-beta.1/CHANGELOG.md) for architecture, APIs, data locations, diagnostics, privacy boundaries, and known limitations. / 架构、API、数据位置、诊断、隐私边界和已知限制请参阅同步的[中文 README](https://github.com/Huckrick/SoundBot/blob/v0.2.1-beta.1/README.md)、[英文 README](https://github.com/Huckrick/SoundBot/blob/v0.2.1-beta.1/README.en.md)与[更新日志](https://github.com/Huckrick/SoundBot/blob/v0.2.1-beta.1/CHANGELOG.md)。
 
 ## Before upgrading / 升级前
 
@@ -47,18 +49,19 @@ Download the NSIS `.exe`, run it, and select an installation directory. If Windo
 
 On macOS 14 or later, open the `.dmg` and drag SoundBot to Applications. This release does not promise production signing or notarization unless explicitly stated; follow macOS security prompts only after verifying the download source. Intel Macs are unsupported. / 在 macOS 14 或更高版本中打开 `.dmg` 并把 SoundBot 拖到 Applications。除非明确说明，本版本不承诺生产级签名或公证；确认下载来源后再按 macOS 安全提示操作。不支持 Intel Mac。
 
-### Optional CLAP model / 可选 CLAP 模型
+### Bundled CLAP model and repair asset / 内置 CLAP 模型与修复资源
 
-Core library, decode, waveform, playback, and keyword search work without the model. For semantic audio search, download both model assets, verify `models.zip` against `models.zip.sha256`, and install this structure in SoundBot's user-data directory (or point `SOUNDBOT_MODELS_PATH` to it): / 没有模型仍可使用基础音效库、解码、波形、播放和关键词搜索。需要语义音频搜索时，请同时下载模型包与校验文件，以 `models.zip.sha256` 验证 `models.zip`，并把下列结构安装到 SoundBot 用户数据目录（或用 `SOUNDBOT_MODELS_PATH` 指向它）：
+The Windows and macOS installers already contain the verified model required for semantic audio search. Ordinary users should install the application only. The separate `models.zip` and `models.zip.sha256` assets are exact-version recovery/build resources; verify the archive before use, and use `SOUNDBOT_MODELS_PATH` only as an explicit controlled override: / Windows 与 macOS 安装包已经包含语义音频搜索所需的已校验模型。普通用户只需安装应用。单独发布的 `models.zip` 与 `models.zip.sha256` 仅用于同版本修复/构建；使用前必须校验压缩包，且仅在受控场景以 `SOUNDBOT_MODELS_PATH` 显式覆盖：
 
 ```text
 models/
 ├── model-manifest.json
+├── CLAP_MODEL_NOTICE.txt
 └── clap/
     └── ...
 ```
 
-The model manifest records an immutable revision and per-file SHA-256 hashes. The resource manager rejects traversal, Zip Slip, symlinks, malformed manifests, and hash mismatches before atomic replacement. / 模型 manifest 记录不可变 revision 与逐文件 SHA-256；资源管理器会在原子替换前拒绝目录穿越、Zip Slip、符号链接、异常 manifest 与哈希不匹配。
+The model manifest records an immutable revision and per-file SHA-256 hashes. The resource manager rejects traversal, Zip Slip, symlinks, malformed manifests, and hash mismatches before atomic replacement. An explicit override is authoritative: remove an incorrect environment variable instead of expecting a silent fallback to bundled resources. / 模型 manifest 记录不可变 revision 与逐文件 SHA-256；资源管理器会在原子替换前拒绝目录穿越、Zip Slip、符号链接、异常 manifest 与哈希不匹配。显式覆盖是权威配置；若环境变量错误，应将其移除，不能依赖静默回退到内置资源。
 
 ## Privacy / 隐私
 
@@ -70,13 +73,13 @@ Configuration reads expose only `has_api_key`. If OS secure storage is unavailab
 
 Leave every item unchecked in the template. The native CI job is the evidence source. There is no manual-dispatch release path: recovery must fix the source and push a valid annotated tag through the same workflow, never bypass failed gates with a manual asset upload. Release creation must depend on all jobs and must not run after any failed smoke test. / 模板中的每项默认保持未勾选，原生 CI 作业才是证据来源。发布不存在手动触发入口：故障恢复必须修复源码并通过同一工作流推送有效 annotated tag，绝不能以手工上传资产绕过失败门禁。Release 创建必须依赖全部作业，任一 smoke test 失败后都不得运行。
 
-- [ ] Version `0.2.0` matches `package.json`, `package-lock.json`, `backend/config.py`, tag `v0.2.0`, both READMEs, and the bilingual changelog. / 版本 `0.2.0` 与 `package.json`、`package-lock.json`、`backend/config.py`、tag `v0.2.0`、两份 README 和双语 changelog 一致。
+- [ ] Version `0.2.1-beta.1` matches `package.json`, `package-lock.json`, `backend/config.py`, tag `v0.2.1-beta.1`, both READMEs, and the bilingual changelog. / 版本 `0.2.1-beta.1` 与 `package.json`、`package-lock.json`、`backend/config.py`、tag `v0.2.1-beta.1`、两份 README 和双语 changelog 一致。
 - [ ] The CLAP asset was downloaded from the pinned immutable revision, its per-file manifest passed, and `models.zip.sha256` matches. / CLAP 资源来自固定不可变 revision，逐文件 manifest 通过，且 `models.zip.sha256` 匹配。
 - [ ] The draft Release contains exactly five assets: `models.zip`, `models.zip.sha256`, one DMG, one EXE, and `SHA256SUMS.txt`. Remote names, sizes, GitHub-provided SHA-256 digests, and `uploaded` states match the local files; both checksum files verify, and GitHub provenance attestations cover all five assets before publication. / 草稿 Release 必须恰好包含五个资产：`models.zip`、`models.zip.sha256`、一个 DMG、一个 EXE 与 `SHA256SUMS.txt`。远端名称、大小、GitHub 提供的 SHA-256 digest 和 `uploaded` 状态必须与本地文件一致；两个校验文件均通过，且公开前 GitHub provenance 证明覆盖全部五个资产。
-- [ ] The macOS arm64 frozen backend starts, contains the PyAV/FFmpeg runtime and notices, the DMG passes integrity verification, and the packaged backend is arm64. / macOS arm64 冻结后端可启动，包含 PyAV/FFmpeg 运行时与许可证，DMG 通过完整性验证，且应用内后端为 arm64。
+- [ ] The macOS arm64 frozen backend starts, contains the PyAV/FFmpeg runtime and notices, the DMG passes integrity verification, the packaged backend is arm64, and its bundled pinned CLAP loads in offline mode. / macOS arm64 冻结后端可启动，包含 PyAV/FFmpeg 运行时与许可证，DMG 通过完整性验证，应用内后端为 arm64，且内置固定 CLAP 可在离线模式加载。
 - [ ] The Windows x64 frozen backend starts with a clean `PATH` and no system FFmpeg, then decodes WAV, MP3, FLAC, AIFF, AIF, OGG, M4A, AAC, and WMA from special-character paths into exact 2,000-point waveforms. / Windows x64 冻结后端在干净 `PATH`、无系统 FFmpeg 下启动，并从特殊字符路径解码 WAV、MP3、FLAC、AIFF、AIF、OGG、M4A、AAC、WMA，生成精确 2,000 点波形。
 - [ ] The same Windows matrix reaches ready waveform/audio/text artifacts, activates cosine CLAP and Chroma manifests, returns hybrid component scores, and produces a valid WMA playback WAV. / 同一 Windows 矩阵使波形/音频/文本 artifact 达到 ready，激活 cosine CLAP 与 Chroma manifest，返回混合搜索分项得分，并生成有效 WMA 播放 WAV。
-- [ ] The backend inside `win-unpacked` starts and passes a real waveform test, and the NSIS installer passes archive-integrity validation. / `win-unpacked` 内后端可启动并通过真实波形测试，NSIS 安装包通过归档完整性验证。
+- [ ] The backend inside `win-unpacked` starts and passes a real waveform test; CI then silently installs the actual NSIS package, launches the installed Electron app, proves both native pickers appear, and verifies bundled models, WAV/WMA import, three waveforms, WMA transcoding, dual indexes, and semantic search. / `win-unpacked` 内后端可启动并通过真实波形测试；随后 CI 静默安装真实 NSIS，启动安装后的 Electron，证明两个原生选择器均会弹出，并验证内置模型、WAV/WMA 导入、三份波形、WMA 转码、双索引与语义搜索。
 - [ ] `app.asar` contains required Electron and renderer modules and excludes WaveSurfer, `.DS_Store`, root `SoundBot.png`, models, and source-only files. / `app.asar` 包含必要 Electron 与渲染模块，并排除 WaveSurfer、`.DS_Store`、根目录 `SoundBot.png`、模型和仅源码文件。
 - [ ] Release notes were generated from `CHANGELOG.md` only after every native, functional, model, metadata, package, and installer gate passed. / 全部原生、功能、模型、元数据、应用包与安装包门禁通过后，发布说明才从 `CHANGELOG.md` 生成。
 

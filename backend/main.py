@@ -452,11 +452,40 @@ async def health_check():
 
     返回服务状态、版本号和当前设备信息
     """
+    from core.audio_service import get_audio_service
+
+    audio_runtime = get_audio_service().runtime_status()
+    audio_decoder_available = bool(audio_runtime["available"])
     return schemas.HealthResponse(
-        status="healthy",
+        status="healthy" if audio_decoder_available else "degraded",
         version=config.APP_VERSION,
         device=config.get_device(),
-        model_loaded=is_embedder_loaded()
+        model_loaded=is_embedder_loaded(),
+        audio_decoder_available=audio_decoder_available,
+    )
+
+
+@app.get(
+    "/api/v1/runtime/capabilities",
+    response_model=schemas.RuntimeCapabilitiesResponse,
+)
+async def get_runtime_capabilities():
+    """Report required and optional frozen-runtime capabilities.
+
+    The response is safe to show in a startup diagnostic: it never includes
+    local paths, environment variables, exception messages, or credentials.
+    """
+    from core.audio_service import get_audio_service
+
+    audio_runtime = get_audio_service().runtime_status()
+    return schemas.RuntimeCapabilitiesResponse(
+        status="ready" if audio_runtime["available"] else "degraded",
+        version=config.APP_VERSION,
+        audio_decoder=schemas.AudioDecoderCapability(**audio_runtime),
+        semantic_search=schemas.SemanticSearchCapability(
+            available=is_embedder_loaded()
+        ),
+        supported_audio_extensions=sorted(config.AUDIO_FORMAT_CAPABILITIES),
     )
 
 

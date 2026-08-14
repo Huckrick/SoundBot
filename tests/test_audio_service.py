@@ -118,6 +118,40 @@ class AudioServiceTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, 'audio_decoder_unavailable')
         self.assertEqual(caught.exception.details['decoder'], 'pyav')
 
+    def test_runtime_status_rejects_missing_pyav_without_leaking_paths(self) -> None:
+        service = AudioService(self.cache)
+        private_error = OSError(
+            r"DLL load failed at C:\\Users\\private-user\\SoundBot\\avcodec.dll"
+        )
+        with (
+            mock.patch.object(audio_service_module, '_av', None),
+            mock.patch.object(audio_service_module, '_AV_IMPORT_ERROR', private_error),
+        ):
+            status = service.runtime_status()
+
+        self.assertFalse(status['available'])
+        self.assertTrue(status['required'])
+        self.assertEqual(status['engine'], 'pyav')
+        self.assertEqual(status['error_code'], 'audio_decoder_unavailable')
+        self.assertEqual(status['error_type'], 'OSError')
+        self.assertNotIn('private-user', json.dumps(status))
+
+    def test_runtime_status_serialises_pyav_and_ffmpeg_versions(self) -> None:
+        class FakeAV:
+            __version__ = '18.0.0'
+            library_versions = {
+                'libavcodec': (62, 11, 100),
+                'libavformat': (62, 3, 100),
+            }
+
+        with mock.patch.object(audio_service_module, '_av', FakeAV()):
+            status = AudioService(self.cache).runtime_status()
+
+        self.assertTrue(status['available'])
+        self.assertEqual(status['version'], '18.0.0')
+        self.assertEqual(status['ffmpeg_libraries']['libavcodec'], '62.11.100')
+        self.assertIsNone(status['error_code'])
+
     def test_fingerprint_uses_size_mtime_ns_and_waveform_version(self) -> None:
         service = AudioService(self.cache)
         before = service.fingerprint(self.source)

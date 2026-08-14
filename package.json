@@ -1,6 +1,6 @@
 {
   "name": "soundbot",
-  "version": "0.2.0",
+  "version": "0.2.1-beta.1",
   "description": "SoundBot - local-first AI sound effect manager with semantic search",
   "main": "main.js",
   "scripts": {
@@ -9,7 +9,7 @@
     "build": "python scripts/build.py",
     "build:mac": "python scripts/build.py --platform macos",
     "build:win": "python scripts/build.py --platform windows",
-    "pack": "electron-builder --dir",
+    "pack": "python scripts/build.py",
     "postinstall": "electron-builder install-app-deps",
     "clean": "python scripts/build.py --clean"
   },
@@ -41,6 +41,7 @@
       "main.js",
       "preload.js",
       "index.html",
+      "splash.html",
       "tailwindcss.js",
       "lucide.min.js",
       "assets/**/*",
@@ -59,7 +60,6 @@
       "!**/models",
       "!**/.git"
     ],
-
     "mac": {
       "minimumSystemVersion": "14.0",
       "category": "public.app-category.music",
@@ -117,6 +117,15 @@
       {
         "from": "dist/backend/soundbot-backend",
         "to": "backend/soundbot-backend"
+      },
+      {
+        "from": "models",
+        "to": "models",
+        "filter": [
+          "model-manifest.json",
+          "CLAP_MODEL_NOTICE.txt",
+          "clap/**/*"
+        ]
       }
     ],
     "publish": null

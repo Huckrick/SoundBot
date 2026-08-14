@@ -146,6 +146,36 @@ class HealthResponse(BaseModel):
     version: str = Field(..., description="版本号")
     device: str = Field(..., description="当前设备")
     model_loaded: Optional[bool] = Field(None, description="AI 模型是否已加载完毕")
+    audio_decoder_available: bool = Field(
+        ..., description="内置 PyAV/FFmpeg 音频解码器是否可用"
+    )
+
+
+class AudioDecoderCapability(BaseModel):
+    """不包含本机路径或原始加载错误的音频运行时能力。"""
+    available: bool
+    required: bool = True
+    engine: str = "pyav"
+    version: Optional[str] = None
+    ffmpeg_libraries: Dict[str, str] = Field(default_factory=dict)
+    error_code: Optional[str] = None
+    error_type: Optional[str] = None
+
+
+class SemanticSearchCapability(BaseModel):
+    """可选的本地语义搜索能力；缺失时不影响基础音频管理。"""
+    available: bool
+    required: bool = False
+    engine: str = "clap"
+
+
+class RuntimeCapabilitiesResponse(BaseModel):
+    """冻结后端启动后可由 Electron 校验的运行时能力。"""
+    status: str
+    version: str
+    audio_decoder: AudioDecoderCapability
+    semantic_search: SemanticSearchCapability
+    supported_audio_extensions: List[str] = Field(default_factory=list)
 
 
 class ErrorResponse(BaseModel):

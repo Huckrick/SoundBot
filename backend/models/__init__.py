@@ -26,6 +26,9 @@ from .schemas import (
     SearchResponse,
     IndexResponse,
     HealthResponse,
+    AudioDecoderCapability,
+    SemanticSearchCapability,
+    RuntimeCapabilitiesResponse,
     ErrorResponse,
     IndexStatus,
 )
@@ -40,6 +43,9 @@ __all__ = [
     "SearchResponse",
     "IndexResponse",
     "HealthResponse",
+    "AudioDecoderCapability",
+    "SemanticSearchCapability",
+    "RuntimeCapabilitiesResponse",
     "ErrorResponse",
     "IndexStatus",
 ]

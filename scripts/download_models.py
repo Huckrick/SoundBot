@@ -1,61 +1,96 @@
 #!/usr/bin/env python3
-"""
-下载 AI 模型脚本 / Download AI Model Script
-用于 CI/CD 或首次设置时下载模型文件
-Used for CI/CD or initial setup to download model files
-"""
+"""Download SoundBot's configured, immutable CLAP bundle for local use."""
 
-import os
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import subprocess
 import sys
 from pathlib import Path
+from typing import Any, Sequence
 
-# 设置 UTF-8 编码（Windows 兼容）
-# Set UTF-8 encoding for Windows compatibility
-if sys.platform == 'win32':
-    import codecs
-    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
-    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
-    os.environ['PYTHONIOENCODING'] = 'utf-8'
 
-# 添加 backend 到路径
-sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_BUNDLE_CONFIG = PROJECT_ROOT / "config" / "model_bundle.json"
+MANIFEST_BUILDER = PROJECT_ROOT / "tests" / "build" / "create_model_manifest.py"
 
-def download_clap_model():
-    """下载 CLAP 模型到本地 models 目录 / Download CLAP model to local models directory"""
-    
-    # 先安装依赖 / Install dependencies first
-    print("Installing transformers library...")
-    import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "transformers", "torch", "torchaudio"])
-    
-    from transformers import ClapModel, ClapProcessor
-    
-    model_name = "laion/larger_clap_general"
-    models_dir = Path(__file__).parent.parent / "models" / "clap"
-    
-    print(f"Downloading CLAP model to {models_dir}...")
-    print(f"Model: {model_name}")
-    
-    # 下载模型和处理器
-    model = ClapModel.from_pretrained(model_name)
-    processor = ClapProcessor.from_pretrained(model_name)
-    
-    # 保存到本地
-    models_dir.mkdir(parents=True, exist_ok=True)
-    model.save_pretrained(models_dir)
-    processor.save_pretrained(models_dir)
-    
-    print("[OK] Model download completed!")
-    size_mb = sum(f.stat().st_size for f in models_dir.rglob('*') if f.is_file()) / 1024 / 1024
-    print(f"Size: {size_mb:.1f} MB")
-    
-    return models_dir
+
+IMMUTABLE_REVISION = re.compile(r"^[0-9a-fA-F]{40,64}$")
+
+
+def read_identity(bundle_config: Path) -> tuple[str, str, str]:
+    loaded: Any = json.loads(
+        Path(bundle_config).expanduser().resolve(strict=True).read_text(encoding="utf-8")
+    )
+    if not isinstance(loaded, dict):
+        raise ValueError("model bundle config must be a JSON object")
+    model_id = str(loaded.get("model_id", "")).strip()
+    revision = str(loaded.get("revision", "")).strip().lower()
+    notice_file = str(loaded.get("notice_file", "")).strip()
+    if not model_id or not notice_file:
+        raise ValueError(
+            "model bundle config must define model_id, revision, and notice_file"
+        )
+    if not IMMUTABLE_REVISION.fullmatch(revision):
+        raise ValueError("model bundle config revision must be an immutable commit")
+    return model_id, revision, notice_file
+
+
+def download_clap_model(
+    models_dir: Path | None = None,
+    bundle_config: Path = DEFAULT_BUNDLE_CONFIG,
+) -> Path:
+    """Run the strict release builder; never install packages or select a branch."""
+    destination = Path(models_dir or PROJECT_ROOT / "models").expanduser()
+    config_path = Path(bundle_config).expanduser().resolve(strict=True)
+    model_id, revision, _notice_file = read_identity(config_path)
+    print(f"Downloading pinned CLAP model: {model_id} @ {revision}")
+    print(f"Destination: {destination.resolve(strict=False)}")
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(MANIFEST_BUILDER),
+            "--models-dir",
+            str(destination),
+            "--bundle-config",
+            str(config_path),
+            "--download",
+        ],
+        cwd=PROJECT_ROOT,
+        check=True,
+    )
+    return destination / "clap"
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--models-dir", type=Path, default=PROJECT_ROOT / "models")
+    parser.add_argument(
+        "--bundle-config",
+        type=Path,
+        default=DEFAULT_BUNDLE_CONFIG,
+        help="Single pinned model identity/revision/notice config",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = parse_args(argv)
+    try:
+        clap_dir = download_clap_model(args.models_dir, args.bundle_config)
+    except (OSError, RuntimeError, ValueError, subprocess.CalledProcessError) as exc:
+        print(f"[ERROR] Model download failed: {exc}", file=sys.stderr)
+        return 1
+
+    size_bytes = sum(
+        path.stat().st_size for path in clap_dir.rglob("*") if path.is_file()
+    )
+    print(f"[OK] Verified local bundle ({size_bytes / 1024 / 1024:.1f} MiB)")
+    return 0
+
 
 if __name__ == "__main__":
-    try:
-        download_clap_model()
-    except Exception as e:
-        print(f"[ERROR] Download failed: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+    raise SystemExit(main())

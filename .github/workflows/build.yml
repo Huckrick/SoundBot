@@ -18,7 +18,6 @@ env:
   PYTHONIOENCODING: 'utf-8'
   NODE_VERSION: '20'
   PYINSTALLER_VERSION: '6.16.0'
-  CLAP_MODEL_REVISION: 'ada0c23a36c4e8582805bb38fec3905903f18b41'
 
 jobs:
   validate-release:
@@ -145,8 +144,7 @@ jobs:
         run: |
           python tests/build/create_model_manifest.py \
             --models-dir models \
-            --model-id laion/larger_clap_general \
-            --revision "${CLAP_MODEL_REVISION}" \
+            --bundle-config config/model_bundle.json \
             --download
 
       - name: Create Models package
@@ -174,7 +172,7 @@ jobs:
           retention-days: 7
 
   build-macos:
-    needs: validate-release
+    needs: [validate-release, build-models]
     runs-on: macos-15
     timeout-minutes: 150
     permissions:
@@ -207,6 +205,21 @@ jobs:
             echo "::error::macOS release must be built on an arm64 runner"
             exit 1
           }
+
+      - name: Download pinned model package for bundled install
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: models-package
+          path: model-release
+
+      - name: Verify and expand pinned model package
+        run: |
+          cd model-release
+          shasum -a 256 -c models.zip.sha256
+          cd ..
+          mkdir -p models
+          unzip -q model-release/models.zip -d models
+          python -c "from scripts.build import verify_packaged_models; verify_packaged_models()"
 
       - name: Cache Electron
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
@@ -355,11 +368,67 @@ jobs:
           APP_ASAR="$APP_PATH/Contents/Resources/app.asar"
           test -f "$APP_ASAR" || { echo "[ERROR] app.asar missing"; exit 1; }
           npx --no-install asar list "$APP_ASAR" > asar-contents.txt
-          for required in '/main.js' '/preload.js' '/index.html' '/assets/i18n.js'; do
+          for required in '/main.js' '/preload.js' '/index.html' '/splash.html' '/assets/i18n.js' '/config/audio_capabilities.json'; do
             grep -Fxq "$required" asar-contents.txt || { echo "[ERROR] missing packaged file: $required"; exit 1; }
           done
           if grep -Ei 'wavesurfer|(^|/)\.DS_Store$|(^|/)SoundBot\.png$' asar-contents.txt; then
             echo "[ERROR] forbidden legacy/development asset found in app.asar"
+            exit 1
+          fi
+
+      - name: Smoke packaged macOS bundled CLAP
+        env:
+          RELEASE_TAG: ${{ needs.validate-release.outputs.release_tag }}
+        run: |
+          APP_PATH=$(find dist-electron -type d -name 'SoundBot.app' -print -quit)
+          test -n "$APP_PATH" || { echo "::error::packaged SoundBot.app not found"; exit 1; }
+          BACKEND_PATH="$APP_PATH/Contents/Resources/backend/soundbot-backend/soundbot-backend"
+          MODELS_PATH="$APP_PATH/Contents/Resources/models"
+          python -c 'from pathlib import Path; import sys; from scripts.build import verify_packaged_models; verify_packaged_models(Path(sys.argv[1]))' "$MODELS_PATH"
+
+          export SOUNDBOT_PORT=18766
+          export SOUNDBOT_MODELS_PATH="$MODELS_PATH"
+          export SOUNDBOT_USER_DATA_DIR="$RUNNER_TEMP/soundbot-release-$GITHUB_RUN_ID-macos-packaged"
+          export ENABLE_MODEL_PRELOAD=true
+          export HF_HUB_OFFLINE=1
+          export TRANSFORMERS_OFFLINE=1
+          export PYTHONIOENCODING=utf-8
+          "$BACKEND_PATH" > "$RUNNER_TEMP/packaged_macos_model.log" 2>&1 &
+          BACKEND_PID=$!
+          cleanup() {
+            kill "$BACKEND_PID" 2>/dev/null || true
+            wait "$BACKEND_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          STARTED=false
+          for i in $(seq 1 180); do
+            HEALTH_JSON="$(curl -sf http://127.0.0.1:18766/api/v1/health 2>/dev/null || true)"
+            if python -c 'import json,sys; p=json.loads(sys.argv[1]); assert p["status"] == "healthy" and p["audio_decoder_available"] is True and p["version"] == sys.argv[2].removeprefix("v")' "$HEALTH_JSON" "$RELEASE_TAG" 2>/dev/null; then
+              STARTED=true
+              break
+            fi
+            kill -0 "$BACKEND_PID" 2>/dev/null || break
+            sleep 1
+          done
+
+          MODEL_READY=false
+          if [ "$STARTED" = true ]; then
+            for i in $(seq 1 600); do
+              MODEL_JSON="$(curl -sf http://127.0.0.1:18766/api/v1/model/status 2>/dev/null || true)"
+              if python -c 'import json,sys; p=json.loads(sys.argv[1]); assert p.get("model_status", {}).get("loaded") is True and p.get("embedder_available") is True' "$MODEL_JSON" 2>/dev/null; then
+                MODEL_READY=true
+                echo "[OK] Packaged macOS CLAP loaded from application resources on attempt ${i}s"
+                break
+              fi
+              kill -0 "$BACKEND_PID" 2>/dev/null || break
+              sleep 1
+            done
+          fi
+
+          tail -80 "$RUNNER_TEMP/packaged_macos_model.log" || true
+          if [ "$STARTED" != true ] || [ "$MODEL_READY" != true ]; then
+            echo "::error::packaged macOS backend or bundled CLAP did not become ready"
             exit 1
           fi
 
@@ -374,7 +443,7 @@ jobs:
 
   build-windows:
     needs: [validate-release, build-models]
-    runs-on: windows-latest
+    runs-on: windows-2025
     timeout-minutes: 210
     permissions:
       contents: read
@@ -424,8 +493,7 @@ jobs:
             Write-Host "::error::pinned model package layout is invalid"
             exit 1
           }
-          python -c "import sys; sys.path.insert(0, 'scripts'); from download_manager import verify_model_manifest; verify_model_manifest('models'); print('[OK] model manifest and every file hash verified')"
-          "SOUNDBOT_MODELS_PATH=$((Resolve-Path models).Path)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          python -c "from scripts.build import verify_packaged_models; verify_packaged_models()"
 
       - name: Cache Electron
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
@@ -450,11 +518,16 @@ jobs:
       - name: Install Node dependencies
         run: npm ci --progress=false
 
+      - name: Test sandboxed Electron preload bridge
+        shell: powershell
+        run: npx --no-install electron tests/frontend/check_electron_preload.js
+
       - name: Build backend and Electron with the canonical script
         shell: powershell
         run: python scripts/build.py --platform windows --release-tag "$env:RELEASE_TAG" --skip-dependency-install
         env:
           RELEASE_TAG: ${{ needs.validate-release.outputs.release_tag }}
+          SOUNDBOT_MODELS_PATH: ${{ github.workspace }}\models
           ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
           ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
 
@@ -500,6 +573,7 @@ jobs:
         shell: powershell
         env:
           RELEASE_TAG: ${{ needs.validate-release.outputs.release_tag }}
+          SOUNDBOT_MODELS_PATH: ${{ github.workspace }}\models
         run: |
           Write-Host "=== Testing frozen backend without a system FFmpeg ==="
           $pythonExe = (Get-Command python).Source
@@ -631,7 +705,7 @@ jobs:
           $asarEntries = @($asarEntriesRaw | ForEach-Object {
             (($_.Trim() -replace '\\', '/') -replace '^/+', '')
           } | Where-Object { $_ })
-          foreach ($required in @('main.js', 'preload.js', 'index.html', 'assets/i18n.js')) {
+          foreach ($required in @('main.js', 'preload.js', 'index.html', 'splash.html', 'assets/i18n.js', 'config/audio_capabilities.json')) {
             if ($asarEntries -notcontains $required) { Write-Host "[ERROR] missing packaged file: $required"; exit 1 }
           }
           if (($asarEntries -join "`n") -match 'wavesurfer|\.DS_Store|SoundBot\.png') {
@@ -691,6 +765,48 @@ jobs:
           if (-not $started) {
             Write-Host "::error::win-unpacked backend failed packaged waveform smoke"
             exit 1
+          }
+
+      - name: Install NSIS and smoke-test installed Electron
+        shell: powershell
+        run: |
+          $pythonExe = (Get-Command python).Source
+          $installer = Get-ChildItem dist-electron/*.exe | Where-Object { $_.Length -gt 1MB } | Select-Object -First 1
+          if (-not $installer) { Write-Host "::error::NSIS installer not found"; exit 1 }
+
+          # /D must be the final NSIS argument. The non-ASCII, spaced path
+          # exercises the same installed-state path handling users depend on.
+          $installDir = Join-Path $env:RUNNER_TEMP 'SoundBot 已安装 空格 (CI)'
+          New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+          $installerArgs = "/S /currentuser /D=$installDir"
+          $install = Start-Process -FilePath $installer.FullName `
+            -ArgumentList $installerArgs `
+            -Wait `
+            -PassThru
+          if ($install.ExitCode -ne 0) {
+            Write-Host "::error::NSIS silent install failed with exit code $($install.ExitCode)"
+            exit 1
+          }
+
+          $installedExe = Join-Path $installDir 'SoundBot.exe'
+          if (-not (Test-Path $installedExe)) {
+            Write-Host "::error::installed SoundBot.exe missing from requested NSIS directory: $installDir"
+            Get-ChildItem $installDir -Recurse -ErrorAction SilentlyContinue
+            exit 1
+          }
+
+          $originalPath = $env:PATH
+          $env:PATH = Join-Path $env:SystemRoot 'System32'
+          & $pythonExe tests/build/check_installed_electron.py `
+            --executable $installedExe `
+            --fixture-root "$env:RUNNER_TEMP\soundbot-installed-electron-smoke % # + (中文)" `
+            --timeout 600 `
+            --require-models
+          $smokeExit = $LASTEXITCODE
+          $env:PATH = $originalPath
+          if ($smokeExit -ne 0) {
+            Write-Host "::error::NSIS-installed Electron/backend/import/waveform smoke failed"
+            exit $smokeExit
           }
 
       - name: Upload Windows artifact
@@ -762,6 +878,7 @@ jobs:
           (cd release-assets && sha256sum --check models.zip.sha256)
           (cd release-assets && sha256sum models.zip *.dmg *.exe | sort -k2 > SHA256SUMS.txt)
           (cd release-assets && sha256sum --check SHA256SUMS.txt)
+          python tests/build/verify_release_assets.py --directory release-assets
 
       - name: Attest release artifacts
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2

@@ -134,7 +134,8 @@ class DownloadManagerTests(unittest.TestCase):
             verify_model_manifest(staging)
 
     def test_default_release_tag_matches_application_version(self) -> None:
-        self.assertEqual(get_application_release_tag(), "v0.2.0")
+        package = json.loads((REPO_ROOT / "package.json").read_text(encoding="utf-8"))
+        self.assertEqual(get_application_release_tag(), f"v{package['version']}")
 
 
 if __name__ == "__main__":

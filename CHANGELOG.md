@@ -4,15 +4,33 @@ All notable changes to SoundBot are documented here. The format follows [Keep a 
 
 ## [Unreleased] / 未发布
 
+## [0.2.1-beta.1] - 2026-08-14 (Prerelease / 预发布)
+
+### Added / 新增
+
+- Added a product-styled local startup window that waits for the production preload handshake and required backend audio capability before showing the main UI, preserves an actionable failure state, and avoids a mismatched system-console experience. / 新增与产品风格一致的本地启动窗口，仅在生产 preload 握手与必需的后端音频能力通过后显示主界面；启动失败会保留可操作的错误状态，避免出现风格割裂的系统控制台体验。
+- Added persistent, size-rotated Electron main-process diagnostics for startup, preload, IPC, and frozen-backend output, with common credential forms redacted and a minimal IPC action for opening the actual log directory. / 新增 Electron 主进程持久诊断日志，覆盖启动、preload、IPC 与冻结后端输出，支持按大小轮换、常见凭据遮盖，并提供最小权限 IPC 操作打开实际日志目录。
+- Added `GET /api/v1/runtime/capabilities` and extended health responses so a missing PyAV/FFmpeg runtime reports a path-free degraded capability instead of presenting an incomplete frozen backend as healthy. / 新增 `GET /api/v1/runtime/capabilities` 并扩展健康响应，使 PyAV/FFmpeg 运行时缺失时返回不含本地路径的降级能力，而不是把不完整的冻结后端误报为健康。
+
 ### Changed / 变更
 
+- Windows and macOS v0.2.1-beta.1 installers embed the single configured CLAP model revision, its per-file SHA-256 manifest, and full Apache-2.0 source/license notice. Ordinary users no longer download `models.zip`; that exact-version archive remains a repair/build/development asset, and an explicit `SOUNDBOT_MODELS_PATH` is authoritative without silent fallback. / Windows 与 macOS v0.2.1-beta.1 安装包会内置唯一配置中固定 revision 的 CLAP 模型、逐文件 SHA-256 manifest 与完整 Apache-2.0 来源/许可说明。普通用户无需另行下载 `models.zip`；该精确版本压缩包仅作为修复、构建与开发资源，显式 `SOUNDBOT_MODELS_PATH` 为权威配置且不会静默回退。
+- Release packaging now regenerates and verifies the pinned model before Electron packaging, repeats model identity, notice, and every manifest hash check inside the final application, loads the packaged macOS model offline, rejects any of the five release assets at or above 2 GiB, and performs a real silent NSIS installation under a path containing spaces and Chinese characters. / 发布打包现在会在 Electron 打包前重新生成并校验固定模型，在最终应用内再次核对模型身份、许可说明与 manifest 中每个文件哈希，以离线模式加载 macOS 应用内模型，拒绝五个 Release 资产中任何达到或超过 2 GiB 的文件，并在包含空格与中文的路径执行真实 NSIS 静默安装。
 - Expanded the mirrored Chinese and English acknowledgments to distinguish AI development collaborators—including OpenAI Codex, Kimi, and Anthropic Claude—from the verified runtime, indexing, audio, UI, and release technology stack. / 扩充中英文镜像致谢，明确区分 OpenAI Codex、Kimi、Anthropic Claude 等 AI 开发协作工具与经仓库核实的运行时、索引、音频、界面及发布技术栈。
 - Replaced the incomplete custom license summary with the official GNU GPLv3 text, aligned package metadata to `GPL-3.0-or-later`, and tightened the bilingual project presentation without changing the established README layout. / 使用 GNU GPLv3 官方全文替换不完整的自定义许可证摘要，将软件包元数据统一为 `GPL-3.0-or-later`，并在保持既有 README 排版的前提下完善双语项目介绍。
 - Documented SoundBot as a public source and release mirror that does not accept external issues, pull requests, discussions, projects, support requests, private reports, code, or data submissions; removed the public support email from repository and release guidance. / 明确 SoundBot 是不接收外部 Issue、Pull Request、Discussion、Project、支持请求、私密报告、代码或数据提交的公开源码与发布镜像，并从仓库及发布说明中移除公开支持邮箱。
 
+### Fixed / 修复
+
+- Fixed the packaged Electron bridge disappearing on Windows because sandboxed preload code attempted a top-level local JSON `require`, which Electron does not expose in a sandbox preload. The preload now imports only Electron's supported API, obtains the shared audio capability table through IPC, signals a ready handshake, and causes startup to fail visibly on `preload-error` instead of opening a partly functional renderer. / 修复 Windows 打包版 Electron bridge 整体消失的问题：根因是沙箱化 preload 在顶层 `require` 本地 JSON，而 Electron 沙箱 preload 不提供该能力。preload 现在只导入 Electron 支持的 API，通过 IPC 获取共享音频能力表并发送就绪握手；发生 `preload-error` 时启动会明确失败，不再打开功能残缺的渲染界面。
+- Fixed installed file import falling back to a browser picker without absolute paths, folder import returning before a native dialog could open, and import progress depending on a live WebSocket. Both native pickers now run through the production bridge with an immutable explicit project ID, while durable job polling remains available if the socket is unavailable. / 修复安装版文件导入回退到无法提供绝对路径的浏览器选择器、文件夹导入在原生窗口打开前直接返回，以及导入进度依赖实时 WebSocket 的问题。两个原生选择器现在都通过生产 bridge 运行并携带不可变的显式工程 ID；socket 不可用时仍可轮询持久化作业。
+- Fixed the same preload failure being misreported as “waveform unavailable.” Waveform requests now use the verified production bridge, reject empty/non-finite data, and surface loading, retryable failure, and cancellation states instead of masking IPC errors. / 修复同一 preload 故障被误报为“波形不可用”的问题。波形请求现在使用经过验证的生产 bridge，拒绝空数组与非有限数据，并明确呈现加载、可重试失败与取消状态，不再掩盖 IPC 错误。
+- Made frozen-backend child-process creation explicitly hidden on Windows while retaining the authoritative `BOUND_PORT` startup handshake and persistent diagnostic capture. / 将 Windows 上的冻结后端子进程显式设为隐藏创建，同时保留权威的 `BOUND_PORT` 启动握手与持久诊断捕获。
+- Expanded the Windows installed-state release gate beyond archive inspection: CI now launches the NSIS-installed Electron application, proves both real native pickers appear, imports WAV and WMA through production IPC, checks SQLite plus three exact 2,000-point waveforms and WMA playback transcoding, then requires bundled CLAP preload, both indexes, and semantic search. / 将 Windows 安装态发布门禁从压缩包检查扩展为真实功能验证：CI 现在启动由 NSIS 安装的 Electron 应用，证明两个真实原生选择器均会弹出，经生产 IPC 导入 WAV 与 WMA，检查 SQLite、三份精确 2,000 点波形及 WMA 播放转码，并要求内置 CLAP 预加载、双索引与语义搜索全部通过。
+
 ### Removed / 移除
 
-- Removed tracked macOS metadata, an empty user-specific runtime configuration, an obsolete one-off copyright script, and an unused audio-import placeholder from the public source tree. Local user files remain ignored and are not deleted. / 从公开源码树移除已跟踪的 macOS 元数据、空的用户运行时配置、过时的一次性版权脚本与无用音频导入占位文件；本地用户文件仅被忽略，不会被删除。
+- Removed tracked macOS metadata, an empty user-specific runtime configuration, an obsolete one-off copyright script, and an unused audio-import test stub from the public source tree. Local user files remain ignored and are not deleted. / 从公开源码树移除已跟踪的 macOS 元数据、空的用户运行时配置、过时的一次性版权脚本与无用音频导入测试说明；本地用户文件仅被忽略，不会被删除。
 
 ### Security / 安全
 
@@ -105,5 +123,6 @@ All notable changes to SoundBot are documented here. The format follows [Keep a 
 - The Windows release gate starts the frozen backend with a clean `PATH` and no system FFmpeg, then requires the complete format matrix, exact waveforms, CLAP, Chroma, hybrid search, `win-unpacked`, and NSIS installer integrity checks to pass before publishing. / Windows 发布门禁会在干净 `PATH`、无系统 FFmpeg 下启动冻结后端，并要求全格式矩阵、精确波形、CLAP、Chroma、混合搜索、`win-unpacked` 与 NSIS 安装包完整性检查全部通过后才允许发布。
 - CI builds Windows x64 and macOS arm64 only on native runners and blocks release creation if any functional smoke test, model check, metadata check, package check, or installer check fails. / CI 仅在原生 runner 构建 Windows x64 与 macOS arm64，并在任一功能冒烟、模型、元数据、应用包或安装包检查失败时阻止创建 Release。
 
-[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v0.2.1-beta.1...HEAD
+[0.2.1-beta.1]: https://github.com/Huckrick/SoundBot/compare/v0.2.0...v0.2.1-beta.1
 [0.2.0]: https://github.com/Huckrick/SoundBot/compare/v0.1.4...v0.2.0

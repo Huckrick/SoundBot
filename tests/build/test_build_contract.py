@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import io
 import json
 import os
@@ -71,6 +72,16 @@ class NativeBuildContractTests(unittest.TestCase):
         self.assertEqual(package["build"]["mac"]["target"][0]["arch"], ["arm64"])
         self.assertEqual(package["build"]["mac"]["minimumSystemVersion"], "14.0")
         self.assertEqual(package["build"]["win"]["target"][0]["arch"], ["x64"])
+        model_resources = [
+            item for item in package["build"]["extraResources"]
+            if item.get("to") == "models"
+        ]
+        self.assertEqual(len(model_resources), 1)
+        self.assertEqual(model_resources[0]["from"], "models")
+        self.assertIn("model-manifest.json", model_resources[0]["filter"])
+        self.assertIn("CLAP_MODEL_NOTICE.txt", model_resources[0]["filter"])
+        self.assertIn("clap/**/*", model_resources[0]["filter"])
+        self.assertEqual(package["scripts"]["pack"], "python scripts/build.py")
 
         requirements = (root / "backend" / "requirements.txt").read_text(encoding="utf-8")
         self.assertRegex(requirements, r"(?m)^av==18\.0\.0$")
@@ -85,14 +96,21 @@ class NativeBuildContractTests(unittest.TestCase):
         spec = (root / "backend" / "main.spec").read_text(encoding="utf-8")
         self.assertIn("('X utf8=1', None, 'OPTION')", spec)
 
+        bundle_config = json.loads(
+            (root / "config" / "model_bundle.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(bundle_config["schema_version"], 1)
+        self.assertRegex(bundle_config["revision"], r"^[0-9a-f]{40}$")
+        self.assertEqual(bundle_config["license"], "Apache-2.0")
         workflow = (root / ".github" / "workflows" / "build.yml").read_text(encoding="utf-8")
-        revision = re.search(r"CLAP_MODEL_REVISION:\s*'([0-9a-f]+)'", workflow)
-        self.assertIsNotNone(revision)
-        self.assertEqual(len(revision.group(1)), 40)
+        self.assertNotIn("CLAP_MODEL_REVISION", workflow)
+        self.assertIn("--bundle-config config/model_bundle.json", workflow)
         workflow_pyinstaller = re.search(r"PYINSTALLER_VERSION:\s*'([^']+)'", workflow)
         self.assertIsNotNone(workflow_pyinstaller)
         self.assertEqual(workflow_pyinstaller.group(1), soundbot_build.PYINSTALLER_VERSION)
         self.assertIn("runs-on: macos-15", workflow)
+        self.assertIn("runs-on: windows-2025", workflow)
+        self.assertNotIn("runs-on: windows-latest", workflow)
         self.assertIn("python scripts/build.py", workflow)
         self.assertIn("--platform macos", workflow)
         self.assertIn("--platform windows", workflow)
@@ -107,6 +125,61 @@ class NativeBuildContractTests(unittest.TestCase):
 
 
 class BuildScriptReliabilityTests(unittest.TestCase):
+    def test_packaged_models_require_complete_manifest_and_pinned_revision(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            models = Path(directory)
+            model_file = models / "clap" / "config.json"
+            model_file.parent.mkdir(parents=True)
+            model_file.write_text("{}\n", encoding="utf-8")
+            revision = "a" * 40
+            (models / "CLAP_MODEL_NOTICE.txt").write_text(
+                "test model notice\n", encoding="utf-8"
+            )
+            controlled_notice = models / "controlled-notice.txt"
+            controlled_notice.write_text("test model notice\n", encoding="utf-8")
+            manifest = {
+                "schema_version": 1,
+                "model_id": "laion/larger_clap_general",
+                "revision": revision,
+                "license": "Apache-2.0",
+                "source_url": "https://example.invalid/test-model",
+                "notice": {
+                    "path": "CLAP_MODEL_NOTICE.txt",
+                    "sha256": hashlib.sha256(
+                        (models / "CLAP_MODEL_NOTICE.txt").read_bytes()
+                    ).hexdigest(),
+                },
+                "files": {
+                    "clap/config.json": hashlib.sha256(model_file.read_bytes()).hexdigest()
+                },
+            }
+            (models / "model-manifest.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
+            )
+            bundle_config = models / "model_bundle.json"
+            bundle_config.write_text(
+                json.dumps({
+                    "schema_version": 1,
+                    "model_id": manifest["model_id"],
+                    "revision": revision,
+                    "license": "Apache-2.0",
+                    "source_url": "https://example.invalid/test-model",
+                    "notice_file": str(controlled_notice),
+                }),
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(soundbot_build, "MODEL_BUNDLE_CONFIG", bundle_config):
+                verified = soundbot_build.verify_packaged_models(models)
+            self.assertEqual(verified["revision"], revision)
+
+            changed = json.loads(bundle_config.read_text(encoding="utf-8"))
+            changed["revision"] = "b" * 40
+            bundle_config.write_text(json.dumps(changed), encoding="utf-8")
+            with mock.patch.object(soundbot_build, "MODEL_BUNDLE_CONFIG", bundle_config):
+                with self.assertRaisesRegex(RuntimeError, "revision"):
+                    soundbot_build.verify_packaged_models(models)
+
     def test_ci_environment_does_not_implicitly_preserve_dist(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -187,6 +260,8 @@ class BuildScriptReliabilityTests(unittest.TestCase):
             soundbot_build, "install_npm_deps"
         ) as install, mock.patch.object(
             soundbot_build, "verify_native_backend_bundle"
+        ), mock.patch.object(
+            soundbot_build, "verify_packaged_models"
         ), mock.patch.object(soundbot_build, "run_command") as run:
             soundbot_build.build_electron("windows", install_dependencies=False)
 
@@ -219,6 +294,8 @@ class BuildScriptReliabilityTests(unittest.TestCase):
     def test_electron_keeps_dependency_install_default_for_compatibility(self) -> None:
         with mock.patch.object(soundbot_build, "install_npm_deps") as install, mock.patch.object(
             soundbot_build, "verify_native_backend_bundle"
+        ), mock.patch.object(
+            soundbot_build, "verify_packaged_models"
         ), mock.patch.object(soundbot_build, "run_command"):
             soundbot_build.build_electron("macos")
 
@@ -287,11 +364,21 @@ class BuildScriptReliabilityTests(unittest.TestCase):
                 soundbot_build, "verify_native_backend_bundle"
             ) as verify_backend, mock.patch.object(
                 soundbot_build, "verify_frozen_runtime_assets"
-            ) as verify_runtime:
+            ) as verify_runtime, mock.patch.object(
+                soundbot_build, "verify_packaged_models"
+            ) as verify_models:
                 soundbot_build.verify_build("macos")
 
             verify_backend.assert_called_once_with(packaged_backend)
             verify_runtime.assert_called_once_with(packaged_backend, "macos")
+            verify_models.assert_called_once_with(
+                electron_dist
+                / "mac-arm64"
+                / "SoundBot.app"
+                / "Contents"
+                / "Resources"
+                / "models"
+            )
 
     def test_cli_rejects_skipping_both_build_stages(self) -> None:
         with mock.patch.object(

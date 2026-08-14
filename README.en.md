@@ -1,7 +1,7 @@
 # 🎵 SoundBot - AI 音效管理器 / AI Sound Effect Manager
 
 [![License: GPL v3+](https://img.shields.io/badge/License-GPLv3%2B-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Version](https://img.shields.io/badge/version-v0.2.0--prerelease-orange.svg)](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.0)
+[![Version](https://img.shields.io/badge/version-v0.2.1--beta.1-orange.svg)](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.1)
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![Electron](https://img.shields.io/badge/electron-28.3.3-9feaf9.svg)](https://www.electronjs.org/)
 
@@ -15,17 +15,17 @@ Electron provides the desktop UI, while a local backend built with FastAPI, SQLi
 
 ## 📥 Download
 
-**Latest test release:** [SoundBot v0.2.0](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.0)
+**Latest test release:** [SoundBot v0.2.1-beta.1](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.1)
 
-The current source version is **v0.2.0 (prerelease)**. This release focuses on audio decoding and waveform rendering in the frozen Windows package, SQLite/Chroma consistency, cross-project isolation, safe index rebuilding, and keeping API keys out of plaintext configuration.
+The current source version is **v0.2.1-beta.1 (prerelease)**. This release fixes file/folder imports and waveform availability caused by a sandboxed-preload crash in the installed Windows app, and bundles the pinned CLAP model, PyAV/FFmpeg audio runtime, and complete verification metadata in each installer.
 
 | Resource | Target | Download |
 | --- | --- | --- |
-| macOS installer | macOS 14+ on Apple Silicon arm64 | [Download the DMG from the v0.2.0 Release](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.0) |
-| Windows installer | Windows 10/11 x64 | [Download the EXE from the v0.2.0 Release](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.0) |
-| CLAP model package | Shared by both platforms; required only for semantic audio indexing | [Download `models.zip` from the v0.2.0 Release](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.0) |
+| macOS installer | macOS 14+ on Apple Silicon arm64 | [Download the DMG from the v0.2.1-beta.1 Release](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.1) |
+| Windows installer | Windows 10/11 x64 | [Download the EXE from the v0.2.1-beta.1 Release](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.1) |
+| CLAP repair/development asset | Shared by both platforms; must exactly match the application version | [Download the optional `models.zip` from the matching Release](https://github.com/Huckrick/SoundBot/releases) |
 
-> This is a test release. Back up the SoundBot user-data directory before upgrading. The core library, waveforms, playback, tags, and keyword search do not require an LLM or CLAP model; files remain safely stored in SQLite when the model is absent.
+> This is a test release. Back up the SoundBot user-data directory before upgrading. The v0.2.1-beta.1 installer bundles a pinned CLAP revision, a per-file manifest, and the Apache-2.0 notice, so ordinary users do not need a separate `models.zip`. If model loading fails, files remain safely stored in SQLite and core management, waveforms, playback, tags, and keyword search remain available.
 
 ### Interface preview
 
@@ -37,11 +37,11 @@ The current source version is **v0.2.0 (prerelease)**. This release focuses on a
 
 ## ✨ Features
 
-| Capability | v0.2.0 behavior |
+| Capability | v0.2.1-beta.1 behavior |
 | --- | --- |
-| File import | Electron submits absolute paths only; the backend writes SQLite first, then a cancellable persistent job creates the waveform and both vectors |
+| File import | A minimal IPC bridge lets the sandboxed preload invoke native file/folder pickers and submit absolute paths only; the backend writes SQLite first, then a cancellable, pollable persistent job creates the waveform and both vectors |
 | Audio decoding | Pinned `av==18.0.0` (PyAV) and its wheel-bundled FFmpeg libraries provide one decoder without invoking a system `ffmpeg` command |
-| Waveforms | Every file produces exactly 2,000 finite, non-negative peaks in `[0,1]`; source or algorithm changes automatically invalidate old peaks |
+| Waveforms | The production preload bridge fetches exactly 2,000 finite, non-negative peaks in `[0,1]` per file on demand; source or algorithm changes automatically invalidate old peaks |
 | Playback | Chromium-compatible formats use Electron Audio directly; incompatible containers are converted on demand to fingerprinted temporary WAV files under an LRU limit |
 | Data and projects | SQLite v3 is the single source of truth for files, waveforms, and index state; files and indexes are isolated by `project_id` |
 | Dual indexes | CLAP encodes the original sound; filename, logical folder, tags, UCS category, and description use a separate text-metadata index |
@@ -49,6 +49,7 @@ The current source version is **v0.2.0 (prerelease)**. This release focuses on a
 | Index maintenance | Status, repair, and full rebuild operations; full rebuilds use a shadow collection and switch atomically only after validation |
 | AI assistant | Local and OpenAI-compatible LLMs are supported; if AI is unavailable, the original query is used for local search |
 | Privacy | No cloud telemetry; an external LLM/Embedding service receives text only after the user explicitly configures it |
+| Startup diagnostics | The main window appears only after the sandboxed preload handshake and backend audio-runtime check pass; a consistently styled startup window reports failures and writes persistent diagnostics |
 
 ***
 
@@ -56,9 +57,9 @@ The current source version is **v0.2.0 (prerelease)**. This release focuses on a
 
 ### Installation
 
-1. Download the installer for your platform from the [v0.2.0 Release](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.0).
+1. Download the installer for your platform from the [v0.2.1-beta.1 Release](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.1).
 2. On macOS, open the DMG and drag SoundBot to Applications. On Windows, run the EXE and complete the installer wizard.
-3. Import, waveforms, playback, tags, and keyword search work on first launch. For semantic audio search, download `models.zip` from the same Release and follow “Model installation and verification” below.
+3. The v0.2.1-beta.1 installer already contains the verified CLAP model, so semantic audio indexing works on first launch without separately downloading or placing `models.zip`.
 4. External LLM and text-Embedding providers are optional and contact the network only after you configure one in Settings.
 
 ### Quick start
@@ -66,14 +67,14 @@ The current source version is **v0.2.0 (prerelease)**. This release focuses on a
 1. Create or select a project, then use Import Folder or Import Files to add your sound library.
 2. Import jobs persist file records before generating waveforms and indexes; switching projects cannot redirect a running job.
 3. Click a sound card to preview it and use the main waveform to select a region. Keyword search works without a model.
-4. Install the CLAP model to enable semantic audio search. The index-status view can Repair missing items or perform a non-destructive Full rebuild.
+4. The installer bundles CLAP and enables semantic audio search. The index-status view can Repair missing items or perform a non-destructive Full rebuild.
 5. If the AI assistant is unavailable, the query automatically falls back to local dual-index and keyword search.
 
 ***
 
 ## 🖥️ Supported platforms
 
-The only official v0.2.0 build targets are:
+The only official v0.2.1-beta.1 build targets are:
 
 - Windows 10/11 x64;
 - macOS 14 or later on Apple Silicon arm64.
@@ -167,7 +168,7 @@ Import, repair, and rebuild jobs capture an immutable `project_id` when created.
 
 ## 🤖 LLM and text Embeddings
 
-The following LLM entries are enabled in v0.2.0:
+The following LLM entries are enabled in v0.2.1-beta.1:
 
 - LM Studio;
 - Ollama;
@@ -191,29 +192,30 @@ External text Embeddings receive metadata text only. They neither replace the CL
 
 ***
 
-## 📦 Model installation and verification
+## 📦 Bundled model and verification
 
-The CLAP model is not required to start the application, manage files, decode audio, render waveforms, play sounds, or use keyword search. Semantic audio indexing expects this layout:
+The v0.2.1-beta.1 Windows/macOS installers include the CLAP model required for semantic audio indexing. `config/model_bundle.json` is the single source for the model ID and immutable commit revision, and installed resources include a per-file SHA-256 manifest plus the full Apache-2.0 source and license notice:
 
 ```text
 models/
 ├── model-manifest.json
+├── CLAP_MODEL_NOTICE.txt
 └── clap/
     ├── config.json
     ├── preprocessor_config.json
     └── ...
 ```
 
-Download both `models.zip` and `models.zip.sha256` from the matching [GitHub Release](https://github.com/Huckrick/SoundBot/releases). The resource manager verifies the archive SHA-256, per-file SHA-256 values in the manifest, an immutable commit revision, extraction boundaries, and Zip Slip protections, then validates a staging directory before replacing the installed model atomically:
+Ordinary desktop users only install the application and do not need `models.zip`. A separately published `models.zip` and `models.zip.sha256` are exact-version resources for offline repair, builds, and source development only; never mix model resources from another application version. Reinstall the same-version installer first if an installed bundled resource is damaged. In a source checkout, the resource manager can fetch the exact release and verifies the archive SHA-256, per-file SHA-256 values, pinned revision, extraction boundaries, and Zip Slip protections before atomically replacing a validated staging directory:
 
 ```bash
-python scripts/download_manager.py download models --tag v0.2.0
+python scripts/download_manager.py download models --tag v0.2.1-beta.1
 python scripts/download_manager.py check
 ```
 
-In a source checkout, the default destination is the repository's `models/` directory. The desktop application uses `models/` inside its user-data directory. `SOUNDBOT_MODELS_PATH` may point to an absolute directory with the layout above. Do not use a mutable branch/tag as a release model revision or install an unknown bundle without `model-manifest.json` and its checksum asset.
+A source checkout defaults to the repository's `models/` directory. A packaged desktop application defaults to its read-only `resources/models/` copy, not a user-data model directory. For controlled repair, development, or testing, `SOUNDBOT_MODELS_PATH` may point to an absolute directory with the layout above. This explicit value has highest priority and is authoritative: even a missing or corrupt target does not silently fall back to the bundled model. Remove an incorrect override after use. Do not use a mutable branch/tag as a release revision or an unknown bundle without a manifest, per-file checksums, and the license notice.
 
-The backend loads CLAP only from a local directory and derives its engine fingerprint from the manifest revision and per-file SHA values; request paths never fall back to Hugging Face. After a missing model causes preload to fail, status polling detects a changed local package and retries. A successful load creates durable reconcile jobs for every project and backfills `pending`, `failed`, or `stale` audio vectors and default CLAP text vectors.
+The backend loads CLAP only from a verified local directory and derives its engine fingerprint from the manifest revision and per-file SHA values; request paths never fall back to Hugging Face. Builds and releases generate and validate the model tree first, copy that same tree into the final application, and repeat per-file hash verification there. A model-load failure never clears data. When status polling detects changed resources and loads them successfully, durable reconcile jobs backfill `pending`, `failed`, or `stale` audio vectors and default CLAP text vectors for every project.
 
 ***
 
@@ -246,7 +248,6 @@ SoundBot/
 ├── db/soundmind.db                         # SQLite v3 source of truth
 ├── db/soundmind.db.pre-v*-to-v3.bak       # one-time migration snapshot, if needed
 ├── chroma_projects/<project_id>/           # project-isolated Chroma collections
-├── models/                                 # optional CLAP model and manifest
 ├── logs/soundmind_YYYYMMDD.log             # backend log
 ├── temp/                                   # temporary clips and on-demand playback WAV files
 ├── ai_config.json                          # non-secret AI metadata configuration
@@ -254,7 +255,9 @@ SoundBot/
 └── secure_secrets.json                     # safeStorage ciphertext, not plaintext keys
 ```
 
-Tests and portable diagnostics can override the directory with `SOUNDBOT_USER_DATA_DIR`; `SOUNDBOT_MODELS_PATH` overrides the model directory separately. Do not edit SQLite, Chroma, or secure-storage files while the application is running.
+The Electron main process separately persists startup, preload, IPC, and frozen-backend output in the OS application-log directory. `soundbot-main.log` rotates to `.1` above 5 MiB, and common API-key and Bearer-token forms are redacted before writing. The diagnostics action opens the actual directory through the main process, so users do not need to guess an installation path.
+
+Tests and portable diagnostics can override the data directory with `SOUNDBOT_USER_DATA_DIR`. Installed models live in application resources and are not part of the user-data tree above; `SOUNDBOT_MODELS_PATH` is a separate authoritative model-directory override. Do not edit SQLite, Chroma, or secure-storage files while the application is running.
 
 ### Diagnostic sequence
 
@@ -263,8 +266,8 @@ If a file exists but has no waveform or search result:
 1. inspect project index status to identify whether `waveform`, `audio_vector`, or `text_vector` is pending/stale/failed;
 2. run Repair missing items first, then inspect job stage, progress, and last error;
 3. use Full rebuild only when the metric, model, or dimension changed, or reconciliation cannot recover the index;
-4. inspect that day's `logs/soundmind_YYYYMMDD.log` in the user-data directory;
-5. call `/api/v1/health` and `/api/v1/model/status` to distinguish backend startup from model availability;
+4. inspect the backend's `logs/soundmind_YYYYMMDD.log` and use the Electron diagnostics action to open `soundbot-main.log`; logs are for local diagnosis and should still be checked for paths and private content before sharing;
+5. call `/api/v1/health`, `/api/v1/runtime/capabilities`, and `/api/v1/model/status` to verify backend identity, required PyAV/FFmpeg decoding, and optional CLAP loading separately;
 6. on Windows, verify that security software did not quarantine `soundbot-backend.exe`. A system FFmpeg installation is not required.
 
 This repository does not accept diagnostic files, audio samples, databases, API keys, or private paths. Do not submit such material through any public or private GitHub channel.
@@ -300,7 +303,13 @@ npm start
 
 ## 🏗️ Native builds
 
-The unified build script verifies release metadata, installs/checks dependencies, freezes the backend, checks PyAV/FFmpeg/licenses, builds Electron, and validates the native backend inside the final package.
+The unified build script verifies release metadata, installs/checks dependencies, freezes the backend, checks PyAV/FFmpeg/licenses, validates the pinned CLAP revision and Apache-2.0 notice, builds Electron, and repeats native-backend and per-file model SHA-256 verification inside the final package.
+
+Before an official build, generate and fully verify the local model tree from `config/model_bundle.json`. This command accepts only the immutable revision in that configuration:
+
+```bash
+python scripts/download_models.py
+```
 
 Apple Silicon macOS:
 
@@ -323,16 +332,17 @@ This repository does not fabricate a Windows package on macOS or a macOS package
 `.github/workflows/build.yml` creates a prerelease only after all of these checks pass:
 
 - versions in `package.json`, `package-lock.json`, `backend/config.py`, the tag, and bilingual changelog are synchronized;
-- the model is pinned to an immutable commit revision and ships with a per-file manifest and `models.zip.sha256`;
+- one version-controlled model configuration pins the immutable commit revision; the build first generates and verifies its per-file manifest, Apache-2.0 notice, and `models.zip.sha256`, then embeds the same model tree in both platform applications;
 - macOS arm64 and Windows x64 are frozen and packaged on their respective native runners;
 - the frozen bundle contains the correct native backend, PyAV extensions, wheel-bundled FFmpeg libraries, and third-party license notices;
+- both final applications repeat model-ID, revision, license-notice, and manifest per-file hash checks; publishing is rejected if any of the five Release assets reaches 2 GiB;
 - Windows runs with a clean `PATH` and no system FFmpeg across WAV, MP3, FLAC, AIFF, AIF, OGG, M4A, AAC, and WMA, including paths with spaces, Chinese characters, `%`, `_`, `#`, `+`, and parentheses;
 - the same Windows smoke test checks exact 2,000-point waveforms, SQLite artifacts, CLAP, cosine Chroma collections, hybrid component scores, and the WMA-to-WAV playback fallback;
-- the backend inside `win-unpacked` starts again and passes a real waveform smoke test, and the NSIS installer passes archive-integrity verification;
-- the macOS DMG, packaged arm64 backend, and `app.asar` resource set pass integrity checks;
+- the backend inside `win-unpacked` starts again and passes a real waveform smoke test; CI then silently installs the actual NSIS package to a path containing spaces and Chinese characters, launches the installed Electron application, lets the production preload/IPC chain start its own frozen backend, proves the real file and folder native pickers appear, and verifies WAV/WMA imports, SQLite listing, three exact 2,000-point waveforms, WMA playback transcoding, bundled CLAP loading, dual indexes, and semantic search;
+- the macOS DMG, packaged arm64 backend, and `app.asar` resource set pass integrity checks, and the pinned CLAP model inside application resources loads successfully in offline mode;
 - any failed functional smoke test prevents the Release job from running.
 
-The Release workflow accepts only a pushed annotated `v*` version tag and has no manual-dispatch entry point. The tag must already exist and point to a commit reachable from the default branch. Every job is bound to that same tag commit, and the complete source and renderer contracts run again before packaging. The workflow first creates a draft Release, uploads the model archive and checksum, DMG, EXE, and unified `SHA256SUMS.txt`, compares remote names, sizes, SHA-256 digests, and upload states, and produces provenance attestations before publishing. It refuses to overwrite any existing Release or draft for that tag, so reruns cannot mix old and new assets. v0.2.0 remains a project-designated prerelease; later SemVer-suffixed versions use the prerelease channel, while stable versions use the full-release channel.
+The Release workflow accepts only a pushed annotated `v*` version tag and has no manual-dispatch entry point. The tag must already exist and point to a commit reachable from the default branch. Every job is bound to that same tag commit, and the complete source and renderer contracts run again before packaging. The workflow first creates a draft Release, uploads the model archive and checksum, DMG, EXE, and unified `SHA256SUMS.txt`, compares remote names, sizes, SHA-256 digests, and upload states, and produces provenance attestations before publishing. It refuses to overwrite any existing Release or draft for that tag, so reruns cannot mix old and new assets. The immutable v0.2.0 remains a historical prerelease; the current v0.2.1-beta.1 and later SemVer-suffixed versions use the prerelease channel, while stable versions use the full-release channel.
 
 Minimal release order: run `python scripts/bump_version.py --version X.Y.Z --write`, replace the changelog placeholder, and commit; wait for `Validate / Source contracts` on main to pass; then run `git tag -a vX.Y.Z -m "SoundBot vX.Y.Z"` and `git push origin vX.Y.Z`. Do not use a lightweight tag.
 
@@ -354,12 +364,13 @@ node --check main.js
 node --check preload.js
 node --check assets/i18n.js
 node tests/frontend/check_renderer_contract.js
+npx --no-install electron tests/frontend/check_electron_preload.js
 ```
 
 Release metadata and the PyInstaller environment:
 
 ```bash
-python tests/build/verify_release_metadata.py --expected-version 0.2.0
+python tests/build/verify_release_metadata.py --expected-version 0.2.1-beta.1
 python scripts/bump_version.py --version 0.2.1          # preview only
 python scripts/bump_version.py --version 0.2.1 --write  # atomically sync all version sources
 python scripts/test_pyinstaller.py
@@ -376,7 +387,8 @@ The backend listens on `127.0.0.1` only. Electron selects a free local port if t
 
 | Method and path | Purpose |
 | --- | --- |
-| `GET /api/v1/health` | Backend version, device, and model-loading state |
+| `GET /api/v1/health` | Backend version, device, model state, and required `audio_decoder_available`; status is `degraded` when decoding is unavailable |
+| `GET /api/v1/runtime/capabilities` | Path-free PyAV/FFmpeg runtime details, supported extensions, and optional semantic-search state |
 | `GET /api/v1/model/status` | CLAP preload status and availability |
 | `GET /api/v1/files?project_id=&limit=&cursor=` | Cursor-paginated metadata; default 200, maximum 500, no peaks |
 | `GET /api/v1/files/{file_id}/waveform?project_id=` | One file's waveform |
@@ -392,7 +404,7 @@ The backend listens on `127.0.0.1` only. Electron selects a free local port if t
 | `GET/POST /api/v1/ai/config` | Read redacted metadata or update in-process configuration |
 | `POST /api/v1/ai/chat` | AI search/chat with an explicit `project_id` |
 
-Folder imports must also use the project-explicit route; the old `POST /api/v1/import/async` remains in v0.2.0 only as a current-project compatibility adapter. The compatibility path `GET /api/waveform?path=...` likewise remains for one release cycle; new callers should use the file-UUID route. Structured errors use:
+Folder imports must also use the project-explicit route; since v0.2.0, the old `POST /api/v1/import/async` has remained only as a current-project compatibility adapter and is retained for one compatibility cycle. The compatibility path `GET /api/waveform?path=...` likewise remains for one release cycle; new callers should use the file-UUID route. Structured errors use:
 
 ```json
 {
@@ -407,7 +419,7 @@ Folder imports must also use the project-explicit route; the old `POST /api/v1/i
 
 ## ⚠️ Known limitations
 
-- v0.2.0 is a prerelease; packages do not yet promise production-grade code signing, notarization, or automatic updates.
+- v0.2.1-beta.1 is a prerelease; packages do not yet promise production-grade code signing, notarization, or automatic updates.
 - Only Windows x64 and macOS arm64 are supported. Linux and Intel Macs are outside the build, test, and support matrix.
 - The CLAP model is large, and first-time indexing or CPU inference may be slow. A single model worker serializes inference to avoid resource contention.
 - When a model or external service is missing, affected vectors remain pending/failed; management, decoding, waveforms, playback, and keyword search remain usable.

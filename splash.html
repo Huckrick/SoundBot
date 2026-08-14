@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SoundBot</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg-primary: #0a0a0a;
+      --bg-secondary: #141414;
+      --border-color: #262626;
+      --text-primary: #e5e5e5;
+      --text-secondary: #a3a3a3;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      width: 400px;
+      height: 240px;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      color: var(--text-primary);
+      background: var(--bg-primary);
+      user-select: none;
+      -webkit-app-region: drag;
+    }
+
+    main {
+      width: calc(100% - 24px);
+      padding: 28px;
+      text-align: center;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+    }
+
+    .brand {
+      font-size: 22px;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+    }
+
+    .status {
+      margin-top: 14px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .progress {
+      min-height: 18px;
+      margin-top: 6px;
+      color: var(--text-secondary);
+      font-size: 12px;
+      line-height: 18px;
+    }
+
+    .indicator {
+      width: 112px;
+      height: 3px;
+      margin: 22px auto 0;
+      overflow: hidden;
+      background: var(--border-color);
+      border-radius: 999px;
+    }
+
+    .indicator::after {
+      content: "";
+      display: block;
+      width: 42%;
+      height: 100%;
+      background: var(--text-primary);
+      border-radius: inherit;
+      animation: loading 1.1s ease-in-out infinite;
+    }
+
+    body.error .indicator::after {
+      width: 100%;
+      background: #ef4444;
+      animation: none;
+    }
+
+    .actions {
+      display: none;
+      margin: 18px auto 0;
+      gap: 8px;
+      justify-content: center;
+      -webkit-app-region: no-drag;
+    }
+
+    .action-button {
+      padding: 7px 18px;
+      color: var(--text-primary);
+      background: transparent;
+      border: 1px solid var(--border-color);
+      border-radius: 7px;
+      font: inherit;
+      font-size: 12px;
+      text-decoration: none;
+      cursor: pointer;
+      -webkit-app-region: no-drag;
+    }
+
+    .action-button:hover { background: rgba(255, 255, 255, 0.06); }
+    body.error .actions { display: flex; }
+
+    @keyframes loading {
+      from { transform: translateX(-110%); }
+      to { transform: translateX(350%); }
+    }
+  </style>
+</head>
+<body>
+  <main role="status" aria-live="polite">
+    <div class="brand">SoundBot</div>
+    <div class="status" id="status">正在启动服务…</div>
+    <div class="progress" id="progress">初始化中</div>
+    <div class="indicator" aria-hidden="true"></div>
+    <div class="actions">
+      <a class="action-button" href="soundbot-action://open-logs">打开日志</a>
+      <button class="action-button" id="closeButton" type="button">退出应用</button>
+    </div>
+  </main>
+  <script>
+    window.setSoundBotSplashStatus = ({ status, progress, isError }) => {
+      document.getElementById('status').textContent = status;
+      document.getElementById('progress').textContent = progress;
+      document.body.classList.toggle('error', Boolean(isError));
+    };
+    document.getElementById('closeButton').addEventListener('click', () => window.close());
+  </script>
+</body>
+</html>

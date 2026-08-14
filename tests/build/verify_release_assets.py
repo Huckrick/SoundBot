@@ -12,6 +12,7 @@ from pathlib import Path
 
 REQUIRED_EXACT = {"models.zip", "models.zip.sha256", "SHA256SUMS.txt"}
 REQUIRED_SUFFIX_COUNTS = {".dmg": 1, ".exe": 1}
+MAX_RELEASE_ASSET_BYTES = 2 * 1024 * 1024 * 1024
 WINDOWS_INSTALLER_NAME = re.compile(
     r"^SoundBot-Setup-(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)"
     r"(?:-[0-9A-Za-z.-]+)?\.exe$"
@@ -47,6 +48,16 @@ def local_inventory(directory: Path) -> dict[str, dict[str, object]]:
     empty = [path.name for path in files if path.stat().st_size <= 0]
     if empty:
         raise ValueError(f"empty release assets: {empty}")
+    oversized = [
+        path.name
+        for path in files
+        if path.stat().st_size >= MAX_RELEASE_ASSET_BYTES
+    ]
+    if oversized:
+        raise ValueError(
+            "release assets must each remain below 2 GiB: "
+            f"{sorted(oversized)}"
+        )
     return {
         path.name: {
             "size": path.stat().st_size,
@@ -102,10 +113,15 @@ def verify_release_assets(directory: Path, remote_json: Path) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", required=True, type=Path)
-    parser.add_argument("--remote-json", required=True, type=Path)
+    parser.add_argument("--remote-json", type=Path)
     args = parser.parse_args()
-    verify_release_assets(args.directory.resolve(), args.remote_json.resolve())
-    print("[OK] draft GitHub Release names, sizes, SHA-256 digests, and states match")
+    directory = args.directory.resolve()
+    if args.remote_json is None:
+        local_inventory(directory)
+        print("[OK] local release asset names, sizes, and SHA-256 digests are valid")
+    else:
+        verify_release_assets(directory, args.remote_json.resolve())
+        print("[OK] draft GitHub Release names, sizes, SHA-256 digests, and states match")
     return 0
 
 

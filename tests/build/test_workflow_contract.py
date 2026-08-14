@@ -46,8 +46,18 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("$asarEntriesRaw = & npx --no-install asar list", self.text)
         self.assertIn("-replace '\\\\', '/'", self.text)
         self.assertIn(
-            "@('main.js', 'preload.js', 'index.html', 'assets/i18n.js')",
+            "@('main.js', 'preload.js', 'index.html', 'splash.html', 'assets/i18n.js', 'config/audio_capabilities.json')",
             self.text,
+        )
+
+    def test_windows_executes_real_sandboxed_preload_smoke(self) -> None:
+        windows_job = self.text.split("  build-windows:", 1)[1].split(
+            "  create-release:", 1
+        )[0]
+        self.assertIn("Test sandboxed Electron preload bridge", windows_job)
+        self.assertIn(
+            "npx --no-install electron tests/frontend/check_electron_preload.js",
+            windows_job,
         )
 
     def test_every_job_checks_out_validated_release_source(self) -> None:
@@ -71,16 +81,23 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn('$env:ENABLE_MODEL_PRELOAD = "true"', self.text)
         self.assertIn("CLAP model did not become ready", self.text)
         self.assertIn("check_frozen_audio_matrix.py", self.text)
-        self.assertIn("verify_model_manifest", self.text)
+        self.assertIn("verify_packaged_models", self.text)
         self.assertIn('p["version"] == sys.argv[2].removeprefix("v")', self.text)
         self.assertIn("$resp.version -eq ($env:RELEASE_TAG).TrimStart('v')", self.text)
         self.assertIn("soundbot-models-intentionally-missing", self.text)
+        self.assertIn("needs: [validate-release, build-models]", self.text)
+        self.assertEqual(self.text.count("name: models-package"), 3)
+        self.assertGreaterEqual(self.text.count("verify_packaged_models"), 2)
 
     def test_release_is_draft_verified_and_channel_aware(self) -> None:
         self.assertIn("cancel-in-progress: false", self.text)
         self.assertIn("--draft", self.text)
         self.assertIn('"v0.2.0"', self.text)
         self.assertIn("verify_release_assets.py", self.text)
+        self.assertIn(
+            "python tests/build/verify_release_assets.py --directory release-assets",
+            self.text,
+        )
         self.assertIn("SHA256SUMS.txt", self.text)
         self.assertIn("actions/attest@", self.text)
         self.assertIn("CREATE_ARGS+=(--prerelease)", self.text)
@@ -102,6 +119,25 @@ class WorkflowContractTests(unittest.TestCase):
             self.text,
         )
         self.assertNotIn("cp artifacts/soundbot-windows/*.exe release-assets/", self.text)
+
+    def test_windows_smokes_the_actual_nsis_installed_application(self) -> None:
+        self.assertIn("Install NSIS and smoke-test installed Electron", self.text)
+        self.assertIn("/S /currentuser /D=$installDir", self.text)
+        self.assertIn("check_installed_electron.py", self.text)
+        self.assertIn("--require-models", self.text)
+        self.assertIn("soundbot-installed-electron-smoke", self.text)
+
+    def test_packaged_macos_bundle_loads_its_embedded_model_offline(self) -> None:
+        mac_job = self.text.split("  build-macos:", 1)[1].split(
+            "  build-windows:", 1
+        )[0]
+        self.assertIn("Smoke packaged macOS bundled CLAP", mac_job)
+        self.assertIn('MODELS_PATH="$APP_PATH/Contents/Resources/models"', mac_job)
+        self.assertIn("verify_packaged_models(Path(sys.argv[1]))", mac_job)
+        self.assertIn("ENABLE_MODEL_PRELOAD=true", mac_job)
+        self.assertIn("HF_HUB_OFFLINE=1", mac_job)
+        self.assertIn("TRANSFORMERS_OFFLINE=1", mac_job)
+        self.assertIn("MODEL_READY=true", mac_job)
 
 
 class ValidationWorkflowContractTests(unittest.TestCase):

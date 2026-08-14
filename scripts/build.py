@@ -23,6 +23,7 @@ import sys
 import subprocess
 import shutil
 import argparse
+import json
 import platform
 import struct
 from pathlib import Path
@@ -40,6 +41,8 @@ BACKEND_DIR = PROJECT_ROOT / "backend"
 DIST_DIR = PROJECT_ROOT / "dist"
 ELECTRON_DIST_DIR = PROJECT_ROOT / "dist-electron"
 PYINSTALLER_VERSION = "6.16.0"
+PACKAGED_MODELS_DIR = PROJECT_ROOT / "models"
+MODEL_BUNDLE_CONFIG = PROJECT_ROOT / "config" / "model_bundle.json"
 
 NPM_MIRROR_ENV_VARS = (
     "ELECTRON_MIRROR",
@@ -153,6 +156,63 @@ def verify_release_metadata(release_tag: Optional[str] = None) -> None:
     if release_tag:
         command.extend(["--tag", release_tag])
     run_command(command)
+
+
+def verify_packaged_models(models_dir: Path = PACKAGED_MODELS_DIR) -> dict:
+    """Verify the exact CLAP tree before electron-builder can copy it.
+
+    Official installers are deliberately self-contained.  Reusing the same
+    strict verifier as the repair archive prevents a partial developer model
+    cache, mutable Hub checkout, or stale weights from entering a release.
+    """
+    scripts_dir = str(PROJECT_ROOT / "scripts")
+    build_helpers_dir = str(PROJECT_ROOT / "tests" / "build")
+    inserted_paths = [
+        candidate
+        for candidate in (scripts_dir, build_helpers_dir)
+        if candidate not in sys.path
+    ]
+    for candidate in reversed(inserted_paths):
+        sys.path.insert(0, candidate)
+    try:
+        from download_manager import verify_model_manifest
+        from create_model_manifest import (
+            load_bundle_config,
+            verify_manifest_against_config,
+        )
+
+        manifest = verify_model_manifest(models_dir)
+        strict_manifest = verify_manifest_against_config(
+            Path(models_dir), load_bundle_config(MODEL_BUNDLE_CONFIG)
+        )
+    except Exception as exc:
+        raise RuntimeError(f"待打包 CLAP 模型严格校验失败: {exc}") from exc
+    finally:
+        for candidate in inserted_paths:
+            sys.path.remove(candidate)
+
+    if manifest != strict_manifest:
+        raise RuntimeError("模型包两组独立校验结果不一致")
+
+    expected_model_id = strict_manifest["model_id"]
+    expected_revision = strict_manifest["revision"]
+    actual_revision = str(manifest.get("revision", "")).strip().lower()
+    if manifest.get("model_id") != expected_model_id:
+        raise RuntimeError(
+            "待打包 CLAP model_id 与固定配置不一致："
+            f"期望 {expected_model_id!r}，实际 {manifest.get('model_id')!r}"
+        )
+    if actual_revision != expected_revision:
+        raise RuntimeError(
+            "待打包 CLAP revision 与发布门禁不一致："
+            f"期望 {expected_revision}，实际 {actual_revision or '<missing>'}"
+        )
+    log(
+        f"模型包校验通过: {manifest['model_id']} @ {actual_revision} "
+        f"({len(manifest['files'])} files)",
+        "SUCCESS",
+    )
+    return manifest
 
 
 def log(message: str, level: str = "INFO"):
@@ -361,6 +421,7 @@ def build_electron(target_platform: str = None, install_dependencies: bool = Tru
         install_npm_deps()
 
     verify_native_backend_bundle(DIST_DIR / "backend" / "soundbot-backend")
+    verify_packaged_models()
 
     # 根据平台选择构建命令（直接调用 electron-builder，避免 npm 脚本循环）
     # 使用 capture=False 实时输出，避免 Windows 编码问题和大缓冲区超时
@@ -447,8 +508,15 @@ def verify_build(target_platform: str = None):
     
     log(f"总大小: {total_size:.1f} MB")
     
-    if total_size > 2000:
-        log("警告: 总大小超过 2GB，可能无法上传到 GitHub Releases", "WARNING")
+    oversized = [
+        artifact for artifact in artifacts
+        if artifact.stat().st_size >= 2 * 1024 * 1024 * 1024
+    ]
+    if oversized:
+        raise RuntimeError(
+            "单个发布产物达到 2 GiB，拒绝生成可能损坏或无法上传的安装包: "
+            + ", ".join(item.name for item in oversized)
+        )
 
     if target_platform == "macos":
         app_paths = sorted(electron_dist.glob("mac*/SoundBot.app"))
@@ -460,6 +528,7 @@ def verify_build(target_platform: str = None):
         packaged_backend = (
             app_paths[0] / "Contents" / "Resources" / "backend" / "soundbot-backend"
         )
+        packaged_models = app_paths[0] / "Contents" / "Resources" / "models"
     else:
         unpacked_paths = sorted(path for path in electron_dist.glob("*unpacked") if path.is_dir())
         if len(unpacked_paths) != 1:
@@ -468,8 +537,10 @@ def verify_build(target_platform: str = None):
                 f"实际找到 {len(unpacked_paths)} 个"
             )
         packaged_backend = unpacked_paths[0] / "resources" / "backend" / "soundbot-backend"
+        packaged_models = unpacked_paths[0] / "resources" / "models"
     verify_native_backend_bundle(packaged_backend)
     verify_frozen_runtime_assets(packaged_backend, target_platform)
+    verify_packaged_models(packaged_models)
 
 
 def main():

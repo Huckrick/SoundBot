@@ -22,6 +22,43 @@ async function main() {
   assert(!/playbackWebSocket|connectPlaybackWebSocket|disconnectPlaybackWebSocket/.test(indexHtml), 'backend playback WebSocket remains');
   assert(!/readAudioFile|read-audio-file/.test(indexHtml + mainJs + preloadJs), 'whole-file IPC reader remains');
   assert(!/requestBackendBinary|audio-stream/.test(mainJs + preloadJs), 'unused whole-file binary playback IPC remains');
+  assert.deepStrictEqual(
+    [...preloadJs.matchAll(/require\((['"])([^'"]+)\1\)/g)].map(match => match[2]),
+    ['electron'],
+    'sandboxed preload imports a local or unsupported CommonJS module'
+  );
+  assert(mainJs.includes('sandbox: true'), 'renderer sandbox is not explicit');
+  assert(mainJs.includes("webContents.on('preload-error'"), 'preload failures are not observed');
+  assert(mainJs.includes("channel === 'renderer-bridge-ready'"), 'preload bridge handshake is not verified');
+  assert(preloadJs.includes("ipcRenderer.send('renderer-bridge-ready'"), 'preload bridge handshake is not sent');
+  assert(mainJs.includes('windowsHide: true'), 'Windows backend console window is not hidden');
+  assert(mainJs.includes("app.setAppLogsPath()"), 'main-process diagnostics are not persisted');
+  assert(mainJs.includes("ipcMain.handle('open-log-directory'"), 'log-directory recovery action is missing');
+  assert(preloadJs.includes("openLogs: () => ipcRenderer.invoke('open-log-directory')"), 'renderer cannot open diagnostics');
+  const redactorMatch = mainJs.match(/function redactDiagnosticText\(value\) \{([\s\S]*?)\n\}/);
+  assert(redactorMatch, 'diagnostic credential redactor is missing');
+  const redactDiagnosticText = vm.runInNewContext(`(function(value) {${redactorMatch[1]}\n})`);
+  for (const sample of [
+    '{"api_key":"secret-value-123"}',
+    "api-key=secret-value-123",
+    '{"Authorization":"Bearer secret-value-123"}',
+    'https://example.test?q=1&' + 'access_token=secret-value-123&next=2'
+  ]) {
+    assert(!redactDiagnosticText(sample).includes('secret-value-123'), 'diagnostic log leaks a credential');
+  }
+  assert(mainJs.includes("payload?.audio_decoder_available === false"), 'startup does not reject a missing audio runtime');
+  assert(mainJs.includes('BrowserWindow.fromWebContents(event.sender)'), 'native dialogs are not owned by their requesting window');
+  assert(mainJs.includes('nativeOpenDialogActive'), 'native open dialogs are not serialized');
+  assert(mainJs.includes('if (owner.isMinimized()) owner.restore()'), 'native dialog owner is not restored before opening');
+  assert(mainJs.includes("loadFile(path.join(__dirname, 'splash.html'))"), 'splash is not loaded from the packaged local page');
+  assert(mainJs.includes('pendingSplashState') && mainJs.includes('applySplashState()'), 'early splash state is not queued until load');
+  assert(indexHtml.includes('if (!window.electronAPI?.fileImport)'), 'file/folder selection does not check the desktop bridge');
+  assert(indexHtml.includes('if (!window.electronAPI?.backendAPI?.importFolderAsync)'), 'folder import backend check is missing');
+  assert(
+    indexHtml.indexOf('const folderResult = await window.electronAPI.fileImport.selectFolder') <
+      indexHtml.indexOf("if (!window.electronAPI?.backendAPI?.importFolderAsync)"),
+    'folder selection is incorrectly blocked on backend readiness'
+  );
 
   for (const name of moduleNames) {
     const scriptPath = `./assets/renderer/${name}.js`;
@@ -59,7 +96,9 @@ async function main() {
   assert(mainJs.includes("case 'import-files':"), 'main-process import-files proxy is missing');
   assert(preloadJs.includes('importFiles: (filePaths'), 'preload import-files API is missing');
   assert(mainJs.includes('/projects/${encodeURIComponent(requireProjectId(data.projectId))}/imports'), 'project-scoped import proxy is missing');
-  assert(indexHtml.includes('currentProject?.id\n                            );'), 'folder import does not pass the active project');
+  assert(indexHtml.includes('const importProjectId = currentProject?.id;'), 'imports do not capture an explicit active project');
+  assert(indexHtml.includes('monitorImportJobWithoutWebSocket(currentScanTaskId)'), 'imports have no job-polling fallback');
+  assert(!indexHtml.includes('handleBrowserFiles'), 'browser-only import fallback still masks a failed Electron bridge');
   assert(!moduleSources.search.includes("options.projectId || 'default'"), 'renderer search still silently falls back to the default project');
   assert(!/top_k\s*:\s*10000|searchAudio\([^\n]*10000/.test(indexHtml + mainJs + preloadJs), 'legacy top_k=10000 remains');
   assert(mainJs.includes("case 'waveform-by-id':"), 'main-process waveform-by-id proxy is missing');
@@ -84,6 +123,10 @@ async function main() {
   assert(backendVersionMatch, 'backend APP_VERSION is missing');
   assert.strictEqual(packageJson.version, backendVersionMatch[1], 'frontend/backend versions drifted');
   assert(packageJson.build.files.includes('assets/**/*'), 'renderer modules are not included in packaging');
+  assert(packageJson.build.files.includes('splash.html'), 'the app-styled splash page is not packaged');
+  const splashHtml = read('splash.html');
+  assert(splashHtml.includes('id="closeButton"'), 'fatal splash state has no exit control');
+  assert(splashHtml.includes('window.close()'), 'fatal splash exit control is not wired');
   assert(!packageJson.build.files.some(entry => /wavesurfer/i.test(entry) && !entry.startsWith('!')), 'WaveSurfer is still packaged');
 
   const calls = [];

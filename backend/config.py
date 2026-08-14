@@ -88,7 +88,11 @@ def find_models_dir() -> Path:
     # 1. 环境变量（最高优先级）
     env_path = os.getenv('SOUNDBOT_MODELS_PATH')
     if env_path:
-        possible_paths.append(Path(env_path))
+        # An explicit override is authoritative even when it is missing. This
+        # makes configuration errors observable and allows release tests to
+        # prove the application degrades cleanly without silently finding a
+        # different bundled/user model.
+        return Path(env_path).expanduser()
     
     # 2. 可执行文件同级目录
     possible_paths.append(exe_dir / 'models')
@@ -155,7 +159,7 @@ def get_chroma_db_path(project_id: str = "default") -> Path:
 # ==================== 项目基础配置 ====================
 
 APP_NAME = "SoundBot"
-APP_VERSION = "0.2.0"
+APP_VERSION = "0.2.1-beta.1"
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
 # ==================== 服务器配置 ====================
@@ -206,7 +210,7 @@ def find_models_dir_runtime() -> Path:
     # 1. 环境变量（最高优先级）- 每次都重新读取
     env_path = os.getenv('SOUNDBOT_MODELS_PATH')
     if env_path:
-        possible_paths.append(Path(env_path))
+        return Path(env_path).expanduser()
     
     # 2. 可执行文件同级目录
     possible_paths.append(exe_dir / 'models')

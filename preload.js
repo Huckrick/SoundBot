@@ -16,11 +16,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// Electron 20+ sandboxes renderer processes by default. Sandboxed preload
+// scripts only have a small, polyfilled `require` surface, so this file must
+// stay self-contained and only import Electron's renderer APIs. In
+// particular, requiring local JSON/CommonJS files here prevents the entire
+// contextBridge from being installed in packaged builds.
 const { contextBridge, ipcRenderer } = require('electron');
-const audioCapabilityManifest = require('./config/audio_capabilities.json');
-const supportedAudioExtensions = Object.freeze(
-  Object.keys(audioCapabilityManifest.formats || {})
-);
 
 const BACKEND_ERROR_SENTINEL = '__soundbotBackendError';
 
@@ -62,15 +63,6 @@ async function invokeAIConfig(action, payload) {
   return result;
 }
 
-function deepCloneValue(obj) {
-  if (obj === null || typeof obj !== 'object') return obj;
-  if (obj instanceof Date) return new Date(obj.getTime());
-  if (Array.isArray(obj)) return obj.map(deepCloneValue);
-  const cloned = {};
-  for (const key of Object.keys(obj)) cloned[key] = deepCloneValue(obj[key]);
-  return cloned;
-}
-
 // 安全地暴露 API 给前端
 contextBridge.exposeInMainWorld('electronAPI', {
   // 窗口控制
@@ -83,7 +75,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // 文件导入（专门为导入按钮设计）
   fileImport: {
-    supportedExtensions: supportedAudioExtensions,
+    // The main process owns the canonical capability manifest. Returning it
+    // over IPC avoids duplicating the table or loading local modules here.
+    getCapabilities: () => ipcRenderer.invoke('audio-capabilities'),
     // 打开音频文件选择对话框
     selectAudioFiles: (options = {}) => ipcRenderer.invoke('file-import', 'select-audio', options),
     // 打开文件夹选择对话框
@@ -221,7 +215,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   backendStatus: {
-    waitUntilReady: (timeoutMs = 60000) => ipcRenderer.invoke('wait-backend-ready', timeoutMs)
+    waitUntilReady: (timeoutMs = 60000) => ipcRenderer.invoke('wait-backend-ready', timeoutMs),
+    openLogs: () => ipcRenderer.invoke('open-log-directory')
   },
 
   runtime: {
@@ -244,89 +239,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // contracts were removed in v0.2.0.
 });
 
-// 暴露一些常用的 Node.js 功能（安全版本）
-contextBridge.exposeInMainWorld('nodeAPI', {
-  path: {
-    basename: (path) => require('path').basename(path),
-    dirname: (path) => require('path').dirname(path),
-    extname: (path) => require('path').extname(path),
-    join: (...paths) => require('path').join(...paths)
-  },
-  fs: {
-    readFile: (path, encoding) => {
-      return new Promise((resolve, reject) => {
-        require('fs').readFile(path, encoding, (err, data) => {
-          if (err) reject(err);
-          else resolve(data);
-        });
-      });
-    },
-    exists: (path) => {
-      return new Promise((resolve) => {
-        require('fs').access(path, (err) => {
-          resolve(!err);
-        });
-      });
-    }
-  },
-  os: {
-    homedir: () => require('os').homedir(),
-    tmpdir: () => require('os').tmpdir()
-  }
-});
-
-// 为前端提供一些工具函数
-contextBridge.exposeInMainWorld('utils', {
-  // 深拷贝对象
-  deepClone: deepCloneValue,
-
-  // 防抖函数
-  debounce: (func, wait) => {
-    let timeout;
-    return function executedFunction(...args) {
-      const later = () => {
-        clearTimeout(timeout);
-        func(...args);
-      };
-      clearTimeout(timeout);
-      timeout = setTimeout(later, wait);
-    };
-  },
-
-  // 节流函数
-  throttle: (func, limit) => {
-    let inThrottle;
-    return function(...args) {
-      if (!inThrottle) {
-        func.apply(this, args);
-        inThrottle = true;
-        setTimeout(() => inThrottle = false, limit);
-      }
-    };
-  },
-
-  // 格式化文件大小
-  formatFileSize: (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  },
-
-  // 格式化时间
-  formatTime: (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  }
-});
-
-// 控制台日志（仅在开发模式下）
-if (process.env.NODE_ENV === 'development') {
-  contextBridge.exposeInMainWorld('debug', {
-    log: (...args) => console.log('[Electron]', ...args),
-    warn: (...args) => console.warn('[Electron]', ...args),
-    error: (...args) => console.error('[Electron]', ...args)
-  });
-}
+// Main uses this one-way handshake as a packaged-runtime assertion that the
+// whole bridge was installed. A syntax-only check cannot catch preload sandbox
+// violations.
+ipcRenderer.send('renderer-bridge-ready', { version: 1 });

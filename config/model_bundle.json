@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "model_id": "laion/larger_clap_general",
+  "revision": "ada0c23a36c4e8582805bb38fec3905903f18b41",
+  "license": "Apache-2.0",
+  "source_url": "https://huggingface.co/laion/larger_clap_general",
+  "notice_file": "tests/build/licenses/CLAP_MODEL_NOTICE.txt"
+}

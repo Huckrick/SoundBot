@@ -20,7 +20,7 @@ import os
 from pathlib import Path
 import tempfile
 import threading
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, Mapping, Optional
 
 import numpy as np
 
@@ -184,6 +184,49 @@ class AudioService:
     def requires_playback_transcode(path: os.PathLike[str] | str) -> bool:
         capability = AUDIO_FORMAT_CAPABILITIES.get(Path(path).suffix.lower())
         return bool(capability and capability['requires_playback_transcode'])
+
+    @staticmethod
+    def runtime_status() -> Dict[str, Any]:
+        """Return a path-free snapshot of the bundled decoder runtime.
+
+        Importing PyAV loads its wheel-bundled FFmpeg libraries.  A missing or
+        quarantined DLL therefore shows up here before an import job is
+        accepted, instead of being mistaken for a healthy backend process.
+        Exception text is deliberately excluded because native-loader errors
+        can contain a user's installation path.
+        """
+        if _av is None:
+            return {
+                'available': False,
+                'required': True,
+                'engine': 'pyav',
+                'version': None,
+                'ffmpeg_libraries': {},
+                'error_code': 'audio_decoder_unavailable',
+                'error_type': type(
+                    _AV_IMPORT_ERROR or ImportError('PyAV unavailable')
+                ).__name__,
+            }
+
+        versions: Dict[str, str] = {}
+        raw_versions = getattr(_av, 'library_versions', {}) or {}
+        if isinstance(raw_versions, Mapping):
+            for name, value in sorted(raw_versions.items(), key=lambda item: str(item[0])):
+                if isinstance(value, (tuple, list)):
+                    rendered = '.'.join(str(part) for part in value)
+                else:
+                    rendered = str(value)
+                versions[str(name)] = rendered
+
+        return {
+            'available': True,
+            'required': True,
+            'engine': 'pyav',
+            'version': str(getattr(_av, '__version__', '') or '') or None,
+            'ffmpeg_libraries': versions,
+            'error_code': None,
+            'error_type': None,
+        }
 
     def fingerprint(self, path: os.PathLike[str] | str) -> FileFingerprint:
         source = self._validate_source(path)
