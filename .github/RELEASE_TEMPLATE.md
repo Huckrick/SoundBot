@@ -1,21 +1,21 @@
-# SoundBot v0.2.1-beta.2 — Release notes and verification / 发布说明与验证
+# SoundBot v0.2.1-beta.3 — Release notes and verification / 发布说明与验证
 
 > Release publishing starts only when an existing annotated `v*` tag is pushed, and its notes are generated automatically from the matching section of `CHANGELOG.md`. This file is a bilingual human-verification and incident-recovery reference, not an alternate manual publishing path; do not mark a gate as passed without its CI evidence. / 只有推送既有的 annotated `v*` tag 才会启动发布，发布说明会从 `CHANGELOG.md` 对应版本自动生成。本文件仅是双语人工核验与故障恢复参考，不是备用的手动发布入口；没有 CI 证据时不要把门禁标为已通过。
 
 **Status / 状态:** Prerelease / 预发布<br>
-**Version / 版本:** 0.2.1-beta.2<br>
+**Version / 版本:** 0.2.1-beta.3<br>
 **License / 许可:** GNU GPL v3 or later / GNU GPL v3 或更高版本
 
 ## Downloads / 下载
 
 | Target / 目标 | Release asset / 发布文件 | Support / 支持状态 |
 | --- | --- | --- |
-| Windows 10/11 x64 | `SoundBot-Setup-0.2.1-beta.2.exe` | Official target / 正式目标 |
-| macOS 14+ Apple Silicon arm64 | `SoundBot-0.2.1-beta.2*.dmg` | Official target / 正式目标 |
+| Windows 10/11 x64 | `SoundBot-Setup-0.2.1-beta.3.exe` | Official target / 正式目标 |
+| macOS 14+ Apple Silicon arm64 | `SoundBot-0.2.1-beta.3*.dmg` | Official target / 正式目标 |
 | CLAP repair/development bundle / CLAP 修复与开发资源 | `models.zip` + `models.zip.sha256` | Exact-version recovery and source-build asset; already embedded in both installers / 同版本修复与源码构建资源；两个安装包均已内置 |
 | Release integrity / 发布完整性 | `models.zip.sha256` + `SHA256SUMS.txt` + GitHub attestations | The checksum files verify the model archive, DMG, and EXE; attestations cover all five assets / 校验文件验证模型包、DMG 与 EXE，证明覆盖全部五个资产 |
 
-Linux and Intel macOS are not built, tested, or supported in v0.2.1-beta.2. Do not publish an artifact for those targets or relabel a foreign native build. / v0.2.1-beta.2 不构建、不测试也不支持 Linux 和 Intel macOS。不得为这些目标发布文件，也不得把其他平台的原生构建改名冒充。
+Linux and Intel macOS are not built, tested, or supported in v0.2.1-beta.3. Do not publish an artifact for those targets or relabel a foreign native build. / v0.2.1-beta.3 不构建、不测试也不支持 Linux 和 Intel macOS。不得为这些目标发布文件，也不得把其他平台的原生构建改名冒充。
 
 ## Highlights / 重点变化
 
@@ -31,7 +31,7 @@ Linux and Intel macOS are not built, tested, or supported in v0.2.1-beta.2. Do n
 - The sandboxed preload now imports only Electron-supported APIs and obtains shared capabilities through IPC, restoring native file/folder import and waveform access in the installed Windows application. / 沙箱化 preload 现在只导入 Electron 支持的 API，并通过 IPC 获取共享能力，恢复 Windows 安装版的原生文件/文件夹导入与波形访问。
 - Both installers include the pinned CLAP model, per-file manifest, and Apache-2.0 notice; a normal user installs one package and does not separately download model files. / 两个平台安装包均包含固定 CLAP 模型、逐文件 manifest 与 Apache-2.0 说明；普通用户只需安装一个软件包，无需另行下载模型文件。
 
-See the synchronized [Chinese README](https://github.com/Huckrick/SoundBot/blob/v0.2.1-beta.2/README.md), [English README](https://github.com/Huckrick/SoundBot/blob/v0.2.1-beta.2/README.en.md), and [changelog](https://github.com/Huckrick/SoundBot/blob/v0.2.1-beta.2/CHANGELOG.md) for architecture, APIs, data locations, diagnostics, privacy boundaries, and known limitations. / 架构、API、数据位置、诊断、隐私边界和已知限制请参阅同步的[中文 README](https://github.com/Huckrick/SoundBot/blob/v0.2.1-beta.2/README.md)、[英文 README](https://github.com/Huckrick/SoundBot/blob/v0.2.1-beta.2/README.en.md)与[更新日志](https://github.com/Huckrick/SoundBot/blob/v0.2.1-beta.2/CHANGELOG.md)。
+See the synchronized [Chinese README](https://github.com/Huckrick/SoundBot/blob/v0.2.1-beta.3/README.md), [English README](https://github.com/Huckrick/SoundBot/blob/v0.2.1-beta.3/README.en.md), and [changelog](https://github.com/Huckrick/SoundBot/blob/v0.2.1-beta.3/CHANGELOG.md) for architecture, APIs, data locations, diagnostics, privacy boundaries, and known limitations. / 架构、API、数据位置、诊断、隐私边界和已知限制请参阅同步的[中文 README](https://github.com/Huckrick/SoundBot/blob/v0.2.1-beta.3/README.md)、[英文 README](https://github.com/Huckrick/SoundBot/blob/v0.2.1-beta.3/README.en.md)与[更新日志](https://github.com/Huckrick/SoundBot/blob/v0.2.1-beta.3/CHANGELOG.md)。
 
 ## Before upgrading / 升级前
 
@@ -73,7 +73,7 @@ Configuration reads expose only `has_api_key`. If OS secure storage is unavailab
 
 Leave every item unchecked in the template. The native CI job is the evidence source. There is no manual-dispatch release path: recovery must fix the source and push a valid annotated tag through the same workflow, never bypass failed gates with a manual asset upload. Release creation must depend on all jobs and must not run after any failed smoke test. / 模板中的每项默认保持未勾选，原生 CI 作业才是证据来源。发布不存在手动触发入口：故障恢复必须修复源码并通过同一工作流推送有效 annotated tag，绝不能以手工上传资产绕过失败门禁。Release 创建必须依赖全部作业，任一 smoke test 失败后都不得运行。
 
-- [ ] Version `0.2.1-beta.2` matches `package.json`, `package-lock.json`, `backend/config.py`, tag `v0.2.1-beta.2`, both READMEs, and the bilingual changelog. / 版本 `0.2.1-beta.2` 与 `package.json`、`package-lock.json`、`backend/config.py`、tag `v0.2.1-beta.2`、两份 README 和双语 changelog 一致。
+- [ ] Version `0.2.1-beta.3` matches `package.json`, `package-lock.json`, `backend/config.py`, tag `v0.2.1-beta.3`, both READMEs, and the bilingual changelog. / 版本 `0.2.1-beta.3` 与 `package.json`、`package-lock.json`、`backend/config.py`、tag `v0.2.1-beta.3`、两份 README 和双语 changelog 一致。
 - [ ] The CLAP asset was downloaded from the pinned immutable revision, its per-file manifest passed, and `models.zip.sha256` matches. / CLAP 资源来自固定不可变 revision，逐文件 manifest 通过，且 `models.zip.sha256` 匹配。
 - [ ] The draft Release contains exactly five assets: `models.zip`, `models.zip.sha256`, one DMG, one EXE, and `SHA256SUMS.txt`. Remote names, sizes, GitHub-provided SHA-256 digests, and `uploaded` states match the local files; both checksum files verify, and GitHub provenance attestations cover all five assets before publication. / 草稿 Release 必须恰好包含五个资产：`models.zip`、`models.zip.sha256`、一个 DMG、一个 EXE 与 `SHA256SUMS.txt`。远端名称、大小、GitHub 提供的 SHA-256 digest 和 `uploaded` 状态必须与本地文件一致；两个校验文件均通过，且公开前 GitHub provenance 证明覆盖全部五个资产。
 - [ ] The macOS arm64 frozen backend starts, contains the PyAV/FFmpeg runtime and notices, the DMG passes integrity verification, the packaged backend is arm64, and its bundled pinned CLAP loads in offline mode. / macOS arm64 冻结后端可启动，包含 PyAV/FFmpeg 运行时与许可证，DMG 通过完整性验证，应用内后端为 arm64，且内置固定 CLAP 可在离线模式加载。

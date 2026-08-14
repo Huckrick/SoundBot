@@ -19,12 +19,19 @@ import ssl
 import uuid
 import re
 
-# 设置 UTF-8 编码（Windows 兼容）
-if sys.platform == 'win32':
-    import codecs
-    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
-    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
-    os.environ['PYTHONIOENCODING'] = 'utf-8'
+
+def configure_utf8_console_streams() -> None:
+    """Best-effort UTF-8 CLI output without replacing host-owned streams."""
+    if sys.platform != "win32":
+        return
+
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (AttributeError, TypeError, ValueError, OSError):
+                continue
 
 # 默认配置
 DEFAULT_CONFIG = {
@@ -619,6 +626,8 @@ def setup_python_env():
 
 def main():
     """主函数"""
+    configure_utf8_console_streams()
+
     import argparse
     
     parser = argparse.ArgumentParser(

@@ -29,11 +29,25 @@ import struct
 from pathlib import Path
 from typing import Optional
 
-# Windows 编码修复
-if sys.platform == 'win32':
-    import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+def configure_utf8_console_streams() -> None:
+    """Use UTF-8 on Windows without replacing or closing the host streams."""
+    if sys.platform != "win32":
+        return
+
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (AttributeError, TypeError, ValueError, OSError):
+                # Captured, detached, or already-closed streams may expose a
+                # reconfigure method without supporting it. The workflow also
+                # sets Python's UTF-8 environment, so this is best-effort only.
+                continue
+
+
+configure_utf8_console_streams()
 
 # 项目路径配置
 PROJECT_ROOT = Path(__file__).parent.parent

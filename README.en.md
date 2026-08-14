@@ -1,7 +1,7 @@
 # 🎵 SoundBot - AI 音效管理器 / AI Sound Effect Manager
 
 [![License: GPL v3+](https://img.shields.io/badge/License-GPLv3%2B-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Version](https://img.shields.io/badge/version-v0.2.1--beta.2-orange.svg)](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.2)
+[![Version](https://img.shields.io/badge/version-v0.2.1--beta.3-orange.svg)](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.3)
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![Electron](https://img.shields.io/badge/electron-28.3.3-9feaf9.svg)](https://www.electronjs.org/)
 
@@ -15,17 +15,17 @@ Electron provides the desktop UI, while a local backend built with FastAPI, SQLi
 
 ## 📥 Download
 
-**Latest test release:** [SoundBot v0.2.1-beta.2](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.2)
+**Latest test release:** [SoundBot v0.2.1-beta.3](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.3)
 
-The current source version is **v0.2.1-beta.2 (prerelease)**. This release fixes file/folder imports and waveform availability caused by a sandboxed-preload crash in the installed Windows app, and bundles the pinned CLAP model, PyAV/FFmpeg audio runtime, and complete verification metadata in each installer.
+The current source version is **v0.2.1-beta.3 (prerelease)**. This release fixes file/folder imports and waveform availability caused by a sandboxed-preload crash in the installed Windows app, and bundles the pinned CLAP model, PyAV/FFmpeg audio runtime, and complete verification metadata in each installer.
 
 | Resource | Target | Download |
 | --- | --- | --- |
-| macOS installer | macOS 14+ on Apple Silicon arm64 | [Download the DMG from the v0.2.1-beta.2 Release](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.2) |
-| Windows installer | Windows 10/11 x64 | [Download the EXE from the v0.2.1-beta.2 Release](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.2) |
+| macOS installer | macOS 14+ on Apple Silicon arm64 | [Download the DMG from the v0.2.1-beta.3 Release](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.3) |
+| Windows installer | Windows 10/11 x64 | [Download the EXE from the v0.2.1-beta.3 Release](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.3) |
 | CLAP repair/development asset | Shared by both platforms; must exactly match the application version | [Download the optional `models.zip` from the matching Release](https://github.com/Huckrick/SoundBot/releases) |
 
-> This is a test release. Back up the SoundBot user-data directory before upgrading. The v0.2.1-beta.2 installer bundles a pinned CLAP revision, a per-file manifest, and the Apache-2.0 notice, so ordinary users do not need a separate `models.zip`. If model loading fails, files remain safely stored in SQLite and core management, waveforms, playback, tags, and keyword search remain available.
+> This is a test release. Back up the SoundBot user-data directory before upgrading. The v0.2.1-beta.3 installer bundles a pinned CLAP revision, a per-file manifest, and the Apache-2.0 notice, so ordinary users do not need a separate `models.zip`. If model loading fails, files remain safely stored in SQLite and core management, waveforms, playback, tags, and keyword search remain available.
 
 ### Interface preview
 
@@ -37,7 +37,7 @@ The current source version is **v0.2.1-beta.2 (prerelease)**. This release fixes
 
 ## ✨ Features
 
-| Capability | v0.2.1-beta.2 behavior |
+| Capability | v0.2.1-beta.3 behavior |
 | --- | --- |
 | File import | A minimal IPC bridge lets the sandboxed preload invoke native file/folder pickers and submit absolute paths only; the backend writes SQLite first, then a cancellable, pollable persistent job creates the waveform and both vectors |
 | Audio decoding | Pinned `av==18.0.0` (PyAV) and its wheel-bundled FFmpeg libraries provide one decoder without invoking a system `ffmpeg` command |
@@ -57,9 +57,9 @@ The current source version is **v0.2.1-beta.2 (prerelease)**. This release fixes
 
 ### Installation
 
-1. Download the installer for your platform from the [v0.2.1-beta.2 Release](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.2).
+1. Download the installer for your platform from the [v0.2.1-beta.3 Release](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.3).
 2. On macOS, open the DMG and drag SoundBot to Applications. On Windows, run the EXE and complete the installer wizard.
-3. The v0.2.1-beta.2 installer already contains the verified CLAP model, so semantic audio indexing works on first launch without separately downloading or placing `models.zip`.
+3. The v0.2.1-beta.3 installer already contains the verified CLAP model, so semantic audio indexing works on first launch without separately downloading or placing `models.zip`.
 4. External LLM and text-Embedding providers are optional and contact the network only after you configure one in Settings.
 
 ### Quick start
@@ -74,7 +74,7 @@ The current source version is **v0.2.1-beta.2 (prerelease)**. This release fixes
 
 ## 🖥️ Supported platforms
 
-The only official v0.2.1-beta.2 build targets are:
+The only official v0.2.1-beta.3 build targets are:
 
 - Windows 10/11 x64;
 - macOS 14 or later on Apple Silicon arm64.
@@ -168,7 +168,7 @@ Import, repair, and rebuild jobs capture an immutable `project_id` when created.
 
 ## 🤖 LLM and text Embeddings
 
-The following LLM entries are enabled in v0.2.1-beta.2:
+The following LLM entries are enabled in v0.2.1-beta.3:
 
 - LM Studio;
 - Ollama;
@@ -194,7 +194,7 @@ External text Embeddings receive metadata text only. They neither replace the CL
 
 ## 📦 Bundled model and verification
 
-The v0.2.1-beta.2 Windows/macOS installers include the CLAP model required for semantic audio indexing. `config/model_bundle.json` is the single source for the model ID and immutable commit revision, and installed resources include a per-file SHA-256 manifest plus the full Apache-2.0 source and license notice:
+The v0.2.1-beta.3 Windows/macOS installers include the CLAP model required for semantic audio indexing. `config/model_bundle.json` is the single source for the model ID and immutable commit revision, and installed resources include a per-file SHA-256 manifest plus the full Apache-2.0 source and license notice:
 
 ```text
 models/
@@ -209,7 +209,7 @@ models/
 Ordinary desktop users only install the application and do not need `models.zip`. A separately published `models.zip` and `models.zip.sha256` are exact-version resources for offline repair, builds, and source development only; never mix model resources from another application version. Reinstall the same-version installer first if an installed bundled resource is damaged. In a source checkout, the resource manager can fetch the exact release and verifies the archive SHA-256, per-file SHA-256 values, pinned revision, extraction boundaries, and Zip Slip protections before atomically replacing a validated staging directory:
 
 ```bash
-python scripts/download_manager.py download models --tag v0.2.1-beta.2
+python scripts/download_manager.py download models --tag v0.2.1-beta.3
 python scripts/download_manager.py check
 ```
 
@@ -342,7 +342,7 @@ This repository does not fabricate a Windows package on macOS or a macOS package
 - the macOS DMG, packaged arm64 backend, and `app.asar` resource set pass integrity checks, and the pinned CLAP model inside application resources loads successfully in offline mode;
 - any failed functional smoke test prevents the Release job from running.
 
-The Release workflow accepts only a pushed annotated `v*` version tag and has no manual-dispatch entry point. The tag must already exist and point to a commit reachable from the default branch. Every job is bound to that same tag commit, and the complete source and renderer contracts run again before packaging. The workflow first creates a draft Release, uploads the model archive and checksum, DMG, EXE, and unified `SHA256SUMS.txt`, compares remote names, sizes, SHA-256 digests, and upload states, and produces provenance attestations before publishing. It refuses to overwrite any existing Release or draft for that tag, so reruns cannot mix old and new assets. The immutable v0.2.0 remains a historical prerelease; the current v0.2.1-beta.2 and later SemVer-suffixed versions use the prerelease channel, while stable versions use the full-release channel.
+The Release workflow accepts only a pushed annotated `v*` version tag and has no manual-dispatch entry point. The tag must already exist and point to a commit reachable from the default branch. Every job is bound to that same tag commit, and the complete source and renderer contracts run again before packaging. The workflow first creates a draft Release, uploads the model archive and checksum, DMG, EXE, and unified `SHA256SUMS.txt`, compares remote names, sizes, SHA-256 digests, and upload states, and produces provenance attestations before publishing. It refuses to overwrite any existing Release or draft for that tag, so reruns cannot mix old and new assets. The immutable v0.2.0 remains a historical prerelease; the current v0.2.1-beta.3 and later SemVer-suffixed versions use the prerelease channel, while stable versions use the full-release channel.
 
 Minimal release order: run `python scripts/bump_version.py --version X.Y.Z --write`, replace the changelog placeholder, and commit; wait for `Validate / Source contracts` on main to pass; then run `git tag -a vX.Y.Z -m "SoundBot vX.Y.Z"` and `git push origin vX.Y.Z`. Do not use a lightweight tag.
 
@@ -370,7 +370,7 @@ npx --no-install electron tests/frontend/check_electron_preload.js
 Release metadata and the PyInstaller environment:
 
 ```bash
-python tests/build/verify_release_metadata.py --expected-version 0.2.1-beta.2
+python tests/build/verify_release_metadata.py --expected-version 0.2.1-beta.3
 python scripts/bump_version.py --version 0.2.1          # preview only
 python scripts/bump_version.py --version 0.2.1 --write  # atomically sync all version sources
 python scripts/test_pyinstaller.py
@@ -419,7 +419,7 @@ Folder imports must also use the project-explicit route; since v0.2.0, the old `
 
 ## ⚠️ Known limitations
 
-- v0.2.1-beta.2 is a prerelease; packages do not yet promise production-grade code signing, notarization, or automatic updates.
+- v0.2.1-beta.3 is a prerelease; packages do not yet promise production-grade code signing, notarization, or automatic updates.
 - Only Windows x64 and macOS arm64 are supported. Linux and Intel Macs are outside the build, test, and support matrix.
 - The CLAP model is large, and first-time indexing or CPU inference may be slow. A single model worker serializes inference to avoid resource contention.
 - When a model or external service is missing, affected vectors remain pending/failed; management, decoding, waveforms, playback, and keyword search remain usable.

@@ -19,6 +19,14 @@ soundbot_build = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
 SPEC.loader.exec_module(soundbot_build)
 
+DOWNLOAD_MANAGER_PATH = MODULE_PATH.with_name("download_manager.py")
+DOWNLOAD_MANAGER_SPEC = importlib.util.spec_from_file_location(
+    "soundbot_download_manager", DOWNLOAD_MANAGER_PATH
+)
+soundbot_download_manager = importlib.util.module_from_spec(DOWNLOAD_MANAGER_SPEC)
+assert DOWNLOAD_MANAGER_SPEC.loader is not None
+DOWNLOAD_MANAGER_SPEC.loader.exec_module(soundbot_download_manager)
+
 
 class NativeBuildContractTests(unittest.TestCase):
     def test_rejects_cross_os_target_before_build(self) -> None:
@@ -130,6 +138,85 @@ class NativeBuildContractTests(unittest.TestCase):
 
 
 class BuildScriptReliabilityTests(unittest.TestCase):
+    def test_windows_console_streams_are_reconfigured_in_place(self) -> None:
+        class ReconfigurableStream:
+            def __init__(self) -> None:
+                self.calls: list[dict[str, str]] = []
+
+            def reconfigure(self, **kwargs: str) -> None:
+                self.calls.append(kwargs)
+
+        stdout = ReconfigurableStream()
+        stderr = ReconfigurableStream()
+        with mock.patch.object(soundbot_build.sys, "platform", "win32"), mock.patch.object(
+            soundbot_build.sys, "stdout", stdout
+        ), mock.patch.object(soundbot_build.sys, "stderr", stderr):
+            soundbot_build.configure_utf8_console_streams()
+            self.assertIs(soundbot_build.sys.stdout, stdout)
+            self.assertIs(soundbot_build.sys.stderr, stderr)
+
+        expected = [{"encoding": "utf-8", "errors": "replace"}]
+        self.assertEqual(stdout.calls, expected)
+        self.assertEqual(stderr.calls, expected)
+
+    def test_windows_console_configuration_tolerates_missing_streams(self) -> None:
+        with mock.patch.object(soundbot_build.sys, "platform", "win32"), mock.patch.object(
+            soundbot_build.sys, "stdout", None
+        ), mock.patch.object(soundbot_build.sys, "stderr", object()):
+            soundbot_build.configure_utf8_console_streams()
+
+    def test_windows_console_configuration_continues_after_rejected_stream(self) -> None:
+        class RejectedStream:
+            def reconfigure(self, **_kwargs: str) -> None:
+                raise ValueError("closed capture stream")
+
+        class RecordingStream:
+            def __init__(self) -> None:
+                self.called = False
+
+            def reconfigure(self, **_kwargs: str) -> None:
+                self.called = True
+
+        stderr = RecordingStream()
+        with mock.patch.object(soundbot_build.sys, "platform", "win32"), mock.patch.object(
+            soundbot_build.sys, "stdout", RejectedStream()
+        ), mock.patch.object(soundbot_build.sys, "stderr", stderr):
+            soundbot_build.configure_utf8_console_streams()
+
+        self.assertTrue(stderr.called)
+
+    def test_non_windows_console_configuration_is_a_noop(self) -> None:
+        stream = mock.Mock()
+        with mock.patch.object(soundbot_build.sys, "platform", "darwin"), mock.patch.object(
+            soundbot_build.sys, "stdout", stream
+        ), mock.patch.object(soundbot_build.sys, "stderr", stream):
+            soundbot_build.configure_utf8_console_streams()
+
+        stream.reconfigure.assert_not_called()
+
+    def test_build_script_never_rewraps_shared_console_buffers(self) -> None:
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        self.assertNotIn("TextIOWrapper", source)
+        self.assertNotIn("sys.stdout.buffer", source)
+        self.assertNotIn("sys.stderr.buffer", source)
+
+        download_source = DOWNLOAD_MANAGER_PATH.read_text(encoding="utf-8")
+        self.assertNotIn("codecs.getwriter", download_source)
+        self.assertNotIn("sys.stdout.buffer", download_source)
+        self.assertNotIn("sys.stderr.buffer", download_source)
+
+    def test_download_manager_reconfigures_cli_streams_in_place(self) -> None:
+        stream = mock.Mock()
+        with mock.patch.object(
+            soundbot_download_manager.sys, "platform", "win32"
+        ), mock.patch.object(
+            soundbot_download_manager.sys, "stdout", stream
+        ), mock.patch.object(soundbot_download_manager.sys, "stderr", stream):
+            soundbot_download_manager.configure_utf8_console_streams()
+
+        self.assertEqual(stream.reconfigure.call_count, 2)
+        stream.reconfigure.assert_called_with(encoding="utf-8", errors="replace")
+
     def test_packaged_models_require_complete_manifest_and_pinned_revision(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             models = Path(directory)
