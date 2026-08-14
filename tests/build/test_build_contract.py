@@ -102,6 +102,11 @@ class NativeBuildContractTests(unittest.TestCase):
         self.assertEqual(bundle_config["schema_version"], 1)
         self.assertRegex(bundle_config["revision"], r"^[0-9a-f]{40}$")
         self.assertEqual(bundle_config["license"], "Apache-2.0")
+        attributes = (root / ".gitattributes").read_text(encoding="utf-8")
+        self.assertRegex(
+            attributes,
+            r"(?m)^tests/build/licenses/CLAP_MODEL_NOTICE\.txt\s+text\s+eol=lf$",
+        )
         workflow = (root / ".github" / "workflows" / "build.yml").read_text(encoding="utf-8")
         self.assertNotIn("CLAP_MODEL_REVISION", workflow)
         self.assertIn("--bundle-config config/model_bundle.json", workflow)

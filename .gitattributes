@@ -1,0 +1,5 @@
+# The bundled notice is hashed byte-for-byte and is generated on Linux before
+# being consumed by native macOS and Windows release jobs. Keep its working
+# tree representation stable so Git's Windows CRLF conversion cannot change
+# the controlled bytes after checkout.
+tests/build/licenses/CLAP_MODEL_NOTICE.txt text eol=lf

@@ -1,6 +1,6 @@
 {
   "name": "soundbot",
-  "version": "0.2.1-beta.1",
+  "version": "0.2.1-beta.2",
   "description": "SoundBot - local-first AI sound effect manager with semantic search",
   "main": "main.js",
   "scripts": {

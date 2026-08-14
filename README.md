@@ -1,7 +1,7 @@
 # 🎵 SoundBot - AI 音效管理器 / AI Sound Effect Manager
 
 [![License: GPL v3+](https://img.shields.io/badge/License-GPLv3%2B-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Version](https://img.shields.io/badge/version-v0.2.1--beta.1-orange.svg)](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.1)
+[![Version](https://img.shields.io/badge/version-v0.2.1--beta.2-orange.svg)](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.2)
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![Electron](https://img.shields.io/badge/electron-28.3.3-9feaf9.svg)](https://www.electronjs.org/)
 
@@ -15,17 +15,17 @@ SoundBot 使用 Electron 提供桌面界面，以 FastAPI、SQLite、PyAV 和 Ch
 
 ## 📥 下载
 
-**最新测试版本：** [SoundBot v0.2.1-beta.1](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.1)
+**最新测试版本：** [SoundBot v0.2.1-beta.2](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.2)
 
-当前源码版本为 **v0.2.1-beta.1（预发布）**。本版本修复 Windows 安装版沙箱 preload 崩溃引发的文件/文件夹导入与波形不可用，并将固定 revision 的 CLAP 模型、PyAV/FFmpeg 音频运行时和完整校验信息一并装入安装包。
+当前源码版本为 **v0.2.1-beta.2（预发布）**。本版本修复 Windows 安装版沙箱 preload 崩溃引发的文件/文件夹导入与波形不可用，并将固定 revision 的 CLAP 模型、PyAV/FFmpeg 音频运行时和完整校验信息一并装入安装包。
 
 | 资源 | 适用环境 | 下载 |
 | --- | --- | --- |
-| macOS 安装包 | macOS 14+、Apple Silicon arm64 | [在 v0.2.1-beta.1 Release 中下载 DMG](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.1) |
-| Windows 安装包 | Windows 10/11 x64 | [在 v0.2.1-beta.1 Release 中下载 EXE](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.1) |
+| macOS 安装包 | macOS 14+、Apple Silicon arm64 | [在 v0.2.1-beta.2 Release 中下载 DMG](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.2) |
+| Windows 安装包 | Windows 10/11 x64 | [在 v0.2.1-beta.2 Release 中下载 EXE](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.2) |
 | CLAP 修复/开发资源 | 两个平台通用；必须与应用版本完全匹配 | [在对应 Release 中下载可选的 `models.zip`](https://github.com/Huckrick/SoundBot/releases) |
 
-> 这是测试版本。升级前请备份 SoundBot 用户数据目录。v0.2.1-beta.1 安装包已内置固定 revision 的 CLAP 模型、逐文件 manifest 与 Apache-2.0 许可说明，普通用户无需另行下载 `models.zip`。模型加载异常时，文件仍会安全保存在 SQLite 中，基础管理、波形、播放、标签和关键词检索仍可使用。
+> 这是测试版本。升级前请备份 SoundBot 用户数据目录。v0.2.1-beta.2 安装包已内置固定 revision 的 CLAP 模型、逐文件 manifest 与 Apache-2.0 许可说明，普通用户无需另行下载 `models.zip`。模型加载异常时，文件仍会安全保存在 SQLite 中，基础管理、波形、播放、标签和关键词检索仍可使用。
 
 ### 界面预览
 
@@ -37,7 +37,7 @@ SoundBot 使用 Electron 提供桌面界面，以 FastAPI、SQLite、PyAV 和 Ch
 
 ## ✨ 功能特性
 
-| 能力 | v0.2.1-beta.1 行为 |
+| 能力 | v0.2.1-beta.2 行为 |
 | --- | --- |
 | 文件导入 | 沙箱化 preload 通过最小 IPC bridge 调用原生文件/文件夹选择器并只提交绝对路径；后端先写入 SQLite，再由可取消、可轮询的持久化作业生成波形和两个向量 |
 | 音频解码 | 固定版本 `av==18.0.0`（PyAV）及其 wheel 内 FFmpeg 动态库统一解码，不依赖系统 `ffmpeg` 命令 |
@@ -57,9 +57,9 @@ SoundBot 使用 Electron 提供桌面界面，以 FastAPI、SQLite、PyAV 和 Ch
 
 ### 安装
 
-1. 在 [v0.2.1-beta.1 Release](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.1) 下载与你平台对应的安装包。
+1. 在 [v0.2.1-beta.2 Release](https://github.com/Huckrick/SoundBot/releases/tag/v0.2.1-beta.2) 下载与你平台对应的安装包。
 2. macOS 打开 DMG 并将 SoundBot 拖入“应用程序”；Windows 运行 EXE 并按安装向导完成安装。
-3. v0.2.1-beta.1 安装包已经包含经过校验的 CLAP 模型；首次启动即可使用语义音频索引，无需另外下载或放置 `models.zip`。
+3. v0.2.1-beta.2 安装包已经包含经过校验的 CLAP 模型；首次启动即可使用语义音频索引，无需另外下载或放置 `models.zip`。
 4. 外部 LLM 和文本 Embedding 均为可选能力，只有在设置页主动配置后才会联网。
 
 ### 快速使用
@@ -74,7 +74,7 @@ SoundBot 使用 Electron 提供桌面界面，以 FastAPI、SQLite、PyAV 和 Ch
 
 ## 🖥️ 支持平台
 
-v0.2.1-beta.1 的正式构建目标只有：
+v0.2.1-beta.2 的正式构建目标只有：
 
 - Windows 10/11 x64；
 - macOS 14 或更高版本、Apple Silicon arm64。
@@ -168,7 +168,7 @@ SoundBot 不把普通文本 embedding 宣称为音频编码器：
 
 ## 🤖 LLM 与文本 Embedding
 
-v0.2.1-beta.1 正式启用以下 LLM 入口：
+v0.2.1-beta.2 正式启用以下 LLM 入口：
 
 - LM Studio；
 - Ollama；
@@ -194,7 +194,7 @@ LLM 请求使用共享异步 HTTP 客户端，支持流式 SSE 跨 chunk 缓冲�
 
 ## 📦 内置模型与校验
 
-v0.2.1-beta.1 Windows/macOS 安装包自带语义音频索引所需的 CLAP 模型。模型 ID 与不可变 commit revision 由 `config/model_bundle.json` 统一固定，安装资源包含逐文件 SHA-256 manifest 以及完整的 Apache-2.0 来源与许可说明：
+v0.2.1-beta.2 Windows/macOS 安装包自带语义音频索引所需的 CLAP 模型。模型 ID 与不可变 commit revision 由 `config/model_bundle.json` 统一固定，安装资源包含逐文件 SHA-256 manifest 以及完整的 Apache-2.0 来源与许可说明：
 
 ```text
 models/
@@ -209,7 +209,7 @@ models/
 普通桌面用户只需安装应用，不需要下载 `models.zip`。Release 中单独提供的 `models.zip` 与 `models.zip.sha256` 仅用于相同应用版本的离线修复、构建和源码开发；不要把其他版本的模型资源混入安装。已安装应用的内置资源损坏时，首选重新安装同版本安装包。源码环境可用资源下载器执行精确版本下载，它会检查压缩包 SHA-256、manifest 内逐文件 SHA-256、固定 revision、目录边界和 Zip Slip，并在暂存目录验证后原子替换：
 
 ```bash
-python scripts/download_manager.py download models --tag v0.2.1-beta.1
+python scripts/download_manager.py download models --tag v0.2.1-beta.2
 python scripts/download_manager.py check
 ```
 
@@ -342,7 +342,7 @@ python scripts/build.py --platform windows
 - macOS DMG、应用内 arm64 后端和 `app.asar` 资源必须通过完整性检查，应用资源中的固定 CLAP 必须在离线模式下真实加载；
 - 任一功能 smoke test 失败，Release 作业不会运行。
 
-Release 工作流只接受 annotated `v*` 版本标签的推送，不提供手动触发入口。发布标签必须事先存在，且对应提交必须可从默认分支达到；所有 job 都绑定同一 tag commit，并在打包前重跑全量源码与渲染层契约。工作流先创建草稿 Release，上传模型包及校验、DMG、EXE 和统一 `SHA256SUMS.txt`，核对远端名称、大小、SHA-256 与上传状态，并生成 provenance attestation 后才公开；若该 tag 已有 Release 或草稿则拒绝覆盖，避免重跑混入旧资产。不可变的 v0.2.0 保留为历史预发布；当前 v0.2.1-beta.1 及后续带 SemVer 预发布后缀的版本进入预发布渠道，稳定版本自动进入正式渠道。
+Release 工作流只接受 annotated `v*` 版本标签的推送，不提供手动触发入口。发布标签必须事先存在，且对应提交必须可从默认分支达到；所有 job 都绑定同一 tag commit，并在打包前重跑全量源码与渲染层契约。工作流先创建草稿 Release，上传模型包及校验、DMG、EXE 和统一 `SHA256SUMS.txt`，核对远端名称、大小、SHA-256 与上传状态，并生成 provenance attestation 后才公开；若该 tag 已有 Release 或草稿则拒绝覆盖，避免重跑混入旧资产。不可变的 v0.2.0 保留为历史预发布；当前 v0.2.1-beta.2 及后续带 SemVer 预发布后缀的版本进入预发布渠道，稳定版本自动进入正式渠道。
 
 最短发布顺序：先运行 `python scripts/bump_version.py --version X.Y.Z --write`，填完 changelog 占位内容并提交；等待 main 上的 `Validate / Source contracts` 通过后，执行 `git tag -a vX.Y.Z -m "SoundBot vX.Y.Z"` 和 `git push origin vX.Y.Z`。不要使用 lightweight tag。
 
@@ -370,7 +370,7 @@ npx --no-install electron tests/frontend/check_electron_preload.js
 发布元数据与 PyInstaller 环境：
 
 ```bash
-python tests/build/verify_release_metadata.py --expected-version 0.2.1-beta.1
+python tests/build/verify_release_metadata.py --expected-version 0.2.1-beta.2
 python scripts/bump_version.py --version 0.2.1          # 预览，不写文件
 python scripts/bump_version.py --version 0.2.1 --write  # 原子同步全部版本源
 python scripts/test_pyinstaller.py
@@ -419,7 +419,7 @@ python scripts/test_pyinstaller.py --build
 
 ## ⚠️ 已知限制
 
-- v0.2.1-beta.1 是预发布版本；安装包尚不保证生产级代码签名、公证或自动更新体验。
+- v0.2.1-beta.2 是预发布版本；安装包尚不保证生产级代码签名、公证或自动更新体验。
 - 只支持 Windows x64 与 macOS arm64；Linux 和 Intel Mac 不在测试、构建或支持范围内。
 - CLAP 模型体积较大，首次索引和 CPU 推理可能较慢；模型 worker 会串行化推理以避免并发争用。
 - 模型或外部服务缺失时，相关向量会保持 pending/failed；基础管理、解码、波形、播放和关键词搜索仍可用。

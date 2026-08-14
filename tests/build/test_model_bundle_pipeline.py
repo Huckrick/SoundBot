@@ -50,6 +50,9 @@ class ModelBundlePipelineTests(unittest.TestCase):
         self.assertIn(f"Model: {config.model_id}", notice)
         self.assertIn(f"Pinned revision: {config.revision}", notice)
         self.assertIn(f"Declared model license: {config.license}", notice)
+        notice_bytes = config.notice_path.read_bytes()
+        self.assertIn(b"\n", notice_bytes)
+        self.assertNotIn(b"\r", notice_bytes)
 
     def test_mutable_revision_and_unknown_config_fields_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -82,6 +85,13 @@ class ModelBundlePipelineTests(unittest.TestCase):
                 manifest["notice"]["sha256"],
                 create_model_manifest.sha256_file(models / "CLAP_MODEL_NOTICE.txt"),
             )
+
+            original_notice = (models / "CLAP_MODEL_NOTICE.txt").read_bytes()
+            (models / "CLAP_MODEL_NOTICE.txt").write_bytes(
+                original_notice.replace(b"\n", b"\r\n")
+            )
+            with self.assertRaisesRegex(ValueError, "controlled notice"):
+                create_model_manifest.verify_manifest_against_config(models, config)
 
             (models / "CLAP_MODEL_NOTICE.txt").write_text(
                 "changed notice\n", encoding="utf-8"
