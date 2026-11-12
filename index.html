@@ -69,6 +69,7 @@ input,select,textarea{font-family:var(--font)}
 .weight-wrap{display:flex;align-items:center;gap:6px;padding-right:10px;color:var(--tx3);font-size:11px;flex:none}
 input[type=range]{-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;background:var(--bg3);cursor:pointer}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--tx1)}
+html:lang(zh-CN){--font:'MiSans VF','MiSans','PingFang SC','Microsoft YaHei',system-ui,sans-serif}
 html:lang(ja){--font:'Hiragino Sans','Yu Gothic UI','Meiryo',system-ui,sans-serif}
 html:lang(zh-TW){--font:'PingFang TC','Microsoft JhengHei',system-ui,sans-serif}
 .top-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
@@ -482,8 +483,13 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
 .settings-group legend{font-size:12px;font-weight:650;color:var(--tx2);margin-bottom:6px}
 .assistant-settings{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 12px;align-items:center}
 .assistant-settings input,.assistant-settings select{width:100%;min-width:0}
-.settings-thanks{border-top:1px solid var(--line);padding-top:12px;color:var(--tx2);font-size:12px}
-.settings-thanks p{margin-top:6px}
+.settings-credits{display:grid;gap:12px;color:var(--tx2);font-size:12px;line-height:1.6}
+.credit-author{padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--bg2)}
+.settings-credits h4,.settings-credits summary{color:var(--tx1);font-size:13px;font-weight:650}
+.settings-credits p{margin:5px 0}
+.credit-links{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.settings-credits details{border-top:1px solid var(--line);padding:9px 0 0}
+.settings-credits summary{cursor:pointer}
 .fx-header{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .fx-card .switch{flex:none} .fx-card .knob{touch-action:none}
 .fx-controls{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap}
@@ -1054,9 +1060,47 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
           </fieldset>
         </section>
         <section class="settings-page hidden" id="settings-about">
-          <section class="settings-thanks" aria-label="致谢与许可">
-            <h4>致谢与许可</h4>
-            <p>第三方许可随源码及发行包提供。</p>
+          <section class="settings-credits" aria-label="致谢与许可">
+            <div class="credit-author">
+              <h4>作者与许可</h4>
+              <p>SoundBot 由 Huckrick 发起、开发和维护。</p>
+              <p>© 2026 Huckrick 与 SoundBot 贡献者。源码采用 GPL-3.0-or-later 许可。</p>
+              <div class="credit-links">
+                <button class="ghost-btn" type="button" data-credit-link="source">项目源码</button>
+                <button class="ghost-btn" type="button" data-credit-link="license">SoundBot 许可证</button>
+                <button class="ghost-btn" type="button" data-credit-link="credits">完整致谢与来源</button>
+              </div>
+            </div>
+            <details open>
+              <summary>界面字体 · MiSans</summary>
+              <p>简体中文主界面优先使用系统已安装的 MiSans VF 或 MiSans。MiSans 由小米提供，MiSans Global 由小米联合 Monotype 和汉仪开发。</p>
+              <p>安装包不附带 MiSans，也不会下载字体。系统没有安装 MiSans 时，界面自动使用苹方、微软雅黑或系统默认字体。字体使用遵循小米发布的 MiSans 字体知识产权许可协议。</p>
+              <div class="credit-links">
+                <button class="ghost-btn" type="button" data-credit-link="misans">MiSans 官方介绍</button>
+                <button class="ghost-btn" type="button" data-credit-link="misans-license">MiSans 字体许可</button>
+              </div>
+            </details>
+            <details>
+              <summary>开源组件与技术来源</summary>
+              <p>Electron、Chromium 和 Node.js 提供桌面运行环境。Python、FastAPI 和 Uvicorn 提供本机服务。SQLite FTS5 和 jieba 支持本地索引与中文分词。</p>
+              <p>PyAV 和 FFmpeg 用于音频解码与渲染，NumPy 用于音频分析和信号处理，Mutagen 和 Pillow 用于读取标签与显示嵌入封面，Pedalboard 用于处理用户加载的 VST3 效果器。</p>
+              <p>实时响度表的 K 加权滤波系数计算改编自 libebur128（© 2011 Jan Kokemüller，MIT 许可）。分类字段参考 Universal Category System（UCS）。</p>
+              <p>发行包的资源目录下附有 licenses 文件夹。后端随各依赖提供上游许可，用户安装的插件遵循各自的许可。</p>
+              <div class="credit-links">
+                <button class="ghost-btn" type="button" data-credit-link="audio">音频组件许可与源码</button>
+                <button class="ghost-btn" type="button" data-credit-link="loudness">libebur128 许可证</button>
+                <button class="ghost-btn" type="button" data-credit-link="ucs">UCS 官方资料</button>
+              </div>
+            </details>
+            <details>
+              <summary>中间件与社区致谢</summary>
+              <p>中间件工作台参考 Wwise WAAPI、FMOD Studio 和 CRI Atom Craft 的官方资料。中间件由用户自行安装，产品名称与商标归各权利人所有。</p>
+              <p>感谢为 SoundBot 提供反馈、复现步骤和测试样例的用户，也感谢维护这些工具、文档和标准的开发者。</p>
+              <div class="credit-links">
+                <button class="ghost-btn" type="button" data-credit-link="middleware">中间件文档与支持范围</button>
+                <button class="ghost-btn" type="button" data-credit-link="issues">社区反馈</button>
+              </div>
+            </details>
           </section>
           <div class="set-row"><label>诊断</label><button class="ghost-btn" id="btnOpenLogs">打开日志</button></div>
         </section>

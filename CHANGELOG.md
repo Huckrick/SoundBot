@@ -4,6 +4,8 @@ Release history for SoundBot. / SoundBot 版本记录。
 
 ## [Unreleased] / 未发布
 
+- Expanded Settings → About with authorship, MiSans use and licensing, component references, and community thanks across all six interface languages. The installer includes the full credits. / 在六种界面语言中补全设置 → 关于的作者、MiSans 使用及许可、组件引用和社区致谢，安装包随附完整致谢文件。
+
 ## [1.0.2] - 2026-11-12
 
 ### Added / 新增

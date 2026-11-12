@@ -463,6 +463,8 @@ def _renderer_smoke_expression(
   const position = element => [element.offsetLeft, element.offsetTop, element.offsetWidth, element.offsetHeight];
   const sidebarGeometry = JSON.stringify([heading, ...viewIcons].map(position));
   const originalLocale = language.value;
+  const authorHeading = document.querySelector('#settings-about .credit-author h4');
+  const miSansHeading = document.querySelector('#settings-about details summary');
   const folders = {{ 'zh-CN': '文件夹', 'zh-TW': '資料夾', ja: 'フォルダー', en: 'Folders', 'pt-BR': 'Pastas', es: 'Carpetas' }};
   const languages = [...language.options].map(option => option.value);
   if (languages.length !== 6 || new Set(languages).size !== 6) throw new Error('locale choices are incomplete');
@@ -474,6 +476,10 @@ def _renderer_smoke_expression(
         document.getElementById('rowCount').textContent !== SoundBotI18n.t('结果：{{count}}', {{count: 3}}) ||
         JSON.stringify([heading, ...viewIcons].map(position)) !== sidebarGeometry) {{
       throw new Error(`sidebar or localization failed for ${{id}}`);
+    }}
+    if (authorHeading?.textContent !== SoundBotI18n.t('作者与许可') ||
+        miSansHeading?.textContent !== SoundBotI18n.t('界面字体 · MiSans')) {{
+      throw new Error(`credits localization failed for ${{id}}`);
     }}
   }}
   viewIcons[2].click();
@@ -679,7 +685,7 @@ def main() -> int:
     windows = os.name == "nt"
     resources = executable.parent / "resources" if windows else executable.parent.parent / "Resources"
     for relative in (
-        "SoundBot.txt", "THIRD_PARTY_AUDIO_NOTICES.txt", "electron/LICENSE",
+        "SoundBot.txt", "SoundBot-CREDITS.md", "THIRD_PARTY_AUDIO_NOTICES.txt", "electron/LICENSE",
         "electron/LICENSES.chromium.html", "ffmpeg/COPYING.LGPLv3", "ffmpeg/COPYING.GPLv3",
     ):
         notice = resources / "licenses" / relative

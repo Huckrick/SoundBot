@@ -12,4 +12,4 @@ The interface supports Simplified Chinese, Traditional Chinese, Japanese, Englis
 
 Issues and discussions are welcome, handled as time allows. Pull requests and code submissions are not accepted, to keep the release pipeline safe. Do not attach keys, audio, databases, raw logs, or private paths in public. [Open an issue](https://github.com/Huckrick/SoundBot/issues/new/choose) · [Discussions](https://github.com/Huckrick/SoundBot/discussions) · [Repository policy](.github/CONTRIBUTING.md)
 
-Maintained by **Huckrick** under GPL-3.0-or-later. [License](LICENSE) · [Build and release](docs/build-and-retrieval.md) · [Security policy](.github/SECURITY.md)
+Maintained by **Huckrick** under GPL-3.0-or-later. [Credits and sources](docs/credits.md) · [License](LICENSE) · [Build and release](docs/build-and-retrieval.md) · [Security policy](.github/SECURITY.md)

@@ -1892,6 +1892,9 @@
             if ($('ovSettings').classList.contains('show') && !$('settings-vst').classList.contains('hidden')) attempt(() => fx()?.settings());
         });
         on('btnOpenLogs', () => desktop.backendStatus.openLogs());
+        for (const button of document.querySelectorAll('[data-credit-link]')) {
+            button.onclick = () => attempt(() => desktop.openCreditLink(button.dataset.creditLink));
+        }
         on('btnSaveAI', () => updateAssistant('save'));
         on('btnTestAI', () => updateAssistant('test'));
         $('llmProvider').onchange = showProvider;

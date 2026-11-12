@@ -15,6 +15,19 @@ const locale = require('./assets/locale');
 const audioCapabilityManifest = require('./config/audio_capabilities.json');
 const supportedAudioExtensions = new Set(Object.keys(audioCapabilityManifest.formats || {}));
 const supportedAudioFilterExtensions = [...supportedAudioExtensions].map((value) => value.slice(1));
+const projectUrl = 'https://github.com/Huckrick/SoundBot';
+const creditLinks = Object.freeze({
+  source: projectUrl,
+  license: `${projectUrl}/blob/main/LICENSE`,
+  credits: `${projectUrl}/blob/main/docs/credits.md`,
+  misans: 'https://hyperos.mi.com/font/en/about/',
+  'misans-license': 'https://hyperos.mi.com/font-download/MiSans%E5%AD%97%E4%BD%93%E7%9F%A5%E8%AF%86%E4%BA%A7%E8%AE%B8%E5%8F%AF%E5%8D%8F%E8%AE%AE.pdf',
+  audio: `${projectUrl}/blob/main/tests/build/licenses/THIRD_PARTY_AUDIO_NOTICES.txt`,
+  loudness: 'https://github.com/jiixyj/libebur128/blob/master/COPYING',
+  ucs: 'https://universalcategorysystem.com/',
+  middleware: `${projectUrl}/blob/main/docs/middleware.md`,
+  issues: `${projectUrl}/issues`
+});
 
 const userDataOverride = process.env.SOUNDBOT_USER_DATA_DIR;
 if (userDataOverride && path.isAbsolute(userDataOverride)) {
@@ -1410,6 +1423,10 @@ function setupIpcHandlers() {
   });
 
   ipcMain.handle('get-runtime-config', () => getRuntimeConfig());
+  ipcMain.handle('open-credit-link', (event, id) => {
+    if (event.sender !== mainWindow?.webContents || typeof id !== 'string' || !Object.hasOwn(creditLinks, id)) return;
+    return shell.openExternal(creditLinks[id]);
+  });
   ipcMain.handle('open-log-directory', async () => {
     const logDir = app.getPath('logs');
     const error = await shell.openPath(logDir);

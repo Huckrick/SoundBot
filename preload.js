@@ -137,6 +137,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getConfig: () => ipcRenderer.invoke('get-runtime-config')
   },
 
+  openCreditLink: id => ipcRenderer.invoke('open-credit-link', id),
+
   // 平台信息
   platform: process.platform,
 

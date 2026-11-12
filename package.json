@@ -118,6 +118,10 @@
         "to": "licenses/SoundBot.txt"
       },
       {
+        "from": "docs/credits.md",
+        "to": "licenses/SoundBot-CREDITS.md"
+      },
+      {
         "from": "tests/build/licenses/THIRD_PARTY_AUDIO_NOTICES.txt",
         "to": "licenses/THIRD_PARTY_AUDIO_NOTICES.txt"
       },
