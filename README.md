@@ -2,7 +2,7 @@
 
 <h1 align="center">SoundBot</h1>
 
-<p align="center">本地音效库、波形剪辑和中间件工作台<br>Local sound library, waveform editor, and middleware workspace</p>
+<p align="center">会和中间件对话的开源音效库。<br>The open-source sound library that talks to your middleware.</p>
 
 <p align="center"><a href="#简体中文">简体中文</a> · <a href="#english">English</a> · <a href="https://github.com/Huckrick/SoundBot/releases">发行版本 / Releases</a></p>
 
@@ -48,7 +48,7 @@ SoundBot 把音效查找、剪辑和交付放在同一个桌面应用里。素�
 
 - **无法启动或导入**：核对系统和架构，确认来源目录仍可访问。打开 **设置 → 关于 → 打开日志** 查看错误。本机日志可能含文件路径，分享前先脱敏。
 - **版本和兼容性**：发行说明记录已通过的验证，包含已知限制。源码维护范围和漏洞处理方式见安全政策。 [发行页](https://github.com/Huckrick/SoundBot/releases) · [安全政策](.github/SECURITY.md)
-- **公开反馈**：可以在对应提交下留言，提供 SoundBot 版本、系统和简短现象。请勿附上密钥、素材、数据库、日志或私人路径。原仓库由 Huckrick 维护，欢迎 Fork。 [提交记录](https://github.com/Huckrick/SoundBot/commits/main/) · [仓库政策](.github/CONTRIBUTING.md)
+- 欢迎 Issue 和讨论区交流，不定时处理。出于发布安全考虑，本仓库不接收 Pull Request 与代码提交。请勿在公开区附密钥、素材、数据库、日志原文或私人路径。 [新建 Issue](https://github.com/Huckrick/SoundBot/issues/new/choose) · [讨论区](https://github.com/Huckrick/SoundBot/discussions) · [仓库政策](.github/CONTRIBUTING.md)
 
 ## English
 
@@ -92,7 +92,7 @@ macOS may ask for access to a protected folder you select. If access is denied, 
 
 - **Startup or import problems.** Check the OS and architecture and make sure the source folder is accessible. Open **Settings → About → Open logs** for local diagnostics. Remove personal paths and other sensitive details before sharing excerpts.
 - **Versions and compatibility.** Release notes record the validation performed and any known limitations. See the security policy for supported versions and vulnerability handling. [Releases](https://github.com/Huckrick/SoundBot/releases) · [Security policy](.github/SECURITY.md)
-- **Public feedback.** Comments on commits are welcome. Include the SoundBot version, OS, and a short description. Keep keys, audio, databases, logs, and private paths out of public comments. Huckrick maintains the upstream repository. Forks are welcome. [Commits](https://github.com/Huckrick/SoundBot/commits/main/) · [Repository policy](.github/CONTRIBUTING.md)
+- Issues and discussions are welcome, handled as time allows. Pull requests and code submissions are not accepted, to keep the release pipeline safe. Do not attach keys, audio, databases, raw logs, or private paths in public. [Open an issue](https://github.com/Huckrick/SoundBot/issues/new/choose) · [Discussions](https://github.com/Huckrick/SoundBot/discussions) · [Repository policy](.github/CONTRIBUTING.md)
 
 Builds use Python 3.12 and Node.js 24. The native GitHub Actions workflow builds and tests both installers and prepares a draft with checksums and provenance. [构建与发布 / Build and release](docs/build-and-retrieval.md) · [合规核对 / Distribution review](docs/release-review.md)
 

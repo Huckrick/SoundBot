@@ -8,9 +8,9 @@ Security fixes are prepared for the current 1.0.x line. Check the published Rele
 
 ## Reporting and credentials / 报告与凭据
 
-Use commit comments for brief public feedback. Keep vulnerability details, credentials, raw logs, audio, database exports, and personal paths out of public comments. Private vulnerability reporting is currently unavailable. Published advisories appear under Security on GitHub.
+Use Issues or Discussions for general feedback. Keep vulnerability details, credentials, raw logs, audio, database exports, and personal paths out of public posts. Private vulnerability reporting is currently unavailable. Published advisories appear under Security on GitHub. [Repository policy](CONTRIBUTING.md)
 
-提交评论适合简短的公开反馈。请勿在公开评论中披露漏洞细节、凭据、原始日志、音频、数据库或私人路径。当前未开通私密漏洞报告。公开安全公告在 GitHub 的 Security 页面查看。 [Advisories / 安全公告](https://github.com/Huckrick/SoundBot/security/advisories)
+一般反馈可通过 Issue 或讨论区交流。请勿在公开帖子中披露漏洞细节、凭据、原始日志、音频、数据库或私人路径。当前未开通私密漏洞报告。公开安全公告在 GitHub 的 Security 页面查看。 [仓库政策](CONTRIBUTING.md) · [Advisories / 安全公告](https://github.com/Huckrick/SoundBot/security/advisories)
 
 If a credential was exposed, revoke or rotate it with its issuer. Removing it in a later commit leaves older Git objects intact.
 

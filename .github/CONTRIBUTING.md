@@ -4,9 +4,9 @@ SoundBot is maintained by Huckrick. Forking and modification are welcome under t
 
 SoundBot 由 Huckrick 维护。欢迎按项目许可证 Fork 和修改。原仓库的分支由所有者创建和更新。
 
-Public comments on commits are welcome for brief feedback. Include the app version, OS, and the steps needed to describe the issue. Keep passwords, API keys, raw logs, personal paths, source audio, and databases out of comments. Pull Requests, Issues, and Discussions are closed.
+Issues and discussions are welcome, handled as time allows. Pull requests and code submissions are not accepted, to keep the release pipeline safe. Do not attach keys, audio, databases, raw logs, or private paths in public. [Open an issue](https://github.com/Huckrick/SoundBot/issues/new/choose) · [Discussions](https://github.com/Huckrick/SoundBot/discussions)
 
-欢迎在提交下公开留言。说明应用版本、系统和简短的复现步骤即可。请勿在评论中发布密码、API 密钥、原始日志、私人路径、音频原件或数据库。Pull Request、Issue 和 Discussion 保持关闭。
+欢迎 Issue 和讨论区交流，不定时处理。出于发布安全考虑，本仓库不接收 Pull Request 与代码提交。请勿在公开区附密钥、素材、数据库、日志原文或私人路径。 [新建 Issue](https://github.com/Huckrick/SoundBot/issues/new/choose) · [讨论区](https://github.com/Huckrick/SoundBot/discussions)
 
 For install, upgrade, and troubleshooting instructions, see the [bilingual README](../README.md). For suspected vulnerabilities, see the [security policy](SECURITY.md).
 
