@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # SoundBot - AI 音效管理器
-# Copyright (C) 2026 Nagisa_Huckrick (胡杨)
+# Copyright (C) 2026 Huckrick and SoundBot contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -88,6 +88,7 @@ class WaveformBatchRequest(BaseModel):
     file_ids: List[str] = Field(..., min_length=1, max_length=100)
     project_id: Optional[str] = Field(default=None)
     points: Literal[2000] = 2000
+    cached_only: bool = False
 
 
 class IndexActionRequest(BaseModel):
@@ -196,57 +197,6 @@ class IndexStatus(BaseModel):
     manifests: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
 
 
-# ==================== 音频处理请求模型 ====================
-
-class ClipRequest(BaseModel):
-    """裁切请求"""
-    path: str = Field(..., description="源音频文件路径")
-    start: float = Field(..., ge=0, description="裁切起始时间（秒）")
-    end: float = Field(..., gt=0, description="裁切结束时间（秒）")
-    output: Optional[str] = Field(None, description="输出文件路径，默认在原文件同目录添加 _clip 后缀")
-    temp_file: bool = Field(default=True, description="是否创建临时文件（用于拖拽导出）")
-
-
-class FadeRequest(BaseModel):
-    """淡入淡出请求"""
-    path: str = Field(..., description="音频文件路径")
-    fade_in: float = Field(default=0, ge=0, description="淡入时长（秒）")
-    fade_out: float = Field(default=0, ge=0, description="淡出时长（秒）")
-    output: Optional[str] = Field(None, description="输出文件路径，默认在原文件同目录添加 _fade 后缀")
-
-
-class ClipWithFadeRequest(BaseModel):
-    """裁切并淡入淡出请求"""
-    path: str = Field(..., description="源音频文件路径")
-    start: float = Field(..., ge=0, description="裁切起始时间（秒）")
-    end: float = Field(..., gt=0, description="裁切结束时间（秒）")
-    fade_in: float = Field(default=0, ge=0, description="淡入时长（秒）")
-    fade_out: float = Field(default=0, ge=0, description="淡出时长（秒）")
-    temp_file: bool = Field(default=True, description="是否创建临时文件")
-
-
-class ClipResponse(BaseModel):
-    """裁切响应"""
-    success: bool = Field(..., description="是否成功")
-    output_path: Optional[str] = Field(None, description="输出文件路径")
-    duration: Optional[float] = Field(None, description="裁切后的时长")
-    message: Optional[str] = Field(None, description="消息")
-
-
-class FadeResponse(BaseModel):
-    """淡入淡出响应"""
-    success: bool = Field(..., description="是否成功")
-    output_path: Optional[str] = Field(None, description="输出文件路径")
-    message: Optional[str] = Field(None, description="消息")
-
-
-# ==================== 临时文件路径配置模型 ====================
-
-class TempDirRequest(BaseModel):
-    """临时文件目录设置请求"""
-    temp_dir: str = Field(..., description="临时文件存放目录路径")
-
-
 # ==================== 工程管理请求模型 ====================
 
 class CreateProjectRequest(BaseModel):
@@ -255,31 +205,26 @@ class CreateProjectRequest(BaseModel):
 
     name: str = Field(..., description="工程名称")
     description: str = Field(default="", description="工程描述")
-    temp_dir: Optional[str] = Field(None, description="工程特定的临时文件目录")
 
 
 class UpdateProjectRequest(BaseModel):
     """更新工程请求"""
     name: Optional[str] = Field(None, description="工程名称")
     description: Optional[str] = Field(None, description="工程描述")
-    temp_dir: Optional[str] = Field(None, description="工程特定的临时文件目录")
     settings: Optional[dict] = Field(None, description="工程特定配置（JSON格式）")
 
 
-class TempDirResponse(BaseModel):
-    """临时文件目录响应"""
-    temp_dir: str = Field(..., description="当前临时文件目录")
-    default_dir: str = Field(..., description="默认临时文件目录")
-    message: Optional[str] = Field(None, description="消息")
-
-
 # ==================== AI Chat 请求模型 ====================
+
+UILocale = Literal["zh-CN", "zh-TW", "ja", "en", "pt-BR", "es"]
+
 
 class AIChatRequest(BaseModel):
     """AI 对话请求"""
     message: str = Field(..., description="用户消息")
     project_id: str = Field(default="default", description="搜索所属工程 ID")
-    history: Optional[List[Dict[str, str]]] = Field(default=[], description="对话历史")
+    history: Optional[List[Dict[str, str]]] = Field(default_factory=list, description="对话历史")
+    locale: Optional[UILocale] = Field(default=None, description="Preferred language for conversational replies")
     top_k: int = Field(default=20, ge=1, le=100, description="返回结果数量")
     threshold: float = Field(default=0.1, ge=0.0, le=1.0, description="相似度阈值")
 

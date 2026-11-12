@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # SoundBot - AI 音效管理器
-# Copyright (C) 2026 Nagisa_Huckrick (胡杨)
+# Copyright (C) 2026 Huckrick and SoundBot contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,12 +18,12 @@
 """
 SoundBot 启动引导模块
 =====================
-在应用启动前检查环境，确保打包后的依赖和模型都已就绪。
+检查应用目录、音频解码和 SQLite FTS5 支持。
 """
 
 import sys
-import os
-from pathlib import Path
+import sqlite3
+from contextlib import closing
 
 
 def check_environment():
@@ -46,9 +46,6 @@ def check_environment():
     from config import (
         get_executable_dir,
         get_user_data_dir,
-        find_models_dir,
-        MODELS_DIR,
-        CLAP_MODEL_PATH,
         get_db_path,
         get_temp_dir
     )
@@ -57,43 +54,22 @@ def check_environment():
     paths = {
         'executable': str(get_executable_dir()),
         'user_data': str(get_user_data_dir()),
-        'models': str(MODELS_DIR),
-        'clap_model': str(CLAP_MODEL_PATH),
         'database': str(get_db_path()),
         'temp': str(get_temp_dir()),
     }
     
-    # 检查模型
-    if not Path(CLAP_MODEL_PATH).exists():
-        warnings.append({
-            'type': 'missing_models',
-            'message': f'AI 模型文件未找到，将以元数据模式启动: {CLAP_MODEL_PATH}',
-            'solution': '请从 GitHub Releases 下载 models.zip（或 models-版本号.zip）并解压到以下任一位置:',
-            'possible_locations': [
-                str(get_executable_dir() / 'models'),
-                str(get_user_data_dir() / 'models'),
-            ]
-        })
-    
-    # 检查 Python 依赖
+    from core.audio_service import AudioService
+
+    if not AudioService.runtime_status()["available"]:
+        errors.append({"type": "audio_decoder", "message": "内置音频解码器不可用",
+                       "solution": "检查 PyAV 安装或应用包完整性"})
     try:
-        import torch
-    except ImportError as e:
-        warnings.append({
-            'type': 'missing_dependency',
-            'message': f'PyTorch 未安装: {e}',
-            'solution': '如果看到此错误，说明 PyInstaller 打包可能不完整'
-        })
-    
-    try:
-        import transformers
-    except ImportError as e:
-        warnings.append({
-            'type': 'missing_dependency',
-            'message': f'Transformers 未安装: {e}',
-            'solution': '如果看到此错误，说明 PyInstaller 打包可能不完整'
-        })
-    
+        with closing(sqlite3.connect(":memory:")) as connection:
+            connection.execute("CREATE VIRTUAL TABLE test_fts USING fts5(value)")
+    except sqlite3.Error:
+        errors.append({"type": "fts5", "message": "SQLite 缺少 FTS5",
+                       "solution": "检查 Python SQLite 运行时或应用包完整性"})
+
     # 检查磁盘空间 (至少 1GB 可用)
     try:
         import shutil

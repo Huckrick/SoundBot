@@ -66,8 +66,8 @@ class VersionBumpTests(unittest.TestCase):
             "## [0.2.0] - 2026-08-12 (Prerelease / 预发布)\n\n"
             "### Added / 新增\n\n"
             "- Added a release. / 新增一个版本。\n\n"
-            "[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v0.2.0...HEAD\n"
-            "[0.2.0]: https://github.com/Huckrick/SoundBot/compare/v0.1.4...v0.2.0\n",
+            "[Unreleased]: https://github.com/example/soundbot/compare/v0.2.0...HEAD\n"
+            "[0.2.0]: https://github.com/example/soundbot/compare/v0.1.4...v0.2.0\n",
             encoding="utf-8",
         )
 

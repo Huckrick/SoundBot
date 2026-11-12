@@ -178,6 +178,7 @@
             && entry.scrollOffset === options.scrollOffset
             && entry.backgroundColor === options.backgroundColor
             && entry.activeColor === options.activeColor
+            && entry.inactiveOpacity === options.inactiveOpacity
             && entry.inactiveColor === options.inactiveColor;
     }
 
@@ -192,7 +193,7 @@
         inactive.ctx.fillRect(0, 0, size.width, size.height);
         drawWaveShape(
             inactive.ctx, size.width, size.height, options.waveformData,
-            options.inactiveColor, 0.25, options.zoomLevel, options.scrollOffset
+            options.inactiveColor, options.inactiveOpacity ?? 0.25, options.zoomLevel, options.scrollOffset
         );
         drawWaveShape(
             active.ctx, size.width, size.height, options.waveformData,
@@ -225,10 +226,20 @@
         const right = clippedEnd - visibleStart;
         ctx.save();
         ctx.globalAlpha = 0.2;
-        ctx.fillStyle = '#3b82f6';
+        ctx.fillStyle = options.selectionColor || '#3b82f6';
         ctx.fillRect(left, 0, right - left, height);
+        if (options.highlightSelection) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(left, 0, right - left, height);
+            ctx.clip();
+            ctx.globalAlpha = 1;
+            const layer = options.highlightSelection;
+            ctx.drawImage(layer, 0, 0, layer.width, layer.height, 0, 0, width, height);
+            ctx.restore();
+        }
         ctx.globalAlpha = 0.8;
-        ctx.strokeStyle = '#3b82f6';
+        ctx.strokeStyle = options.selectionColor || '#3b82f6';
         ctx.lineWidth = 2;
         for (const boundary of [globalStart, globalEnd]) {
             if (boundary < visibleStart || boundary > visibleEnd) continue;
@@ -238,7 +249,7 @@
             ctx.lineTo(x, height);
             ctx.stroke();
             ctx.globalAlpha = 1;
-            ctx.fillStyle = '#3b82f6';
+            ctx.fillStyle = options.selectionColor || '#3b82f6';
             const direction = boundary === globalStart ? 1 : -1;
             ctx.beginPath();
             ctx.moveTo(x, 0);
@@ -261,7 +272,7 @@
         const actualWidth = width * options.zoomLevel;
         const progressX = progress * actualWidth - options.scrollOffset;
         const clippedProgressX = Math.max(0, Math.min(width, progressX));
-        if (clippedProgressX > 0) {
+        if (clippedProgressX > 0 && !(options.highlightSelection && options.selectionStart < options.selectionEnd)) {
             ctx.save();
             ctx.beginPath();
             ctx.rect(0, 0, clippedProgressX, height);
@@ -318,7 +329,9 @@
             entry.inactiveLayer, 0, 0, entry.inactiveLayer.width, entry.inactiveLayer.height,
             0, 0, size.width, size.height
         );
-        drawSelection(ctx, size.width, size.height, normalized);
+        drawSelection(ctx, size.width, size.height, {
+            ...normalized, highlightSelection: normalized.highlightSelection ? entry.activeLayer : null
+        });
         compositeProgress(ctx, entry, size.width, size.height, normalized);
         return true;
     }
@@ -343,7 +356,7 @@
         drawWaveShape(
             ctx, width, height, waveformData,
             options.isCurrent ? (options.activeColor || '#e5e5e5') : (options.inactiveColor || '#a3a3a3'),
-            options.isCurrent ? 1 : 0.5,
+            options.isCurrent ? 1 : 0.85,
             1,
             0
         );

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # SoundBot - AI 音效管理器
-# Copyright (C) 2026 Nagisa_Huckrick (胡杨)
+# Copyright (C) 2026 Huckrick and SoundBot contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@ LLM 和 Embedding 配置管理器
 
 集中管理 LLM 模型和 Embedding 模型的配置，支持：
 - 本地模型：LM Studio、Ollama
-- 外部 API：OpenAI、Azure OpenAI、Gemini、Kimi、Anthropic、DeepSeek、SiliconFlow 等
+- 外部 API：通过可配置的服务适配器访问
 - 默认配置：CLAP 模型（写死）
 """
 
@@ -287,7 +287,7 @@ LLM_PROVIDER_META: Dict[str, Dict[str, Any]] = {
     "custom": {
         "name": "自定义 API",
         "icon": "settings",
-        "default_url": "https://your-api.com/v1",
+        "default_url": "https://provider.example.invalid/v1",
         "need_api_key": True,
         "auth_type": "bearer",
         "default_model": "",
@@ -390,7 +390,7 @@ DEFAULT_CONFIG = {
             "model": "Qwen/Qwen2.5-7B-Instruct",
         },
         "custom": {
-            "base_url": "https://your-api.com/v1",
+            "base_url": "https://provider.example.invalid/v1",
             "api_key": "",
             "model": "",
         },
@@ -858,20 +858,10 @@ class LLMConfigManager:
         """
         provider = provider or self.get_embedding_provider()
         
-        # CLAP is local, but it is not "always available": packaged installs
-        # are allowed to start before the optional model bundle is installed.
         if provider == EmbeddingProvider.DEFAULT:
-            from core.embedder import is_embedder_loaded
+            return {"success": False, "message": "当前版本使用本地关键词索引",
+                    "code": "semantic_disabled", "retryable": False}
 
-            model_path = Path(config.get_clap_model_name())
-            available = model_path.exists() or is_embedder_loaded()
-            return {
-                "success": available,
-                "message": "默认 CLAP 模型已就绪" if available else "CLAP 模型尚未安装或加载",
-                "code": None if available else "model_unavailable",
-                "retryable": not available,
-            }
-        
         provider_config = self.resolve_embedding_provider_config(provider, provider_config)
         
         base_url = provider_config.get("base_url", "")

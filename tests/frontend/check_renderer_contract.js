@@ -12,7 +12,7 @@ const mainJs = read('main.js');
 const preloadJs = read('preload.js');
 const packageJson = JSON.parse(read('package.json'));
 const backendVersionMatch = read('backend/config.py').match(/^APP_VERSION\s*=\s*["']([^"']+)["']/m);
-const moduleNames = ['api', 'state', 'audio', 'waveform', 'search', 'projects', 'settings'];
+const moduleNames = ['api', 'audio', 'waveform'];
 const moduleSources = Object.fromEntries(
   moduleNames.map(name => [name, read(`assets/renderer/${name}.js`)])
 );
@@ -50,58 +50,35 @@ async function main() {
   assert(mainJs.includes('BrowserWindow.fromWebContents(event.sender)'), 'native dialogs are not owned by their requesting window');
   assert(mainJs.includes('nativeOpenDialogActive'), 'native open dialogs are not serialized');
   assert(mainJs.includes('if (owner.isMinimized()) owner.restore()'), 'native dialog owner is not restored before opening');
-  assert(mainJs.includes("loadFile(path.join(__dirname, 'splash.html'))"), 'splash is not loaded from the packaged local page');
+  assert(mainJs.includes("loadFile(path.join(__dirname, 'splash.html'),"), 'splash is not loaded from the packaged local page');
   assert(mainJs.includes('pendingSplashState') && mainJs.includes('applySplashState()'), 'early splash state is not queued until load');
-  assert(indexHtml.includes('if (!window.electronAPI?.fileImport)'), 'file/folder selection does not check the desktop bridge');
-  assert(indexHtml.includes('if (!window.electronAPI?.backendAPI?.importFolderAsync)'), 'folder import backend check is missing');
-  assert(
-    indexHtml.indexOf('const folderResult = await window.electronAPI.fileImport.selectFolder') <
-      indexHtml.indexOf("if (!window.electronAPI?.backendAPI?.importFolderAsync)"),
-    'folder selection is incorrectly blocked on backend readiness'
-  );
-
-  for (const name of moduleNames) {
-    const scriptPath = `./assets/renderer/${name}.js`;
-    assert(indexHtml.includes(`<script src="${scriptPath}"></script>`), `${name} module is not loaded`);
-    assert(indexHtml.includes(`rendererModules.${name}`), `${name} module is not referenced by the page`);
-    new vm.Script(moduleSources[name], { filename: `${name}.js` });
+  const rendererEntries = ['api', 'audio', 'waveform', 'playback', 'workspace', 'equalizer', 'effects', 'timeline'];
+  for (const name of rendererEntries) {
+    assert(indexHtml.includes(`<script src="./assets/renderer/${name}.js"></script>`), `${name} is not loaded`);
+    new vm.Script(read(`assets/renderer/${name}.js`), { filename: `${name}.js` });
   }
-
-  assert(!/function apiUrl|function wsUrl|function drawBarWaveform|new ResizeObserver|window\.devicePixelRatio/.test(indexHtml), 'extracted renderer core remains inline');
-  assert(!/function getSecretUpdateForInput|function getAiSecretUpdates/.test(indexHtml), 'secret-intent core remains inline');
-  assert(indexHtml.includes('rendererWaveform.renderMain(canvas'), 'main waveform is not rendered by the cached module');
-  assert(indexHtml.includes('rendererAudio.resolvePlaybackSource(sound'), 'playback-source selection is not wired');
-  assert(indexHtml.includes('r.metadata?.file_id'), 'AI results do not preserve stable file IDs');
-  assert(indexHtml.includes('selectAndPlaySound(soundObj);'), 'AI result playback is not an explicit select-and-play action');
-  assert(indexHtml.includes('rendererSearch.buildPayload({'), 'search payload module is not wired');
-  assert(indexHtml.includes("rendererApi.post('/api/v1/search', searchRequest)"), 'project-scoped search request is not wired');
-  assert(indexHtml.includes('rendererProjects.listFiles('), 'cursor file API is not wired');
-  assert(indexHtml.includes('loadFilesFromDatabase({ reset: false })'), 'cursor continuation is not wired');
-  assert(indexHtml.includes('id="audioIndexStatus"') && indexHtml.includes('id="textIndexStatus"'), 'project index status UI is missing');
-  assert(indexHtml.includes("runProjectIndexAction('reconcile')"), 'reconcile action is not wired');
-  assert(indexHtml.includes("runProjectIndexAction('rebuild')"), 'rebuild action is not wired');
-
+  const workspace = read('assets/renderer/workspace.js');
+  const timeline = read('assets/renderer/timeline.js');
+  for (const element of ['rows', 'wwiseView', 'wwiseTree', 'wave', 'waveformStatus', 'btnExportWwise', 'dragRange',
+    'moveRange', 'tabVst', 'groupsPanel', 'jobsList']) {
+    assert(indexHtml.includes(`id="${element}"`), `${element} is missing`);
+  }
+  assert(workspace.includes('desktop.fileImport.selectFolder'), 'native folder selection is missing');
+  assert(workspace.includes("route('/imports', libraryId)"), 'imports are not scoped to the chosen library');
+  assert(workspace.includes("api.get(route('/jobs'))"), 'job polling is missing');
+  assert(workspace.includes('state.cursor = result.next_cursor'), 'cursor continuation is missing');
+  assert(workspace.includes('waveform.renderMain(canvas'), 'main waveform is not wired to the canvas');
+  assert(workspace.includes('visiblePreviews()') && workspace.includes('[...waves].slice(0, 2)'),
+    'thumbnail generation is not bounded to visible assets');
+  assert(timeline.includes('ui.openDockEditor(item)') && timeline.includes('ui.miniCanvas(item)'),
+    'Wwise dock does not share the asset waveform workflow');
+  assert(workspace.includes('desktop.startDrag(state.delivery)'), 'native drag does not use a prepared delivery');
+  assert(timeline.includes("desktop.desktopMedia('writeback', session)"), 'Wwise writeback is not wired');
+  assert(mainJs.includes('event.sender.startDrag({ file,'), 'Electron native drag is missing');
+  assert(!/https?:\/\//.test(indexHtml.match(/<script[^>]*src[^>]*>/gi).join('')), 'offline renderer depends on remote scripts');
+  assert(!packageJson.build.extraResources.some(entry => entry.to === 'models'), 'core ships with model resources');
   assert(moduleSources.waveform.includes('value.length > 0 && value.every(Number.isFinite)'), 'strict waveform validation is missing');
   assert(moduleSources.waveform.includes('const layerCache = new WeakMap()'), 'offscreen waveform cache is missing');
-  assert(moduleSources.waveform.includes('inactiveLayer') && moduleSources.waveform.includes('activeLayer'), 'static waveform layers are missing');
-  assert(moduleSources.audio.includes("['aif', 'aiff', 'm4a', 'aac', 'wma']"), 'transcode extension list is incomplete');
-  assert(moduleSources.audio.includes('/playback-source?project_id='), 'file-ID playback-source endpoint is missing');
-  assert(moduleSources.projects.includes('/index/reconcile') && moduleSources.projects.includes('/index/rebuild'), 'project index actions are missing');
-  assert(moduleSources.projects.includes('/api/v1/files?'), 'cursor files endpoint is missing');
-
-  assert(indexHtml.includes('id="waveformStatus"'), 'waveform loading/error status is missing');
-  assert(indexHtml.includes('id="waveformRetryBtn"'), 'waveform retry control is missing');
-  assert(!/伪随机 fallback|备用假数据/.test(indexHtml), 'generated waveform fallback remains');
-  assert(indexHtml.includes("importFiles(\n                        filePaths"), 'file import is not routed to the backend job');
-  assert(mainJs.includes("case 'import-files':"), 'main-process import-files proxy is missing');
-  assert(preloadJs.includes('importFiles: (filePaths'), 'preload import-files API is missing');
-  assert(mainJs.includes('/projects/${encodeURIComponent(requireProjectId(data.projectId))}/imports'), 'project-scoped import proxy is missing');
-  assert(indexHtml.includes('const importProjectId = currentProject?.id;'), 'imports do not capture an explicit active project');
-  assert(indexHtml.includes('monitorImportJobWithoutWebSocket(currentScanTaskId)'), 'imports have no job-polling fallback');
-  assert(!indexHtml.includes('handleBrowserFiles'), 'browser-only import fallback still masks a failed Electron bridge');
-  assert(!moduleSources.search.includes("options.projectId || 'default'"), 'renderer search still silently falls back to the default project');
-  assert(!/top_k\s*:\s*10000|searchAudio\([^\n]*10000/.test(indexHtml + mainJs + preloadJs), 'legacy top_k=10000 remains');
-  assert(mainJs.includes("case 'waveform-by-id':"), 'main-process waveform-by-id proxy is missing');
   assert(mainJs.includes("const BACKEND_ERROR_SENTINEL = '__soundbotBackendError'"), 'structured backend error sentinel is missing');
   assert(preloadJs.includes('throw createRendererError(result.error)'), 'preload does not reject structured backend errors');
   assert(mainJs.includes('retryable: Boolean(') && mainJs.includes('details,'), 'structured backend error fields are incomplete');
@@ -110,19 +87,16 @@ async function main() {
   assert(mainJs.includes('updateBackendEndpoint(Number(match[1]))'), 'announced backend port is not authoritative');
   assert(mainJs.includes("payload?.status === 'healthy'"), 'health polling can accept an unrelated HTTP service');
   assert(preloadJs.includes("cancelRequest: (requestId) => ipcRenderer.invoke('backend-api-cancel'"), 'preload cancellation API is missing');
-  assert(indexHtml.includes('cancelActiveWaveformRequest();'), 'main waveform does not cancel stale HTTP requests');
+  assert(workspace.includes('peakRequest?.abort()'), 'main waveform does not cancel stale HTTP requests');
   assert(mainJs.includes('safeStorage.encryptString'), 'safeStorage secret encryption is missing');
-  assert(preloadJs.includes('secrets: {'), 'secret API is not exposed by preload');
-
-  for (const provider of ['azure', 'gemini', 'anthropic', 'kimi_coding']) {
-    const pattern = new RegExp(`<label class="[^"]*hidden[^"]*"[^>]*data-llm-provider="${provider}"`);
-    assert(pattern.test(indexHtml), `${provider} should be hidden`);
-  }
+  assert(!preloadJs.includes('secrets: {'), 'preload exposes a general-purpose credential bridge');
+  assert(mainJs.includes('devTools: false') && !mainJs.includes('openDevTools('), 'developer tools are enabled');
+  assert(mainJs.includes('X-SoundBot-IPC') && !preloadJs.includes('X-SoundBot-IPC'), 'desktop token escaped the main process');
 
   assert(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(packageJson.version), 'package version is not SemVer');
   assert(backendVersionMatch, 'backend APP_VERSION is missing');
   assert.strictEqual(packageJson.version, backendVersionMatch[1], 'frontend/backend versions drifted');
-  assert(packageJson.build.files.includes('assets/**/*'), 'renderer modules are not included in packaging');
+  assert(packageJson.build.files.includes('assets/renderer/*.js'), 'renderer modules are not included in packaging');
   assert(packageJson.build.files.includes('splash.html'), 'the app-styled splash page is not packaged');
   const splashHtml = read('splash.html');
   assert(splashHtml.includes('id="closeButton"'), 'fatal splash state has no exit control');
@@ -167,27 +141,8 @@ async function main() {
   assert.strictEqual(modules.api.url('/api/v1/health'), 'http://127.0.0.1:19000/api/v1/health');
   assert.strictEqual(modules.api.wsUrl('/ws/scan/x'), 'ws://127.0.0.1:19000/ws/scan/x');
 
-  const store = modules.state.createStore({ project: 'default' });
-  assert.strictEqual(store.set('project', 'demo'), 'demo');
-  assert.strictEqual(store.get('project'), 'demo');
-  assert(modules.state.isSameOrChildPath('C:\\Audio\\FX', 'C:\\Audio'));
-
-  assert.throws(() => modules.search.buildPayload({ query: 'hit' }), /projectId is required/);
-  const payload = modules.search.buildPayload({
-    query: ' hit ', topK: 10000, threshold: 2, page: 0, pageSize: 50, projectId: 'project-a'
-  });
-  assert.strictEqual(payload.query, 'hit');
-  assert.strictEqual(payload.top_k, 1000);
-  assert.strictEqual(payload.threshold, 1);
-  assert.strictEqual(payload.page, 1);
-  assert.strictEqual(payload.project_id, 'project-a');
-  assert.strictEqual(
-    modules.search.buildChatPayload({ message: 'hit', projectId: 'project-a' }).project_id,
-    'project-a'
-  );
-
   const normalSource = await modules.audio.resolvePlaybackSource({ filePath: '/tmp/test.wav', fileId: 'wav-id' });
-  assert(normalSource.startsWith('soundmind-audio://local/'));
+  assert(normalSource.startsWith('soundbot-audio://local/'));
   const soundA = { id: 'sound-a', fileId: 'sound-a' };
   const soundB = { id: 'sound-b', fileId: 'sound-b' };
   assert.strictEqual(modules.audio.playbackAction(soundA, soundA, true), 'pause');
@@ -203,7 +158,7 @@ async function main() {
     { filePath: 'C:\\Audio\\test.wma', fileId: 'wma-id' },
     { api: modules.api, projectId: 'project-a' }
   );
-  assert.strictEqual(wmaSource, 'soundmind-audio://local/%2Ftmp%2Frendered.wav');
+  assert.strictEqual(wmaSource, 'soundbot-audio://local/%2Ftmp%2Frendered.wav');
   assert.strictEqual(calls.length, callCountBeforeWma + 1);
   assert(calls.at(-1).url.includes('/api/v1/files/wma-id/playback-source?project_id=project-a'));
   await modules.audio.resolvePlaybackSource(
@@ -240,34 +195,8 @@ async function main() {
   modules.waveform.renderMain(mainCanvas, { waveformData: peaks, duration: 1000, progress: 0.8 });
   assert.strictEqual(createdLayers, 2, 'static waveform layers were rebuilt for a progress-only frame');
 
-  await modules.projects.listFiles('project-a', { limit: 200, cursor: 9 });
-  assert(calls.at(-1).url.includes('/api/v1/files?project_id=project-a&limit=200&cursor=9'));
-  const indexStatus = await modules.projects.indexStatus('project-a');
-  assert.deepStrictEqual(
-    JSON.parse(JSON.stringify(modules.projects.artifactSummary(indexStatus, 'audio_vector'))),
-    { ready: 5, pending: 3, failed: 1 }
-  );
-  await modules.projects.reconcileIndex('project-a', ['audio_vector', 'text_vector']);
-  assert(calls.at(-1).url.endsWith('/api/v1/projects/project-a/index/reconcile'));
-  assert.deepStrictEqual(JSON.parse(calls.at(-1).options.body).kinds, ['audio_vector', 'text_vector']);
-  const completedJob = await modules.projects.waitForJob('job-1');
-  assert.strictEqual(completedJob.state, 'completed');
-
-  assert.deepStrictEqual(
-    JSON.parse(JSON.stringify(modules.settings.secretIntent({ dataset: { secretAction: 'keep' }, value: '' }))),
-    { action: 'keep' }
-  );
-  assert.deepStrictEqual(
-    JSON.parse(JSON.stringify(modules.settings.secretIntent({ dataset: { secretAction: 'set' }, value: ' new-key ' }))),
-    { action: 'set', value: 'new-key' }
-  );
-  assert.deepStrictEqual(
-    JSON.parse(JSON.stringify(modules.settings.secretIntent({ dataset: { secretAction: 'clear' }, value: '' }))),
-    { action: 'clear' }
-  );
-
   const inlineScripts = [...indexHtml.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
-  assert(inlineScripts.length > 0, 'no inline renderer script found');
+  assert.strictEqual(inlineScripts.length, 0, 'workspace logic should be packaged in renderer modules');
   for (const [index, match] of inlineScripts.entries()) {
     new vm.Script(match[1], { filename: `index.inline.${index}.js` });
   }

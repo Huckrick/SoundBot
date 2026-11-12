@@ -25,28 +25,19 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertRegex(self.text, r"(?m)^  PYTHONUTF8: '1'$")
         self.assertRegex(self.text, r"(?m)^  PYTHONIOENCODING: 'utf-8'$")
 
-    def test_release_workflow_is_strictly_tag_push_only(self) -> None:
-        self.assertRegex(
-            self.text,
-            r"(?ms)^on:\n  push:\n    tags:\n      - 'v\*'\n\npermissions:",
-        )
-        self.assertNotIn("workflow_dispatch", self.text)
+    def test_manual_builds_cannot_create_a_release(self) -> None:
+        self.assertIn("  workflow_dispatch:\n", self.text)
+        self.assertIn("      - 'v*'\n", self.text)
+        self.assertIn("    if: github.event_name == 'push' && github.ref_type == 'tag'", self.text)
+        self.assertNotIn("--draft=false", self.text)
         self.assertNotIn("inputs.tag_name", self.text)
-        self.assertNotIn("github.event_name", self.text)
-        self.assertIn(
-            "group: soundbot-release-${{ github.ref_name }}",
-            self.text,
-        )
-        self.assertEqual(
-            self.text.count("RELEASE_TAG: ${{ github.ref_name }}"),
-            1,
-        )
+        self.assertIn("ref: ${{ github.sha }}", self.text)
 
     def test_windows_asar_inventory_is_path_separator_independent(self) -> None:
         self.assertIn("$asarEntriesRaw = & npx --no-install asar list", self.text)
         self.assertIn("-replace '\\\\', '/'", self.text)
         self.assertIn(
-            "@('main.js', 'preload.js', 'index.html', 'splash.html', 'assets/i18n.js', 'config/audio_capabilities.json')",
+            "@('main.js', 'preload.js', 'index.html', 'splash.html', 'assets/i18n.js', 'assets/locale.js', 'assets/locale-messages.js', 'assets/audio-icon.png', 'config/audio_capabilities.json')",
             self.text,
         )
 
@@ -68,7 +59,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn('git merge-base --is-ancestor "$TAG_SHA" "origin/$DEFAULT_BRANCH"', self.text)
         self.assertGreaterEqual(
             self.text.count("ref: ${{ needs.validate-release.outputs.release_sha }}"),
-            4,
+            3,
         )
         self.assertIn("--verify-tag", self.text)
 
@@ -77,17 +68,12 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotRegex(self.text, r"(?m)^\s+pyinstaller\s+main\.spec")
         self.assertNotRegex(self.text, r"(?m)^\s+npx electron-builder")
 
-    def test_model_and_release_gates_are_not_contradictory(self) -> None:
-        self.assertIn('$env:ENABLE_MODEL_PRELOAD = "true"', self.text)
-        self.assertIn("CLAP model did not become ready", self.text)
-        self.assertIn("check_frozen_audio_matrix.py", self.text)
-        self.assertIn("verify_packaged_models", self.text)
+    def test_core_release_runs_audio_matrix_on_both_platforms(self) -> None:
+        self.assertNotIn("build-models:", self.text)
+        self.assertNotIn("models.zip", self.text)
+        self.assertGreaterEqual(self.text.count("check_frozen_audio_matrix.py"), 2)
         self.assertIn('p["version"] == sys.argv[2].removeprefix("v")', self.text)
         self.assertIn("$resp.version -eq ($env:RELEASE_TAG).TrimStart('v')", self.text)
-        self.assertIn("soundbot-models-intentionally-missing", self.text)
-        self.assertIn("needs: [validate-release, build-models]", self.text)
-        self.assertEqual(self.text.count("name: models-package"), 3)
-        self.assertGreaterEqual(self.text.count("verify_packaged_models"), 2)
 
     def test_release_is_draft_verified_and_channel_aware(self) -> None:
         self.assertIn("cancel-in-progress: false", self.text)
@@ -124,20 +110,14 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("Install NSIS and smoke-test installed Electron", self.text)
         self.assertIn("/S /currentuser /D=$installDir", self.text)
         self.assertIn("check_installed_electron.py", self.text)
-        self.assertIn("--require-models", self.text)
+        self.assertNotIn("--require-models", self.text)
         self.assertIn("soundbot-installed-electron-smoke", self.text)
 
-    def test_packaged_macos_bundle_loads_its_embedded_model_offline(self) -> None:
-        mac_job = self.text.split("  build-macos:", 1)[1].split(
-            "  build-windows:", 1
-        )[0]
-        self.assertIn("Smoke packaged macOS bundled CLAP", mac_job)
-        self.assertIn('MODELS_PATH="$APP_PATH/Contents/Resources/models"', mac_job)
-        self.assertIn("verify_packaged_models(Path(sys.argv[1]))", mac_job)
-        self.assertIn("ENABLE_MODEL_PRELOAD=true", mac_job)
-        self.assertIn("HF_HUB_OFFLINE=1", mac_job)
-        self.assertIn("TRANSFORMERS_OFFLINE=1", mac_job)
-        self.assertIn("MODEL_READY=true", mac_job)
+    def test_packaged_macos_bundle_smokes_the_core_runtime(self) -> None:
+        mac_job = self.text.split("  build-macos:", 1)[1].split("  build-windows:", 1)[0]
+        self.assertIn("Smoke packaged macOS offline library", mac_job)
+        self.assertIn("check_frozen_audio_matrix.py", mac_job)
+        self.assertNotIn("ENABLE_MODEL_PRELOAD", mac_job)
 
 
 class ValidationWorkflowContractTests(unittest.TestCase):

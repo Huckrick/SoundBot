@@ -1,11 +1,10 @@
 {
   "name": "soundbot",
-  "version": "0.2.1-beta.3",
-  "description": "SoundBot - local-first AI sound effect manager with semantic search",
+  "version": "1.0.0",
+  "description": "SoundBot - local-first sound effects library and middleware workspace",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --dev",
     "build": "python scripts/build.py",
     "build:mac": "python scripts/build.py --platform macos",
     "build:win": "python scripts/build.py --platform windows",
@@ -19,20 +18,18 @@
     "sound",
     "manager",
     "ai",
-    "semantic-search",
-    "clap",
     "pyinstaller"
   ],
-  "author": "Nagisa_Huckrick (胡杨)",
+  "author": "Huckrick",
   "license": "GPL-3.0-or-later",
   "devDependencies": {
-    "electron": "28.3.3",
+    "electron": "45.3.1",
     "electron-builder": "26.8.1"
   },
   "build": {
     "appId": "com.soundbot.app",
     "productName": "SoundBot",
-    "copyright": "Copyright © 2026 Nagisa_Huckrick (胡杨)",
+    "copyright": "Copyright © 2026 Huckrick and SoundBot contributors",
     "directories": {
       "output": "dist-electron",
       "buildResources": "build"
@@ -42,17 +39,17 @@
       "preload.js",
       "index.html",
       "splash.html",
-      "tailwindcss.js",
-      "lucide.min.js",
-      "assets/**/*",
-      "config/**/*",
+      "assets/*.js",
+      "assets/renderer/*.js",
+      "assets/soundbot.svg",
+      "assets/audio-icon.png",
+      "config/audio_capabilities.json",
       "!backend/**",
       "!scripts/**",
       "!**/*.pyc",
       "!**/__pycache__",
       "!**/*.spec",
       "!**/.DS_Store",
-      "!SoundBot.png",
       "!backend/dist",
       "!backend/build",
       "!dist-electron",
@@ -117,15 +114,6 @@
       {
         "from": "dist/backend/soundbot-backend",
         "to": "backend/soundbot-backend"
-      },
-      {
-        "from": "models",
-        "to": "models",
-        "filter": [
-          "model-manifest.json",
-          "CLAP_MODEL_NOTICE.txt",
-          "clap/**/*"
-        ]
       }
     ],
     "publish": null

@@ -12,7 +12,7 @@
       --border-color: #262626;
       --text-primary: #e5e5e5;
       --text-secondary: #a3a3a3;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, sans-serif;
+      font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
     }
 
     * { box-sizing: border-box; }
@@ -42,6 +42,10 @@
     }
 
     .brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
       font-size: 22px;
       font-weight: 650;
       letter-spacing: -0.02em;
@@ -118,7 +122,7 @@
 </head>
 <body>
   <main role="status" aria-live="polite">
-    <div class="brand">SoundBot</div>
+    <div class="brand"><img src="./assets/soundbot.svg" width="32" height="32" alt="">SoundBot</div>
     <div class="status" id="status">正在启动服务…</div>
     <div class="progress" id="progress">初始化中</div>
     <div class="indicator" aria-hidden="true"></div>
@@ -127,6 +131,9 @@
       <button class="action-button" id="closeButton" type="button">退出应用</button>
     </div>
   </main>
+  <script src="./assets/locale-messages.js"></script>
+  <script src="./assets/locale.js"></script>
+  <script src="./assets/i18n.js"></script>
   <script>
     window.setSoundBotSplashStatus = ({ status, progress, isError }) => {
       document.getElementById('status').textContent = status;

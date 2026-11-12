@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise an actual NSIS-installed SoundBot Electron/backend chain.
+"""Exercise a packaged SoundBot Electron/backend chain.
 
 The release workflow launches the installed application with Chromium's local
 debugging endpoint, then evaluates only the same context-bridged APIs available
@@ -25,7 +25,7 @@ import time
 import urllib.request
 import wave
 
-import websocket
+from websockets.sync.client import connect
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -62,7 +62,7 @@ def _discover_main_target(port: int, deadline: float) -> tuple[str, list[str]]:
     endpoint = f"http://127.0.0.1:{port}/json/list"
     while time.monotonic() < deadline:
         try:
-            with urllib.request.urlopen(endpoint, timeout=2) as response:
+            with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(endpoint, timeout=2) as response:
                 targets = json.loads(response.read().decode("utf-8"))
             observed_urls = [str(item.get("url", "")) for item in targets]
             for target in targets:
@@ -85,11 +85,8 @@ def _discover_main_target(port: int, deadline: float) -> tuple[str, list[str]]:
 
 class _DevToolsClient:
     def __init__(self, url: str, timeout: float) -> None:
-        self._connection = websocket.create_connection(
-            url,
-            timeout=timeout,
-            suppress_origin=True,
-        )
+        self._connection = connect(url, open_timeout=timeout, max_size=16 * 1024 * 1024, proxy=None)
+        self._timeout = timeout
         self._next_id = 0
 
     def close(self) -> None:
@@ -105,7 +102,7 @@ class _DevToolsClient:
             )
         )
         while True:
-            payload = json.loads(self._connection.recv())
+            payload = json.loads(self._connection.recv(timeout=self._timeout))
             if payload.get("id") != request_id:
                 continue
             if "error" in payload:
@@ -386,21 +383,7 @@ def _renderer_smoke_expression(
     }}
     return payload;
   }};
-  const waitForModel = async () => {{
-    const deadline = Date.now() + {timeout_ms};
-    while (Date.now() < deadline) {{
-      const status = await requestJson('/model/status');
-      if (status?.model_status?.loaded === true && status?.embedder_available === true) {{
-        return status;
-      }}
-      if (status?.model_status?.error) {{
-        throw new Error(`installed CLAP preload failed: ${{status.model_status.error}}`);
-      }}
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    }}
-    throw new Error('installed CLAP model did not become ready');
-  }};
-  const modelStatus = await waitForModel();
+  if (health.model_loaded !== false) throw new Error('core backend must run without a model');
   const waitForJob = async (jobId) => {{
     const deadline = Date.now() + {timeout_ms};
     while (Date.now() < deadline) {{
@@ -438,12 +421,6 @@ def _renderer_smoke_expression(
   if (records.some((item) => !item?.id)) {{
     throw new Error(`installed imports missing from SQLite: ${{JSON.stringify(listing)}}`);
   }}
-  for (const record of records) {{
-    if (record.audio_index_state !== 'ready' || record.text_index_state !== 'ready') {{
-      throw new Error(`installed dual index is not ready for ${{record.filename}}: ${{JSON.stringify(record)}}`);
-    }}
-  }}
-
   const search = await api.backendAPI.searchAudio('tone', 20, 0.0, 1, 20, 'default');
   const resultById = new Map(
     (search?.results || []).map((item) => [item?.audio_file?.id, item])
@@ -451,12 +428,67 @@ def _renderer_smoke_expression(
   for (const record of records) {{
     const match = resultById.get(record.id);
     if (!match) {{
-      throw new Error(`dual-index search did not return ${{record.filename}}: ${{JSON.stringify(search)}}`);
+      throw new Error(`keyword search did not return ${{record.filename}}: ${{JSON.stringify(search)}}`);
     }}
-    if (!Number.isFinite(match?.metadata?.audio_score) || !Number.isFinite(match?.metadata?.text_score)) {{
-      throw new Error(`dual-index search scores are incomplete for ${{record.filename}}: ${{JSON.stringify(match)}}`);
+    if (!Number.isFinite(match?.metadata?.keyword_score)) {{
+      throw new Error(`keyword search scores are incomplete for ${{record.filename}}: ${{JSON.stringify(match)}}`);
     }}
   }}
+
+  const wmaRecord = records.find((item) => item.filename.toLowerCase().endsWith('.wma'));
+  const until = async (check, description) => {{
+    const deadline = Date.now() + 12000;
+    while (Date.now() < deadline) {{
+      if (check()) return;
+      await new Promise(resolve => setTimeout(resolve, 12));
+    }}
+    throw new Error(`workspace did not reach ${{description}}. ${{document.getElementById('toast')?.textContent}}`);
+  }};
+  const workspace = globalThis.SoundBotWorkspace;
+  await until(() => workspace?.state.library?.id === 'default', 'active library');
+  const searchInput = document.getElementById('searchInput');
+  searchInput.value = 'tone';
+  searchInput.dispatchEvent(new Event('input', {{bubbles: true}}));
+  await until(() => document.getElementById('rowCount').textContent === SoundBotI18n.t('结果：{{count}}', {{count: 3}}), 'keyword results');
+  const language = document.getElementById('languageSelect');
+  const heading = document.getElementById('activeViewLabel');
+  const viewIcons = [...document.querySelectorAll('#viewTabs button')];
+  const position = element => [element.offsetLeft, element.offsetTop, element.offsetWidth, element.offsetHeight];
+  const sidebarGeometry = JSON.stringify([heading, ...viewIcons].map(position));
+  const originalLocale = language.value;
+  const folders = {{ 'zh-CN': '文件夹', 'zh-TW': '資料夾', ja: 'フォルダー', en: 'Folders', 'pt-BR': 'Pastas', es: 'Carpetas' }};
+  const languages = [...language.options].map(option => option.value);
+  if (languages.length !== 6 || new Set(languages).size !== 6) throw new Error('locale choices are incomplete');
+  for (const id of languages) {{
+    language.value = id;
+    language.dispatchEvent(new Event('change', {{ bubbles: true }}));
+    if (document.documentElement.lang !== id || heading.textContent !== folders[id] ||
+        viewIcons[0].getAttribute('aria-label') !== folders[id] ||
+        document.getElementById('rowCount').textContent !== SoundBotI18n.t('结果：{{count}}', {{count: 3}}) ||
+        JSON.stringify([heading, ...viewIcons].map(position)) !== sidebarGeometry) {{
+      throw new Error(`sidebar or localization failed for ${{id}}`);
+    }}
+  }}
+  viewIcons[2].click();
+  if (viewIcons[2].getAttribute('aria-pressed') !== 'true' ||
+      heading.textContent !== SoundBotI18n.t('分组') ||
+      JSON.stringify([heading, ...viewIcons].map(position)) !== sidebarGeometry) {{
+    throw new Error('changing library views moved or failed to update the sidebar caption');
+  }}
+  viewIcons[0].click();
+  language.value = originalLocale;
+  language.dispatchEvent(new Event('change', {{ bubbles: true }}));
+  const thumbnailReady = canvas => {{
+    if (!canvas) return false;
+    const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+    return pixels.some((value, index) => index % 4 === 3 && value > 0);
+  }};
+  await until(() => {{
+    const rows = [...document.querySelectorAll('#rows .row')];
+    return rows.length === records.length && rows.every(row =>
+      row.querySelector('.asset-cover') && thumbnailReady(row.querySelector('canvas'))
+    );
+  }}, 'automatic visible thumbnails before selection');
 
   const waveformSummaries = [];
   for (const record of records) {{
@@ -478,7 +510,48 @@ def _renderer_smoke_expression(
       state: record.waveform_state,
     }});
   }}
-  const wmaRecord = records.find((item) => item.filename.toLowerCase().endsWith('.wma'));
+  workspace.playback.setVolume(0, true);
+  const audition = async (filename) => {{
+    const row = [...document.querySelectorAll('#rows .row')].find(
+      item => item.title.split(/[\\\\/]/).at(-1) === filename
+    );
+    if (!row) throw new Error(`missing visible row: ${{filename}}`);
+    const start = performance.now();
+    row.click();
+    await until(() => workspace.playback.currentTime() > 0.01, `playing ${{filename}}`);
+    const ms = Math.round(performance.now() - start);
+    document.getElementById('btnStop').click();
+    return ms;
+  }};
+  const auditionMs = {{ native: await audition(expectedNames[0]), streamed: await audition(wmaRecord.filename) }};
+  const wwiseTab = document.querySelector('[data-ws="wwise"]');
+  wwiseTab.click();
+  await until(() => wwiseTab.getAttribute('aria-selected') === 'true', 'middleware workspace');
+  if (wwiseTab.textContent !== SoundBotI18n.t('中间件工作台')) throw new Error('middleware workspace label missing');
+  const hostSelector = document.getElementById('middlewareHost');
+  if ([...hostSelector.options].map(option => option.value).join() !== 'wwise,fmod,cri') {{
+    throw new Error('middleware host choices are incomplete');
+  }}
+  for (const host of ['fmod', 'cri', 'wwise']) {{
+    hostSelector.value = host;
+    hostSelector.dispatchEvent(new Event('change', {{ bubbles: true }}));
+    await until(() => document.getElementById('middlewareSettingsHost').value === host && !hostSelector.disabled,
+      `middleware host ${{host}}`);
+    const exportLabel = SoundBotI18n.t(host === 'wwise' ? '渲染并导回 Wwise' : '渲染新 WAV');
+    if (document.getElementById('btnExportWwise').textContent !== exportLabel) {{
+      throw new Error(`incorrect delivery mode for ${{host}}`);
+    }}
+  }}
+  const dock = document.getElementById('miniRows');
+  await until(() => thumbnailReady(dock.querySelector('canvas')), 'docked waveform previews');
+  if (!document.getElementById('tabAi').classList.contains('hidden') ||
+      document.getElementById('tabVst').classList.contains('hidden')) {{
+    throw new Error('unexpected Wwise inspector tabs');
+  }}
+  dock.querySelector('.mini-name').click();
+  await until(() => workspace.state.dockEditing && workspace.state.waveform, 'shared dock waveform editor');
+  document.getElementById('btnBackDock').click();
+  if (workspace.state.dockEditing) throw new Error('dock editor failed to close');
   const wmaPlayback = await requestJson(
     `/files/${{encodeURIComponent(wmaRecord.id)}}/playback-source?project_id=default`
   );
@@ -492,14 +565,12 @@ def _renderer_smoke_expression(
     capabilities: capabilities.extensions.length,
     fileJob: fileJobResult.state,
     folderJob: folderJobResult.state,
-    modelLoaded: modelStatus.model_status.loaded,
-    modelFingerprint: modelStatus.model_status.fingerprint,
+    modelLoaded: health.model_loaded,
     imported: records.length,
     searched: resultById.size,
-    dualIndexReady: records.every((item) =>
-      item.audio_index_state === 'ready' && item.text_index_state === 'ready'
-    ),
     wmaPlayback: wmaPlayback.mode,
+    auditionMs,
+    languages,
     waveforms: waveformSummaries,
   }};
 }})()
@@ -582,27 +653,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--fixture-root", required=True, type=Path)
     parser.add_argument("--debug-port", type=int, default=0)
     parser.add_argument("--timeout", type=int, default=480)
-    parser.add_argument("--require-models", action="store_true")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    if os.name != "nt":
-        raise RuntimeError("the installed Electron smoke must run on Windows")
-
     executable = args.executable.resolve(strict=True)
     fixture_root = args.fixture_root.resolve()
     fixture_root.mkdir(parents=True, exist_ok=True)
-    resources = executable.parent / "resources"
-    backend_executable = (
-        resources / "backend" / "soundbot-backend" / "soundbot-backend.exe"
+    windows = os.name == "nt"
+    resources = executable.parent / "resources" if windows else executable.parent.parent / "Resources"
+    backend_executable = resources / "backend" / "soundbot-backend" / (
+        "soundbot-backend.exe" if windows else "soundbot-backend"
     )
     if not backend_executable.is_file():
         raise FileNotFoundError(f"installed backend is missing: {backend_executable}")
-    model_manifest = None
-    if args.require_models:
-        model_manifest = _verify_installed_models(resources / "models")
+    if (resources / "models").exists():
+        raise ValueError("core installer contains a model directory")
 
     file_fixture = (
         fixture_root / "单文件 导入 % # + (A)" / "tone 单文件 % # + (A).wav"
@@ -627,14 +694,12 @@ def main() -> int:
     electron_log = fixture_root / "installed-electron.chromium.log"
     port = args.debug_port or _free_loopback_port()
     env = dict(os.environ)
-    # The build job also has a verified workspace model. Never allow that
-    # source path to mask a missing/corrupt model in the installed resources.
     env.pop("SOUNDBOT_MODELS_PATH", None)
     env.update(
         {
             "APPDATA": str(appdata),
             "LOCALAPPDATA": str(local_appdata),
-            "ENABLE_MODEL_PRELOAD": "true" if args.require_models else "false",
+            "SOUNDBOT_USER_DATA_DIR": str(fixture_root / "user-data"),
             "ELECTRON_ENABLE_LOGGING": "true",
             "ELECTRON_LOG_FILE": str(electron_log),
             "HF_HUB_OFFLINE": "1",
@@ -657,6 +722,7 @@ def main() -> int:
                     "--remote-debugging-address=127.0.0.1",
                     "--remote-allow-origins=*",
                     "--disable-gpu",
+                    "--autoplay-policy=no-user-gesture-required",
                 ],
                 cwd=str(executable.parent),
                 env=env,
@@ -673,7 +739,7 @@ def main() -> int:
                 _exercise_native_chooser(
                     client, process.pid, "selectFolder", timeout=45.0
                 ),
-            ]
+            ] if windows else []
             result = client.evaluate(
                 _renderer_smoke_expression(
                     file_fixture,
@@ -694,10 +760,9 @@ def main() -> int:
         if (
             not result.get("bridge")
             or result.get("imported") != 3
-            or (args.require_models and not result.get("modelLoaded"))
-            or (args.require_models and not result.get("dualIndexReady"))
+            or result.get("modelLoaded") is not False
             or result.get("wmaPlayback") != "transcoded_wav"
-            or len(result.get("nativeDialogs") or []) != 2
+            or len(result.get("nativeDialogs") or []) != (2 if windows else 0)
             or not all(item.get("appeared") for item in result.get("nativeDialogs", []))
         ):
             raise AssertionError(f"installed Electron smoke was incomplete: {result}")
@@ -706,9 +771,6 @@ def main() -> int:
                 {
                     "executable": str(executable),
                     "resources": str(resources),
-                    "model_revision": (
-                        model_manifest.get("revision") if model_manifest else None
-                    ),
                     "targets": observed_urls,
                     **result,
                 },
@@ -724,7 +786,7 @@ def main() -> int:
         print(_tail(stderr_log), file=sys.stderr)
         print("--- installed Electron Chromium log (tail) ---", file=sys.stderr)
         print(_tail(electron_log), file=sys.stderr)
-        for backend_log in sorted(fixture_root.rglob("soundmind_*.log")):
+        for backend_log in sorted(fixture_root.rglob("soundbot_*.log")):
             print(f"--- frozen backend log: {backend_log} (tail) ---", file=sys.stderr)
             print(_tail(backend_log), file=sys.stderr)
         raise

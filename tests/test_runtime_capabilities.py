@@ -30,7 +30,6 @@ class RuntimeCapabilitiesTests(unittest.TestCase):
         with (
             mock.patch.object(audio_service_module, "_av", None),
             mock.patch.object(audio_service_module, "_AV_IMPORT_ERROR", private_error),
-            mock.patch.object(main, "is_embedder_loaded", return_value=False),
         ):
             health = asyncio.run(main.health_check())
             capabilities = asyncio.run(main.get_runtime_capabilities())
@@ -52,7 +51,6 @@ class RuntimeCapabilitiesTests(unittest.TestCase):
 
         with (
             mock.patch.object(audio_service_module, "_av", FakeAV()),
-            mock.patch.object(main, "is_embedder_loaded", return_value=False),
         ):
             health = asyncio.run(main.health_check())
             capabilities = asyncio.run(main.get_runtime_capabilities())

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # SoundBot - AI 音效管理器
-# Copyright (C) 2026 Nagisa_Huckrick (胡杨)
+# Copyright (C) 2026 Huckrick and SoundBot contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -65,60 +65,6 @@ def get_user_data_dir() -> Path:
     return data_dir
 
 
-def find_models_dir() -> Path:
-    """
-    自动检索模型目录（多路径优先级）
-    
-    检索顺序:
-    1. 环境变量 SOUNDBOT_MODELS_PATH
-    2. 可执行文件同级目录的 models/
-    3. 可执行文件上级目录的 models/
-    4. 用户数据目录的 models/
-    5. 开发环境项目根目录的 models/
-    
-    Returns:
-        模型目录路径（无论是否存在）
-    """
-    exe_dir = get_executable_dir()
-    user_data = get_user_data_dir()
-    
-    # 所有可能的路径（按优先级）
-    possible_paths = []
-    
-    # 1. 环境变量（最高优先级）
-    env_path = os.getenv('SOUNDBOT_MODELS_PATH')
-    if env_path:
-        # An explicit override is authoritative even when it is missing. This
-        # makes configuration errors observable and allows release tests to
-        # prove the application degrades cleanly without silently finding a
-        # different bundled/user model.
-        return Path(env_path).expanduser()
-    
-    # 2. 可执行文件同级目录
-    possible_paths.append(exe_dir / 'models')
-    
-    # 3. 可执行文件上级目录（Electron 资源目录结构）
-    possible_paths.append(exe_dir.parent / 'models')
-    possible_paths.append(exe_dir.parent.parent / 'models')
-    
-    # 4. 用户数据目录
-    possible_paths.append(user_data / 'models')
-    
-    # 5. 开发环境
-    if not getattr(sys, 'frozen', False):
-        dev_root = Path(__file__).parent.parent
-        possible_paths.append(dev_root / 'models')
-    
-    # 查找第一个包含 clap 子目录的路径
-    for models_path in possible_paths:
-        clap_dir = models_path / 'clap'
-        if clap_dir.exists() and clap_dir.is_dir():
-            return models_path
-    
-    # 如果没有找到，返回第一个路径（用于错误提示）
-    return possible_paths[0] if possible_paths else exe_dir / 'models'
-
-
 def get_db_path() -> Path:
     """获取数据库存储路径（用户数据目录）"""
     db_path = get_user_data_dir() / 'db'
@@ -159,7 +105,7 @@ def get_chroma_db_path(project_id: str = "default") -> Path:
 # ==================== 项目基础配置 ====================
 
 APP_NAME = "SoundBot"
-APP_VERSION = "0.2.1-beta.3"
+APP_VERSION = "1.0.0"
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
 # ==================== 服务器配置 ====================
@@ -180,7 +126,7 @@ CORS_ORIGINS = [
 
 # ==================== 模型配置 ====================
 
-HF_ENDPOINT = os.getenv("HF_ENDPOINT", "https://hf-mirror.com")
+HF_ENDPOINT = os.getenv("HF_ENDPOINT", "https://huggingface.co")
 
 
 def find_models_dir_runtime() -> Path:
@@ -254,17 +200,6 @@ def get_clap_model_name() -> str:
     return str(clap_path)
 
 
-# 自动查找模型目录（使用运行时版本确保每次都读取最新环境变量）
-MODELS_DIR = str(find_models_dir_runtime())
-CLAP_MODEL_PATH = str(Path(MODELS_DIR) / 'clap')
-
-# 仅允许本地、经 manifest 校验安装的 CLAP 模型。模型缺失时应用仍可
-# 启动元数据功能，但绝不在请求路径隐式访问 Hugging Face。
-CLAP_MODEL_NAME = str(CLAP_MODEL_PATH)
-
-# 注意：在 PyInstaller 打包后的环境中，CLAP_MODEL_NAME 可能是错误的绝对路径
-# 应该使用 get_clap_model_name() 函数来获取正确的模型路径
-
 CLAP_DEVICE = os.getenv("CLAP_DEVICE", "auto")
 MODEL_LOAD_TIMEOUT = int(os.getenv("MODEL_LOAD_TIMEOUT", "120"))
 ENABLE_MODEL_PRELOAD = os.getenv("ENABLE_MODEL_PRELOAD", "true").lower() == "true"
@@ -309,50 +244,6 @@ PLAYBACK_WAV_CACHE_MAX_BYTES = int(
 )
 PLAYBACK_WAV_CACHE_MAX_FILES = int(os.getenv('PLAYBACK_WAV_CACHE_MAX_FILES', '128'))
 MAX_AUDIO_DURATION = 300  # 最大处理 5 分钟音频
-
-# ==================== 临时文件配置 ====================
-
-DEFAULT_TEMP_CLIP_DIR = str(get_temp_dir())
-PROJECT_TEMP_CLIP_DIR = None
-
-# 获取临时文件目录（支持用户自定义）
-def get_temp_clip_dir() -> str:
-    """
-    获取临时文件存放目录
-    优先使用当前工程目录，其次读取用户配置，否则使用默认路径
-    """
-    import json
-
-    if PROJECT_TEMP_CLIP_DIR and Path(PROJECT_TEMP_CLIP_DIR).exists():
-        return str(PROJECT_TEMP_CLIP_DIR)
-    
-    config_path = get_user_data_dir() / 'user_config.json'
-    if config_path.exists():
-        try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                user_config = json.load(f)
-                temp_dir = user_config.get('tempClipDir')
-                if temp_dir and Path(temp_dir).exists():
-                    return temp_dir
-        except Exception:
-            pass
-    
-    return str(DEFAULT_TEMP_CLIP_DIR)
-
-
-def set_project_temp_clip_dir(temp_dir: str = None) -> str:
-    """设置当前工程的临时文件目录覆盖值。"""
-    global PROJECT_TEMP_CLIP_DIR, TEMP_CLIP_DIR
-
-    if temp_dir and Path(temp_dir).exists():
-        PROJECT_TEMP_CLIP_DIR = str(Path(temp_dir))
-    else:
-        PROJECT_TEMP_CLIP_DIR = None
-
-    TEMP_CLIP_DIR = get_temp_clip_dir()
-    return TEMP_CLIP_DIR
-
-TEMP_CLIP_DIR = get_temp_clip_dir()
 
 # ==================== 工程管理配置 ====================
 
@@ -446,6 +337,5 @@ def validate_audio_path(file_path: str, allowed_base: Path = None) -> Path:
 if __name__ == "__main__" or DEBUG:
     print(f"[Config] 可执行文件目录: {get_executable_dir()}")
     print(f"[Config] 用户数据目录: {get_user_data_dir()}")
-    print(f"[Config] 模型目录: {MODELS_DIR}")
     print(f"[Config] 数据库目录: {get_db_path()}")
     print(f"[Config] 临时目录: {get_temp_dir()}")

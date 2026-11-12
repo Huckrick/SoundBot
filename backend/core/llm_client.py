@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # SoundBot - AI 音效管理器
-# Copyright (C) 2026 Nagisa_Huckrick (胡杨)
+# Copyright (C) 2026 Huckrick and SoundBot contributors
 
 """Async OpenAI-compatible LLM and text-embedding client.
 

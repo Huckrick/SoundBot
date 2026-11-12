@@ -29,8 +29,8 @@
     function localSource(filePath) {
         if (!filePath) return '';
         const value = String(filePath);
-        if (/^(blob:|https?:|soundmind-audio:)/i.test(value)) return value;
-        return `soundmind-audio://local/${encodeURIComponent(value)}`;
+        if (/^(blob:|https?:|soundbot-audio:)/i.test(value)) return value;
+        return `soundbot-audio://local/${encodeURIComponent(value)}`;
     }
 
     async function resolvePlaybackSource(sound, options = {}) {

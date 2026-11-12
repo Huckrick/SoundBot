@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # SoundBot - AI 音效管理器
-# Copyright (C) 2026 Nagisa_Huckrick (胡杨)
+# Copyright (C) 2026 Huckrick and SoundBot contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -30,7 +30,7 @@ import config
 
 
 def setup_logger(
-    name: str = "soundmind",
+    name: str = "soundbot",
     level: int = logging.INFO,
     log_file: Optional[str] = None
 ) -> logging.Logger:
@@ -77,7 +77,7 @@ def setup_logger(
     return logger
 
 
-def get_logger(name: str = "soundmind") -> logging.Logger:
+def get_logger(name: str = "soundbot") -> logging.Logger:
     """
     获取日志记录器
     
@@ -96,10 +96,10 @@ def init_logger() -> logging.Logger:
     log_dir = config.get_user_data_dir() / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     
-    log_file = log_dir / f"soundmind_{datetime.now().strftime('%Y%m%d')}.log"
+    log_file = log_dir / f"soundbot_{datetime.now().strftime('%Y%m%d')}.log"
     
     return setup_logger(
-        name="soundmind",
+        name="soundbot",
         level=logging.DEBUG if config.DEBUG else logging.INFO,
         log_file=str(log_file)
     )

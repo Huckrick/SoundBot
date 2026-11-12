@@ -12,12 +12,14 @@ unrelated libsndfile codec matrix.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass, field
 from hashlib import sha256
 import logging
 import math
 import os
 from pathlib import Path
+import re
 import tempfile
 import threading
 from typing import Any, Dict, Iterable, Mapping, Optional
@@ -111,6 +113,7 @@ class AudioMetadata:
     channels: int
     format: str
     codec: str = ''
+    tags: Dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -153,6 +156,7 @@ class AudioService:
         waveform_work_dir: Optional[os.PathLike[str] | str] = None,
         playback_cache_max_bytes: int = PLAYBACK_WAV_CACHE_MAX_BYTES,
         playback_cache_max_files: int = PLAYBACK_WAV_CACHE_MAX_FILES,
+        manage_temporary: bool = False,
     ) -> None:
         if playback_cache_max_bytes < 1 or playback_cache_max_files < 1:
             raise ValueError('playback cache limits must be positive')
@@ -175,6 +179,8 @@ class AudioService:
         self.playback_cache_max_bytes = playback_cache_max_bytes
         self.playback_cache_max_files = playback_cache_max_files
         self._cache_lock = threading.RLock()
+        self._active_cache: dict[Path, int] = {}
+        self._manage_temporary = manage_temporary
 
     @staticmethod
     def is_supported(path: os.PathLike[str] | str) -> bool:
@@ -242,8 +248,30 @@ class AudioService:
             raise AudioServiceError(
                 'audio_probe_failed',
                 f'Unable to read audio metadata: {source.name}',
-                details={'path': str(source), 'decoder': 'pyav'},
+                details={'path': str(source), 'decoder': 'pyav', 'reason': self._safe_error(exc)},
             ) from exc
+
+    def artwork(self, path: os.PathLike[str] | str):
+        """Read a bounded display image from the audio file's embedded artwork."""
+        from core.source_metadata import read_artwork
+
+        source = self._validate_source(path)
+        self._require_pyav()
+        try:
+            return read_artwork(source, _av)
+        except (OSError, ValueError, _av.FFmpegError) as exc:
+            raise AudioServiceError('artwork_unavailable', 'Unable to read embedded artwork') from exc
+
+    def details(self, path: os.PathLike[str] | str) -> Dict[str, Any]:
+        """Read original file metadata for the details panel on demand."""
+        from core.source_metadata import read_details
+
+        source = self._validate_source(path)
+        self._require_pyav()
+        try:
+            return read_details(source, _av)
+        except (OSError, ValueError, _av.FFmpegError) as exc:
+            raise AudioServiceError('audio_probe_failed', 'Unable to read audio metadata') from exc
 
     def decode(
         self,
@@ -289,15 +317,32 @@ class AudioService:
         This keeps waveform memory usage essentially constant for long files
         while retaining exact equal-width bins over the fully decoded stream.
         """
-        temp_root = self.waveform_work_dir
-        temp_root.mkdir(parents=True, exist_ok=True)
-        fd, raw_path = tempfile.mkstemp(prefix="waveform-", suffix=".f32", dir=temp_root)
-        temp_path = Path(raw_path)
+        with self._temporary(self.waveform_work_dir, "f32") as temp_path:
+            return self._waveform_from_frames(source, temp_path)
+
+    @contextmanager
+    def _temporary(self, directory: Path, extension: str):
+        directory.mkdir(parents=True, exist_ok=True)
+        if self._manage_temporary:
+            from core.delivery import staging
+
+            with staging(directory, extension) as path:
+                yield path
+            return
+        fd, name = tempfile.mkstemp(suffix=f".{extension}", dir=directory)
+        os.close(fd)
+        path = Path(name)
+        try:
+            yield path
+        finally:
+            path.unlink(missing_ok=True)
+
+    def _waveform_from_frames(self, source: Path, temp_path: Path) -> WaveformResult:
         frame_count = 0
         sample_rate = 0
         mapped = None
         try:
-            with os.fdopen(fd, "wb") as sink, _av.open(str(source), mode="r") as container:
+            with temp_path.open("wb") as sink, _av.open(str(source), mode="r") as container:
                 stream = next(
                     (item for item in container.streams if item.type == "audio"), None
                 )
@@ -347,38 +392,60 @@ class AudioService:
         finally:
             if mapped is not None:
                 del mapped
-            try:
-                temp_path.unlink(missing_ok=True)
-            except OSError:
-                logger.debug("Unable to remove waveform work file %s", temp_path)
+
+    def _cache_path(self, source: Path) -> Path:
+        source_key = sha256(str(source).encode('utf-8', errors='surrogatepass')).hexdigest()[:20]
+        return self.playback_cache_dir / f'{source_key}-{self.fingerprint(source).key}.wav'
+
+    @contextmanager
+    def playback_cache_lease(self, source: Path):
+        target = self._cache_path(self._validate_source(source))
+        with self._cache_lock:
+            if not target.is_symlink() and target.is_file() and target.stat().st_size > 44:
+                self._register_cache(target)
+                self._active_cache[target] = self._active_cache.get(target, 0) + 1
+                self._touch(target)
+            else:
+                target = None
+        try:
+            yield target
+        finally:
+            if target is not None:
+                with self._cache_lock:
+                    self._active_cache[target] -= 1
+                    if not self._active_cache[target]:
+                        del self._active_cache[target]
+
+    def _register_cache(self, target: Path) -> None:
+        if self._manage_temporary:
+            from core.delivery import initialize
+            from core.database import get_db_manager
+
+            with get_db_manager().get_cursor() as cur:
+                initialize(cur)
+                cur.execute("INSERT OR IGNORE INTO render_files(path,state) VALUES (?,'playback')", (str(target),))
 
     def prepare_playback_wav(self, path: os.PathLike[str] | str) -> Path:
         """Create/reuse an atomic, fingerprinted WAV and enforce disk LRU limits."""
         source = self._validate_source(path)
-        fingerprint = self.fingerprint(source)
-        source_key = sha256(str(source).encode('utf-8', errors='surrogatepass')).hexdigest()[:20]
-        target = self.playback_cache_dir / f'{source_key}-{fingerprint.key}.wav'
+        target = self._cache_path(source)
 
         with self._cache_lock:
             self.playback_cache_dir.mkdir(parents=True, exist_ok=True)
-            if target.is_file() and target.stat().st_size > 44:
+            if not target.is_symlink() and target.is_file() and target.stat().st_size > 44:
                 if target.stat().st_size <= self.playback_cache_max_bytes:
+                    self._register_cache(target)
                     self._touch(target)
                     self._prune_playback_cache(protected=target)
                     return target
                 target.unlink(missing_ok=True)
 
             decoded = self.decode(source, mono=False)
-            temp_path: Optional[Path] = None
             try:
-                fd, raw_temp_path = tempfile.mkstemp(
-                    prefix=f'.{target.stem}-', suffix='.tmp.wav', dir=self.playback_cache_dir
-                )
-                os.close(fd)
-                temp_path = Path(raw_temp_path)
-                self._write_wav(temp_path, decoded.samples, decoded.sample_rate)
-                os.replace(temp_path, target)
-                temp_path = None
+                with self._temporary(self.playback_cache_dir, "wav") as temp_path:
+                    self._write_wav(temp_path, decoded.samples, decoded.sample_rate)
+                    self._register_cache(target)
+                    os.replace(temp_path, target)
             except AudioServiceError:
                 raise
             except Exception as exc:
@@ -387,13 +454,6 @@ class AudioService:
                     f'Unable to create playback WAV: {source.name}',
                     details={'path': str(source), 'reason': self._safe_error(exc)},
                 ) from exc
-            finally:
-                if temp_path is not None:
-                    try:
-                        temp_path.unlink(missing_ok=True)
-                    except OSError:
-                        pass
-
             self._touch(target)
             self._prune_playback_cache(protected=target)
             if target.stat().st_size > self.playback_cache_max_bytes:
@@ -493,7 +553,7 @@ class AudioService:
 
     @staticmethod
     def _probe_with_pyav(source: Path) -> AudioMetadata:
-        with _av.open(str(source), mode='r') as container:
+        with _av.open(str(source), mode='r', timeout=(4.0, 4.0)) as container:
             stream = next((item for item in container.streams if item.type == 'audio'), None)
             if stream is None:
                 raise ValueError('container has no audio stream')
@@ -516,6 +576,7 @@ class AudioService:
                 channels=channels,
                 format=source.suffix.lower().lstrip('.'),
                 codec=codec,
+                tags={**container.metadata, **stream.metadata},
             )
 
     @staticmethod
@@ -652,13 +713,7 @@ class AudioService:
             pass
 
     def _prune_playback_cache(self, *, protected: Optional[Path] = None) -> None:
-        entries = []
-        for entry in self.playback_cache_dir.glob('*.wav'):
-            try:
-                stat = entry.stat()
-                entries.append((entry, stat.st_mtime_ns, stat.st_size))
-            except OSError:
-                continue
+        entries = self._playback_entries()
         entries.sort(key=lambda item: item[1])
         total_bytes = sum(item[2] for item in entries)
         total_files = len(entries)
@@ -668,14 +723,60 @@ class AudioService:
                 and total_bytes <= self.playback_cache_max_bytes
             ):
                 break
-            if protected is not None and entry == protected:
+            if entry == protected or entry in self._active_cache:
                 continue
             try:
-                entry.unlink()
+                self._remove_cache(entry)
                 total_files -= 1
                 total_bytes -= size
             except OSError:
                 logger.debug('Unable to prune playback cache file %s', entry, exc_info=True)
+
+    def _playback_entries(self):
+        if self._manage_temporary:
+            from core.database import get_db_manager
+            from core.delivery import initialize
+
+            with get_db_manager().get_cursor() as cur:
+                initialize(cur)
+                paths = [Path(row["path"]) for row in cur.execute("SELECT path FROM render_files WHERE state='playback'")]
+        else:
+            paths = self.playback_cache_dir.glob("*.wav")
+        entries = []
+        for entry in paths:
+            if entry.parent != self.playback_cache_dir or not re.fullmatch(r"[a-f0-9]{20}-[a-f0-9]{64}\.wav", entry.name):
+                continue
+            try:
+                if not entry.is_symlink():
+                    stat = entry.stat()
+                    entries.append((entry, stat.st_mtime_ns, stat.st_size))
+            except FileNotFoundError:
+                self._remove_cache(entry)
+        return entries
+
+    def _remove_cache(self, entry):
+        entry.unlink(missing_ok=True)
+        if self._manage_temporary:
+            from core.database import get_db_manager
+
+            with get_db_manager().get_cursor() as cur:
+                cur.execute("DELETE FROM render_files WHERE path=? AND state='playback'", (str(entry),))
+
+    def cleanup_playback_cache(self, *, execute, paths=None):
+        files = []
+        with self._cache_lock:
+            for entry, _, size in self._playback_entries():
+                active = entry in self._active_cache
+                removed = False
+                if execute and not active and (paths is None or str(entry) in paths):
+                    try:
+                        self._remove_cache(entry)
+                        removed = True
+                    except OSError:
+                        logger.debug("Unable to remove playback cache %s", entry, exc_info=True)
+                files.append({"path": str(entry), "bytes": size, "removed": removed, "eligible": not active,
+                              "reason": "试听使用中" if active else "可再生成的试听缓存"})
+        return files
 
     @staticmethod
     def _safe_error(exc: Exception) -> str:
@@ -693,5 +794,5 @@ def get_audio_service() -> AudioService:
     if _audio_service is None:
         with _audio_service_lock:
             if _audio_service is None:
-                _audio_service = AudioService()
+                _audio_service = AudioService(manage_temporary=True)
     return _audio_service

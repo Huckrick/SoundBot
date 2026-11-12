@@ -21,12 +21,20 @@ from xml.etree import ElementTree
 FORBIDDEN_NAMES = {
     ".DS_Store",
     "indexed_files_meta.json",
+    "secure_secrets.json",
+    "user_config.json",
 }
 FORBIDDEN_PATHS = {
     "config/user_config.json",
 }
 FORBIDDEN_PREFIXES = (
     "backend/db/",
+    "dist/",
+    "dist-electron/",
+    "logs/",
+    "playback_wav/",
+    "waveform_work/",
+    "wwise-backups/",
     "chroma/",
     "chroma_projects/",
     "downloads/",
@@ -36,12 +44,21 @@ FORBIDDEN_PREFIXES = (
     "waveform_cache/",
 )
 FORBIDDEN_SUFFIXES = (
+    ".db",
+    ".sqlite",
+    ".sqlite3",
     ".db-wal",
     ".db-shm",
     ".sqlite-wal",
     ".sqlite-shm",
     ".reapeaks",
+    ".xlsx",
 )
+AUDIO_SUFFIXES = {".wav", ".wave", ".aif", ".aiff", ".flac", ".mp3", ".ogg", ".opus", ".m4a", ".aac", ".wma"}
+SYNTHETIC_AUDIO_FIXTURES = {
+    f"tests/build/fixtures/tone.{extension}"
+    for extension in ("aac", "aif", "aiff", "flac", "m4a", "mp3", "ogg", "wav", "wma")
+}
 SENSITIVE_JSON_KEYS = {
     "api_key",
     "access_token",
@@ -107,6 +124,7 @@ def audit_tracked_paths(paths: Iterable[str]) -> list[str]:
             or path in FORBIDDEN_PATHS
             or path.startswith(FORBIDDEN_PREFIXES)
             or path.lower().endswith(FORBIDDEN_SUFFIXES)
+            or (PurePosixPath(path).suffix.lower() in AUDIO_SUFFIXES and path not in SYNTHETIC_AUDIO_FIXTURES)
             or PurePosixPath(path).name == ".env"
             or (
                 PurePosixPath(path).name.startswith(".env.")

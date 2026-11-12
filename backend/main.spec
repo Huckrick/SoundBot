@@ -13,7 +13,7 @@ import platform
 from importlib.metadata import distribution
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules, copy_metadata
+from PyInstaller.utils.hooks import collect_all, collect_submodules, copy_metadata
 
 # ==================== 路径设置 ====================
 
@@ -50,11 +50,6 @@ if not audio_notices.is_file():
     raise FileNotFoundError(f'Required third-party audio notice is missing: {audio_notices}')
 datas.append((str(audio_notices), 'licenses'))
 
-ucs_workbook = project_root / 'UCS+音效分类中英文对照表.xlsx'
-if not ucs_workbook.is_file():
-    raise FileNotFoundError(f'Required UCS keyword workbook is missing: {ucs_workbook}')
-datas.append((str(ucs_workbook), '.'))
-
 # ==================== 自动收集第三方包 ====================
 binaries = []
 hiddenimports = []
@@ -63,8 +58,6 @@ hiddenimports = []
 # 这些包含有 PyInstaller 无法自动发现的运行时数据文件
 _collect_all_packages = [
     'jieba',                 # 中文分词词典
-    'tokenizers',            # Rust 原生扩展
-    'safetensors',           # Rust 原生扩展
 ]
 
 # 只需要收集子模块的包（纯 Python，PyInstaller 自动分析可能遗漏动态导入）
@@ -78,7 +71,8 @@ _collect_submodules_packages = [
     'httpx',
     'httpcore',
     'anyio',
-    'huggingface_hub',
+    'pedalboard',
+    'mutagen',               # Metadata readers are selected by container type
 ]
 
 for pkg in _collect_all_packages:
@@ -91,20 +85,14 @@ for pkg in _collect_all_packages:
     except Exception as e:
         print(f'Warning: collect_all({pkg}) failed: {e}')
 
-# Chroma's local persistent client only needs its migration SQL and a small
-# set of implementations selected by dotted class name at runtime.  Using
-# collect_all('chromadb') also freezes the cloud/server/CLI/ONNX/Kubernetes
-# stacks, none of which SoundBot invokes.
-try:
-    datas += collect_data_files('chromadb', includes=['migrations/**/*.sql'])
-except Exception as e:
-    raise RuntimeError(f'Unable to collect Chroma migration SQL: {e}')
-
 # Preserve PyAV distribution metadata and its bundled license notices.
 try:
     datas += copy_metadata('av')
+    datas += copy_metadata('pedalboard')
+    datas += copy_metadata('mutagen')
+    datas += copy_metadata('pillow')
 except Exception as e:
-    print(f'Warning: copy_metadata(av) failed: {e}')
+    print(f'Warning: copying audio runtime metadata failed: {e}')
 
 # auditwheel/delvewheel may put FFmpeg libraries in an ``av.libs`` sibling
 # directory rather than inside the import package.  Collect every native file
@@ -141,15 +129,17 @@ hiddenimports += [
     # core 子模块
     'core',
     'core.database',
-    'core.embedder',
-    'core.indexer',
-    'core.index_lifecycle',
+    'core.catalog',
+    'core.delivery',
+    'core.editing',
+    'core.effects',
+    'core.vst',
+    'pedalboard_native',
+    'core.media_api',
+    'core.wwise',
     'core.scanner',
-    'core.searcher',
-    'core.search_engine',
     'core.audio_service',
     'core.websocket_manager',
-    'core.model_preloader',
     'core.llm_config_manager',
     'core.llm_client',
     'core.ai_chat_service',
@@ -161,34 +151,6 @@ hiddenimports += [
     'models',
     'models.schemas',
 
-    # Transformers lazily resolves these classes from the local CLAP model.
-    'transformers.models.clap',
-    'transformers.models.clap.configuration_clap',
-    'transformers.models.clap.feature_extraction_clap',
-    'transformers.models.clap.modeling_clap',
-    'transformers.models.clap.processing_clap',
-    'transformers.models.roberta',
-    'transformers.models.roberta.tokenization_roberta',
-    'transformers.models.auto.configuration_auto',
-    'transformers.models.auto.feature_extraction_auto',
-    'transformers.models.auto.modeling_auto',
-    'transformers.models.auto.processing_auto',
-    'transformers.models.encoder_decoder.configuration_encoder_decoder',
-    'transformers.generation.configuration_utils',
-    'transformers.generation.utils',
-    'transformers.distributed.configuration_utils',
-    'transformers.tokenization_utils_base',
-    'transformers.feature_extraction_utils',
-
-    # Chroma selects the local implementations from string settings.
-    'chromadb_rust_bindings',
-    'chromadb.api.rust',
-    'chromadb.db.impl.sqlite',
-    'chromadb.execution.executor.local',
-    'chromadb.quota.simple_quota_enforcer',
-    'chromadb.rate_limit.simple_rate_limit',
-    'chromadb.segment.impl.manager.local',
-    'chromadb.telemetry.product.posthog',
 ]
 
 # ==================== 额外手动补充 ====================
@@ -217,32 +179,19 @@ hiddenimports += [
     # 网络
     'h11',
     'websockets',
-    'urllib3',
 
     # 数据验证
-    'pydantic_settings',
     'annotated_types',
     'typing_extensions',
 
     # 音频
-    'mutagen',
-    'mutagen.mp4',
-    'mutagen.flac',
-    'mutagen.oggvorbis',
-    'mutagen.easymp4',
-    'tinytag',
     'wave',
 
     # 工具
     'yaml',
-    'regex',
-    'tqdm',
-    'filelock',
-    'fsspec',
     'packaging',
     'packaging.version',
     'packaging.specifiers',
-    'pkg_resources',
 
     # 编码
     'encodings',
@@ -251,23 +200,6 @@ hiddenimports += [
     'encodings.latin_1',
     'encodings.idna',
 ]
-
-# ==================== 过滤不必要的数据文件（减小体积 + 避免 EMFILE）====================
-# torch/include/ 包含数千个 ATen C++ 头文件，仅用于编译 PyTorch 扩展，
-# 运行时推理完全不需要。保留这些文件会导致 macOS 签名时 EMFILE: too many open files。
-# torch/share/  包含 CMake 配置文件，同样仅编译时用。
-# caffe2/proto/ 包含 .proto 源文件，运行时不需要。
-_build_only_extensions = ('.h', '.hpp', '.cmake', '.pc', '.prl', '.proto')
-_build_only_dest_prefixes = ('torch/include', 'torch/share', 'caffe2/proto')
-
-datas = [
-    (src, dest) for (src, dest) in datas
-    if not (
-        any(str(src).endswith(ext) for ext in _build_only_extensions)
-        or any(dest.replace('\\', '/').startswith(p) for p in _build_only_dest_prefixes)
-    )
-]
-print(f'[spec] After filtering build-only files: {len(datas)} datas remaining')
 
 # ==================== 分析阶段 ====================
 a = Analysis(
@@ -280,8 +212,13 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        # Optional developer/cloud/media stacks that are not reachable from
-        # SoundBot's local CLAP + Chroma execution path.
+        'torch',
+        'transformers',
+        'chromadb',
+        'huggingface_hub',
+        'tokenizers',
+        'safetensors',
+        # Optional developer/media stacks.
         'accelerate',
         'aiofiles',
         'aiosqlite',
@@ -322,24 +259,6 @@ _binaries_to_exclude = [
 a.binaries = [
     b for b in a.binaries
     if not any(x in str(b[0]) for x in _binaries_to_exclude)
-]
-
-# The Transformers hook copies metadata for every optional package visible in
-# the build environment.  Keep frozen availability checks truthful: packages
-# excluded above must not reappear as orphaned ``*.dist-info`` directories.
-_excluded_metadata_prefixes = (
-    'accelerate-', 'aiofiles-', 'aiosqlite-', 'audioread-', 'flax-',
-    'jax-', 'jaxlib-', 'kubernetes-', 'librosa-', 'llvmlite-', 'numba-',
-    'onnxruntime-', 'openpyxl-', 'pandas-', 'scikit_learn-', 'scipy-',
-    'sentence_transformers-', 'soundfile-', 'soxr-', 'tensorflow-',
-)
-a.datas = [
-    item for item in a.datas
-    if not any(
-        part.casefold().startswith(prefix)
-        for part in Path(str(item[0])).parts
-        for prefix in _excluded_metadata_prefixes
-    )
 ]
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)

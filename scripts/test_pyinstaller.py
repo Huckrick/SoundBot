@@ -54,12 +54,10 @@ def check_imports():
     critical_imports = [
         ('fastapi', 'FastAPI'),
         ('uvicorn', 'Uvicorn'),
-        ('chromadb', 'ChromaDB'),
-        ('transformers', 'Transformers'),
-        ('torch', 'PyTorch'),
         ('av', 'PyAV'),
         ('numpy', 'NumPy'),
         ('pydantic', 'Pydantic'),
+        ('websockets', 'WebSockets'),
     ]
     
     all_ok = True
@@ -71,6 +69,16 @@ def check_imports():
             print(f"❌ {name:20s} - 导入失败: {e}")
             all_ok = False
     
+    try:
+        import sqlite3
+        from contextlib import closing
+
+        with closing(sqlite3.connect(":memory:")) as db:
+            db.execute("CREATE VIRTUAL TABLE test_fts USING fts5(value)")
+        print("✅ SQLite FTS5 - 可用")
+    except sqlite3.Error as exc:
+        print(f"❌ SQLite FTS5 不可用: {exc}")
+        all_ok = False
     return all_ok
 
 
@@ -157,8 +165,11 @@ def check_file_structure():
         'core/__init__.py',
         'utils/__init__.py',
         'models/__init__.py',
-        'core/embedder.py',
-        'core/indexer.py',
+        'core/catalog.py',
+        'core/editing.py',
+        'core/delivery.py',
+        'core/media_api.py',
+        'core/wwise.py',
         'core/database.py',
         'core/audio_service.py',
         '../tests/build/licenses/THIRD_PARTY_AUDIO_NOTICES.txt',

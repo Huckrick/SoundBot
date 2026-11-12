@@ -10,7 +10,7 @@ import re
 from pathlib import Path
 
 
-REQUIRED_EXACT = {"models.zip", "models.zip.sha256", "SHA256SUMS.txt"}
+REQUIRED_EXACT = {"SHA256SUMS.txt"}
 REQUIRED_SUFFIX_COUNTS = {".dmg": 1, ".exe": 1}
 MAX_RELEASE_ASSET_BYTES = 2 * 1024 * 1024 * 1024
 WINDOWS_INSTALLER_NAME = re.compile(
@@ -43,8 +43,8 @@ def local_inventory(directory: Path) -> dict[str, dict[str, object]]:
             "Windows release asset must use the stable "
             f"SoundBot-Setup-<version>.exe name: {windows_installers[0]!r}"
         )
-    if len(files) != 5:
-        raise ValueError(f"expected exactly 5 release assets, found {len(files)}: {sorted(names)}")
+    if len(files) != 3:
+        raise ValueError(f"expected exactly 3 release assets, found {len(files)}: {sorted(names)}")
     empty = [path.name for path in files if path.stat().st_size <= 0]
     if empty:
         raise ValueError(f"empty release assets: {empty}")

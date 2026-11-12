@@ -144,7 +144,8 @@ class InstalledElectronSmokeTests(unittest.TestCase):
     def test_installed_runtime_cannot_inherit_the_build_workspace_model(self) -> None:
         source = MODULE_PATH.read_text(encoding="utf-8")
         self.assertIn('env.pop("SOUNDBOT_MODELS_PATH", None)', source)
-        self.assertIn('"ENABLE_MODEL_PRELOAD": "true" if args.require_models', source)
+        self.assertNotIn('"ENABLE_MODEL_PRELOAD": "true"', source)
+        self.assertIn('health.model_loaded !== false', source)
         self.assertIn('"HF_HUB_OFFLINE": "1"', source)
         self.assertIn('_windows_process_tree(root_pid)', source)
         self.assertNotIn("SOUNDBOT_TEST_DIALOG", source)

@@ -175,6 +175,9 @@ def validate_release_metadata(
         declared, prerelease = _readme_declared_version(
             readme, english=readme_name == "README.en.md"
         )
+        if readme_name == "README.md" and "## English" in readme:
+            if _readme_declared_version(readme, english=True) != (version, expected_prerelease):
+                raise ReleaseMetadataError("README.md English version or release channel is out of sync")
         if declared != version:
             raise ReleaseMetadataError(
                 f"{readme_name} current version is {declared}, expected {version}"

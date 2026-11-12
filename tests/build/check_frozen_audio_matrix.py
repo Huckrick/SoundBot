@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise every supported audio format plus CLAP/Chroma search on a frozen backend."""
+"""Check audio decoding and local search on a frozen backend."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ def prepare_fixtures(destination_root: Path) -> list[Path]:
         if sha256_file(source) != expected_hash:
             raise RuntimeError(f"committed fixture checksum mismatch: {source}")
         suffix = source.suffix.lower()
-        copied = target / f"声 音_%_#+(){suffix}"
+        copied = target / f"tone 声 音_%_#+(){suffix}"
         shutil.copyfile(source, copied)
         result.append(copied.resolve())
     return result
@@ -64,7 +64,7 @@ def request_json(
         headers["Content-Type"] = "application/json; charset=utf-8"
     request = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(request, timeout=timeout) as response:
             payload = response.read().decode("utf-8")
             if response.status < 200 or response.status >= 300:
                 raise RuntimeError(f"{method} {route} returned HTTP {response.status}: {payload}")
@@ -139,20 +139,12 @@ def run_smoke(base_url: str, fixture_root: Path, job_timeout: float) -> dict[str
     job = wait_for_job(base_url, imported["job_id"], job_timeout)
 
     status = request_json(base_url, "GET", "/api/v1/projects/default/index/status")
+    if status.get("keyword", {}).get("indexed") != len(fixtures):
+        raise AssertionError(f"keyword index does not cover the imported fixtures: {status}")
+    health = request_json(base_url, "GET", "/api/v1/health")
+    if health.get("model_loaded") is not False:
+        raise AssertionError("core backend must start without a model")
     artifacts = status.get("artifacts", {})
-    for kind in ("waveform", "audio_vector", "text_vector"):
-        counts = artifacts.get(kind, {})
-        if counts.get("ready", 0) != len(fixtures):
-            raise AssertionError(f"{kind} did not reach ready for every fixture: {counts}")
-        if counts.get("failed", 0):
-            raise AssertionError(f"{kind} has failed artifacts: {counts}")
-    manifests = status.get("manifests", {})
-    for kind in ("audio_vector", "text_vector"):
-        manifest = manifests.get(kind) or {}
-        if manifest.get("metric") != "cosine" or manifest.get("state") != "ready":
-            raise AssertionError(f"{kind} manifest is not an active cosine index: {manifest}")
-        if not manifest.get("collection_name") or int(manifest.get("revision", 0)) < 1:
-            raise AssertionError(f"{kind} manifest has no active revision: {manifest}")
 
     files_payload = request_json(
         base_url, "GET", "/api/v1/files", query={"project_id": "default", "limit": 100}
@@ -171,8 +163,8 @@ def run_smoke(base_url: str, fixture_root: Path, job_timeout: float) -> dict[str
             query={"project_id": "default"},
         )
         assert_waveform(Path(str(item["path"])), cached)
-        if cached.get("cached") is not True:
-            raise AssertionError(f"persisted waveform was not restored from SQLite: {item['path']}")
+        if cached.get("cached") is not False:
+            raise AssertionError(f"import should leave waveform generation on demand: {item['path']}")
 
     batch = request_json(
         base_url,
@@ -182,7 +174,7 @@ def run_smoke(base_url: str, fixture_root: Path, job_timeout: float) -> dict[str
     )
     batch_items = batch.get("items") or []
     if len(batch_items) != len(files) or not all(
-        item.get("ok") and len(item.get("peaks") or []) == 2000 for item in batch_items
+        item.get("ok") and item.get("cached") and len(item.get("peaks") or []) == 2000 for item in batch_items
     ):
         raise AssertionError(f"batch waveform contract failed: {batch}")
 
@@ -207,7 +199,7 @@ def run_smoke(base_url: str, fixture_root: Path, job_timeout: float) -> dict[str
         "POST",
         "/api/v1/search",
         body={
-            "query": "a steady pure sine tone",
+            "query": "tone",
             "project_id": "default",
             "top_k": 20,
             "threshold": 0.0,
@@ -216,15 +208,8 @@ def run_smoke(base_url: str, fixture_root: Path, job_timeout: float) -> dict[str
         },
         timeout=180,
     )
-    if search.get("total", 0) < 1 or not search.get("results"):
-        raise AssertionError(f"CLAP/Chroma search returned no fixture: {search}")
-    metadata = search["results"][0].get("metadata") or {}
-    for score_name in ("audio_score", "text_score", "keyword_score"):
-        score = metadata.get(score_name)
-        if not isinstance(score, (int, float)) or not math.isfinite(score):
-            raise AssertionError(f"search response has invalid {score_name}: {metadata}")
-    if metadata["audio_score"] <= 0:
-        raise AssertionError(f"search did not return a positive CLAP audio branch: {metadata}")
+    if search.get("total") != len(fixtures):
+        raise AssertionError(f"keyword search missed imported fixtures: {search}")
 
     return {
         "fixtures": len(fixtures),
@@ -248,7 +233,7 @@ def main() -> int:
     args = parse_args()
     result = run_smoke(args.base_url, args.fixture_root.resolve(), args.job_timeout)
     print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
-    print("[OK] frozen PyAV formats, CLAP, Chroma, hybrid search, and WMA playback")
+    print("[OK] frozen PyAV formats, lazy waveforms, keyword search, and WMA playback")
     return 0
 
 

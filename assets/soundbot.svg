@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" rx="224" fill="#101010"/>
+  <rect x="35" y="35" width="954" height="954" rx="189" fill="none" stroke="#373737" stroke-width="10"/>
+  <g id="capsule-mark" transform="translate(100 100) scale(37.45)" fill="#fff">
+    <rect x="2" y="8" width="2.6" height="6" rx="1.3" opacity=".55"/>
+    <rect x="7" y="4" width="2.6" height="14" rx="1.3"/>
+    <rect x="12" y="7" width="2.6" height="8" rx="1.3" opacity=".75"/>
+    <rect x="17" y="10" width="2.6" height="4" rx="1.3" opacity=".4"/>
+  </g>
+</svg>

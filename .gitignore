@@ -46,10 +46,6 @@ coverage/
 # nyc test coverage
 .nyc_output
 
-# Dependency directories
-node_modules/
-jspm_packages/
-
 # Optional npm cache directory
 .npm
 
@@ -121,6 +117,8 @@ venv.bak/
 *.sqlite3
 *.db-wal
 *.db-shm
+*.db-journal
+*.db.pre-*.bak
 *.sqlite-wal
 *.sqlite-shm
 *.backup-*
@@ -147,7 +145,27 @@ backend/temp_clips/
 *.ckpt
 
 # User-specific runtime configuration and imported audio
+*.wav
+*.wave
+*.aif
+*.aiff
+*.flac
+*.mp3
+*.ogg
+*.opus
+*.m4a
+*.aac
+*.wma
+!tests/build/fixtures/tone.*
+*.xlsx
+/secure_secrets.json
+/interface.json
 /config/user_config.json
+/user_config.json
+/wwise-backups/
+/playback_wav/
+/waveform_work/
+/修改方案/
 /temp_clips/
 /test_audio/
 *.reapeaks
@@ -172,6 +190,7 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+*.part
 
 # Test and static-analysis caches
 .pytest_cache/

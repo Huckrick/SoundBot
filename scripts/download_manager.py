@@ -35,7 +35,7 @@ def configure_utf8_console_streams() -> None:
 
 # 默认配置
 DEFAULT_CONFIG = {
-    "github_repo": "Huckrick/SoundBot",
+    "github_repo": "",
     "resources": {
         "models": {
             "filename": "models.zip",
@@ -408,7 +408,10 @@ def download_resource(resource_type, release_tag=None, force=False):
         force: 是否强制重新下载
     """
     config = get_config()
-    repo = config.get("github_repo", DEFAULT_CONFIG["github_repo"])
+    repo = config.get("github_repo") or os.getenv("GITHUB_REPOSITORY")
+    if not repo:
+        print("[ERROR] 请用 --repo 指定可选资源仓库")
+        return False
     
     if resource_type not in config.get("resources", {}):
         print(f"[ERROR] 未知资源类型: {resource_type}")

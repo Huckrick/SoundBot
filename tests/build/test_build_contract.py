@@ -80,15 +80,10 @@ class NativeBuildContractTests(unittest.TestCase):
         self.assertEqual(package["build"]["mac"]["target"][0]["arch"], ["arm64"])
         self.assertEqual(package["build"]["mac"]["minimumSystemVersion"], "14.0")
         self.assertEqual(package["build"]["win"]["target"][0]["arch"], ["x64"])
-        model_resources = [
-            item for item in package["build"]["extraResources"]
-            if item.get("to") == "models"
-        ]
-        self.assertEqual(len(model_resources), 1)
-        self.assertEqual(model_resources[0]["from"], "models")
-        self.assertIn("model-manifest.json", model_resources[0]["filter"])
-        self.assertIn("CLAP_MODEL_NOTICE.txt", model_resources[0]["filter"])
-        self.assertIn("clap/**/*", model_resources[0]["filter"])
+        self.assertEqual(
+            [resource for resource in package["build"]["extraResources"] if resource.get("to") == "models"],
+            [],
+        )
         self.assertEqual(package["scripts"]["pack"], "python scripts/build.py")
 
         requirements = (root / "backend" / "requirements.txt").read_text(encoding="utf-8")
@@ -117,7 +112,7 @@ class NativeBuildContractTests(unittest.TestCase):
         )
         workflow = (root / ".github" / "workflows" / "build.yml").read_text(encoding="utf-8")
         self.assertNotIn("CLAP_MODEL_REVISION", workflow)
-        self.assertIn("--bundle-config config/model_bundle.json", workflow)
+        self.assertNotIn("--bundle-config config/model_bundle.json", workflow)
         workflow_pyinstaller = re.search(r"PYINSTALLER_VERSION:\s*'([^']+)'", workflow)
         self.assertIsNotNone(workflow_pyinstaller)
         self.assertEqual(workflow_pyinstaller.group(1), soundbot_build.PYINSTALLER_VERSION)
@@ -463,14 +458,7 @@ class BuildScriptReliabilityTests(unittest.TestCase):
 
             verify_backend.assert_called_once_with(packaged_backend)
             verify_runtime.assert_called_once_with(packaged_backend, "macos")
-            verify_models.assert_called_once_with(
-                electron_dist
-                / "mac-arm64"
-                / "SoundBot.app"
-                / "Contents"
-                / "Resources"
-                / "models"
-            )
+            verify_models.assert_not_called()
 
     def test_cli_rejects_skipping_both_build_stages(self) -> None:
         with mock.patch.object(

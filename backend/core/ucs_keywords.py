@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # SoundBot - AI 音效管理器
-# Copyright (C) 2026 Nagisa_Huckrick (胡杨)
+# Copyright (C) 2026 Huckrick and SoundBot contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,60 +14,19 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""
-UCS (Universal Category System) 关键词映射模块
-
-从 Excel 文件加载中文-英文音效关键词映射，用于增强中文搜索能力。
-
-特性：
-1. 惰性加载 - 首次使用时才加载 Excel 数据
-2. 缓存机制 - 加载后缓存到内存，避免重复读取
-3. 性能优化 - 使用字典结构，O(1) 查询复杂度
-4. 中文分词 - 支持 jieba 中文分词扩展
-
-================================================================================
-数据来源 / Data Source
-================================================================================
-
-UCS 音效分类中英文对照表来自 Bilibili 用户分享：
-- 来源链接：https://www.bilibili.com/read/cv23153650/
-- 原作者：Bilibili 音频后期社区用户
-- 整理目的：帮助中文用户更好地使用 UCS 通用分类系统
-
-关于 UCS (Universal Category System)：
-UCS 是一个开放的、免费的音效分类系统，由音效社区共同维护。
-更多信息请访问：https://universalcategoriesystem.com/
-
-================================================================================
-免责声明 / Disclaimer
-================================================================================
-
-1. 本模块使用的 UCS 分类表仅供学习和研究使用
-2. 数据版权归原作者和 UCS 社区所有
-3. 本项目不对数据的准确性和完整性承担责任
-4. 使用 UCS 分类系统时请遵守其使用条款
-5. 如需商业使用 UCS 分类数据，请联系 UCS 官方获取授权
-
-================================================================================
-许可证 / License
-================================================================================
-
-本模块代码采用 MIT License 开源
-UCS 分类数据版权归原作者所有，遵循 UCS 社区使用规范
-
-Copyright (c) 2024 SoundBot Project
-"""
+"""Search expansion from an optional local keyword workbook."""
 
 import os
 import re
 import logging
 import posixpath
-import sys
 import zipfile
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 from functools import lru_cache
 from xml.etree import ElementTree
+
+import config
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +34,7 @@ logger = logging.getLogger(__name__)
 _ucs_keywords_cache: Optional[Dict[str, List[str]]] = None
 _ucs_loaded = False
 _jieba_available = False
-_UCS_FILENAME = 'UCS+音效分类中英文对照表.xlsx'
+_UCS_FILENAME = 'ucs-keywords.xlsx'
 _SPREADSHEET_NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
 _DOCUMENT_REL_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
 _PACKAGE_REL_NS = 'http://schemas.openxmlformats.org/package/2006/relationships'
@@ -92,16 +51,8 @@ except ImportError:
 
 
 def _default_ucs_path() -> Path:
-    """Resolve the committed UCS workbook in source and frozen layouts."""
-    candidates = []
-    frozen_root = getattr(sys, '_MEIPASS', None)
-    if frozen_root:
-        candidates.append(Path(frozen_root) / _UCS_FILENAME)
-    candidates.extend([
-        Path(sys.executable).resolve().parent / _UCS_FILENAME,
-        Path(__file__).resolve().parents[2] / _UCS_FILENAME,
-    ])
-    return next((path for path in candidates if path.is_file()), candidates[0])
+    override = os.environ.get("SOUNDBOT_UCS_PATH")
+    return Path(override).expanduser() if override else config.get_user_data_dir() / _UCS_FILENAME
 
 
 def _column_index(reference: str) -> int:
@@ -193,7 +144,6 @@ def load_ucs_keywords(excel_path: Optional[str] = None) -> Dict[str, List[str]]:
         excel_path = str(_default_ucs_path())
     
     if not os.path.exists(excel_path):
-        logger.warning(f"UCS 关键词文件不存在: {excel_path}")
         _ucs_loaded = True
         return {}
     
@@ -252,6 +202,23 @@ def load_ucs_keywords(excel_path: Optional[str] = None) -> Dict[str, List[str]]:
     except Exception as e:
         logger.error(f"❌ 加载 UCS 关键词失败: {e}")
         _ucs_loaded = True
+        return {}
+
+
+@lru_cache(maxsize=1)
+def category_codes() -> Dict[str, str]:
+    """Canonical UCS CatID by case-insensitive filename prefix."""
+    path = _default_ucs_path()
+    if not path.is_file():
+        return {}
+    try:
+        return {
+            code.casefold(): code
+            for row in _read_xlsx_rows(path)
+            if (code := row.get("CatID", "").strip())
+        }
+    except (OSError, ValueError, KeyError, IndexError, ElementTree.ParseError, zipfile.BadZipFile):
+        logger.warning("无法读取本地分类表")
         return {}
 
 

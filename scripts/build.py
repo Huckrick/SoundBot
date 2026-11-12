@@ -435,7 +435,6 @@ def build_electron(target_platform: str = None, install_dependencies: bool = Tru
         install_npm_deps()
 
     verify_native_backend_bundle(DIST_DIR / "backend" / "soundbot-backend")
-    verify_packaged_models()
 
     # 根据平台选择构建命令（直接调用 electron-builder，避免 npm 脚本循环）
     # 使用 capture=False 实时输出，避免 Windows 编码问题和大缓冲区超时
@@ -554,7 +553,8 @@ def verify_build(target_platform: str = None):
         packaged_models = unpacked_paths[0] / "resources" / "models"
     verify_native_backend_bundle(packaged_backend)
     verify_frozen_runtime_assets(packaged_backend, target_platform)
-    verify_packaged_models(packaged_models)
+    if packaged_models.exists():
+        raise RuntimeError("Core installer unexpectedly contains a model directory")
 
 
 def main():

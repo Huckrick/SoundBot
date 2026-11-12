@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -35,7 +36,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
 
       - name: Install locked dependencies
@@ -57,6 +58,7 @@ jobs:
           node --check preload.js
           node --check assets/i18n.js
           node tests/frontend/check_renderer_contract.js
+          node tests/frontend/check_localization.js
 
       - name: Verify repository diff hygiene
         run: git diff --check

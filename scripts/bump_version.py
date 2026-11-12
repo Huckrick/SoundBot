@@ -300,16 +300,18 @@ def build_version_bump_plan(
     package["version"] = new_version
     lock["version"] = new_version
     lock_packages[""]["version"] = new_version
+    main_readme = _replace_readme_version(
+        originals["readme_zh"], old_version=old_version, new_version=new_version, english=False
+    )
+    if EN_VERSION_LINE.search(main_readme):
+        main_readme = _replace_readme_version(
+            main_readme, old_version=old_version, new_version=new_version, english=True
+        )
     updates = {
         "package": _json_text(package, trailing_newline=originals["package"].endswith("\n")),
         "lock": _json_text(lock, trailing_newline=originals["lock"].endswith("\n")),
         "backend": _replace_backend_version(originals["backend"], old_version, new_version),
-        "readme_zh": _replace_readme_version(
-            originals["readme_zh"],
-            old_version=old_version,
-            new_version=new_version,
-            english=False,
-        ),
+        "readme_zh": main_readme,
         "readme_en": _replace_readme_version(
             originals["readme_en"],
             old_version=old_version,

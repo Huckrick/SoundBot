@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # SoundBot - AI 音效管理器
-# Copyright (C) 2026 Nagisa_Huckrick (胡杨)
+# Copyright (C) 2026 Huckrick and SoundBot contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -50,7 +50,7 @@ from datetime import datetime
 
 logger = None  # 延迟初始化
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 ARTIFACT_KINDS = ("waveform", "audio_vector", "text_vector")
 ARTIFACT_STATES = ("pending", "processing", "ready", "failed", "stale")
 SAFE_PROJECT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
@@ -400,6 +400,8 @@ class DatabaseManager:
                     timeout=30.0
                 )
                 conn.row_factory = sqlite3.Row
+                from core.catalog import configure_connection
+                configure_connection(conn)
                 conn.execute("PRAGMA foreign_keys=ON")
                 conn.execute("PRAGMA journal_mode=DELETE")
                 conn.execute("PRAGMA synchronous=NORMAL")
@@ -484,6 +486,8 @@ class DatabaseManager:
                 # 全新数据库，直接创建所有表
                 cursor.execute("BEGIN IMMEDIATE")
                 _execute_sql_statements(cursor, CREATE_TABLE_SQL)
+                from core.catalog import migrate
+                migrate(cursor)
                 integrity = cursor.execute("PRAGMA quick_check").fetchone()
                 if not integrity or integrity[0] != "ok":
                     raise sqlite3.DatabaseError(
@@ -521,6 +525,11 @@ class DatabaseManager:
                         # files table or reset ready artifacts.
                         self._migrate_db_v3(cursor)
                         current_version = 3
+                    if current_version < 4:
+                        from core.catalog import migrate
+                        if not cursor.connection.in_transaction:
+                            cursor.execute("BEGIN IMMEDIATE")
+                        migrate(cursor)
                     schema_version_pending = True
 
             # A process can stop between claiming an artifact/job and recording
@@ -2586,7 +2595,10 @@ def get_db_manager(db_path: Optional[str] = None) -> DatabaseManager:
         if db_path is None:
             # 延迟导入避免循环依赖
             import config
-            db_path = str(config.get_db_path() / "soundmind.db")
+            directory = config.get_db_path()
+            current = directory / "soundbot.db"
+            legacy = directory / "soundmind.db"
+            db_path = str(legacy if not current.exists() and legacy.is_file() else current)
         _db_manager = DatabaseManager(db_path)
     return _db_manager
 

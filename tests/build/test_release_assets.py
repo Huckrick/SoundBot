@@ -16,8 +16,6 @@ from tests.build.verify_release_assets import (
 class ReleaseAssetTests(unittest.TestCase):
     def make_assets(self, root: Path) -> dict[str, dict[str, object]]:
         payloads = {
-            "models.zip": b"models",
-            "models.zip.sha256": b"hash  models.zip\n",
             "SoundBot-0.2.0-arm64.dmg": b"dmg",
             "SoundBot-Setup-0.2.0.exe": b"exe",
             "SHA256SUMS.txt": b"checksums",
@@ -99,8 +97,8 @@ class ReleaseAssetTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self.make_assets(root)
-            model_archive = root / "models.zip"
-            with model_archive.open("wb") as handle:
+            installer = root / "SoundBot-0.2.0-arm64.dmg"
+            with installer.open("wb") as handle:
                 handle.seek(MAX_RELEASE_ASSET_BYTES - 1)
                 handle.write(b"\0")
 

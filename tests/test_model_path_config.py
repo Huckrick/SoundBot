@@ -22,7 +22,6 @@ class ModelPathConfigurationTests(unittest.TestCase):
             with mock.patch.dict(
                 os.environ, {"SOUNDBOT_MODELS_PATH": str(missing)}, clear=False
             ):
-                self.assertEqual(config.find_models_dir(), missing)
                 self.assertEqual(config.find_models_dir_runtime(), missing)
 
 

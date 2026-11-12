@@ -1,6 +1,6 @@
 /**
  * SoundBot - AI 音效管理器 (PyInstaller 一体化版本)
- * Copyright (C) 2026 Nagisa_Huckrick (胡杨)
+ * Copyright (C) 2026 Huckrick and SoundBot contributors
  *
  * 前后端一体化打包，无需单独安装 Python 环境
  */
@@ -9,13 +9,21 @@ const { app, BrowserWindow, Menu, ipcMain, dialog, protocol, shell, safeStorage 
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
+const { randomUUID } = require('crypto');
 const net = require('net');
+const locale = require('./assets/locale');
 const audioCapabilityManifest = require('./config/audio_capabilities.json');
 const supportedAudioExtensions = new Set(Object.keys(audioCapabilityManifest.formats || {}));
 const supportedAudioFilterExtensions = [...supportedAudioExtensions].map((value) => value.slice(1));
 
+const userDataOverride = process.env.SOUNDBOT_USER_DATA_DIR;
+if (userDataOverride && path.isAbsolute(userDataOverride)) {
+  fs.mkdirSync(userDataOverride, { recursive: true, mode: 0o700 });
+  app.setPath('userData', userDataOverride);
+}
+
 // 自定义协议：用于在渲染进程中安全加载本地音频
-const AUDIO_PROTOCOL = 'soundmind-audio';
+const AUDIO_PROTOCOL = 'soundbot-audio';
 
 // 必须在 app.ready 之前调用
 protocol.registerSchemesAsPrivileged([
@@ -23,6 +31,42 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 let mainWindow;
+let interfaceLocale = locale.create();
+let savedInterfaceLocale = null;
+const t = (key, args) => interfaceLocale.t(key, args);
+const interfaceSettingsPath = () => path.join(app.getPath('userData'), 'interface.json');
+
+function loadInterfaceLocale() {
+  try {
+    savedInterfaceLocale = locale.normalize(JSON.parse(fs.readFileSync(interfaceSettingsPath(), 'utf8')).locale);
+    interfaceLocale = locale.create(savedInterfaceLocale);
+  } catch (error) {
+    if (error.code !== 'ENOENT') console.warn('[Locale] Could not read interface preference:', error);
+  }
+}
+
+function saveInterfaceLocale(value) {
+  const file = interfaceSettingsPath();
+  const staged = `${file}.${randomUUID()}.tmp`;
+  try {
+    fs.writeFileSync(staged, JSON.stringify({ locale: value }), { flag: 'wx', mode: 0o600 });
+    fs.renameSync(staged, file);
+    savedInterfaceLocale = value;
+  } catch (error) {
+    console.warn('[Locale] Could not save interface preference:', error);
+    try { fs.rmSync(staged, { force: true }); } catch (cleanupError) {
+      console.warn('[Locale] Could not remove staged interface preference:', cleanupError);
+    }
+  }
+}
+const desktopToken = randomUUID();
+let dawDirectory = null;
+const middlewareFolders = new Map();
+const middlewareProjects = Object.freeze({
+  fmod: { extension: 'fspro', name: 'FMOD Studio', folder: 'Assets' },
+  cri: { extension: 'atmcproject', name: 'CRI Atom Craft', folder: 'Materials' }
+});
+const dragDeliveries = new Map();
 let backendProcess = null;
 let backendStartupPromise = null;
 let ipcHandlersInitialized = false;
@@ -81,6 +125,7 @@ function initializeMainLogging() {
   };
   try {
     app.setAppLogsPath();
+    if (userDataOverride) app.setAppLogsPath(path.join(getUserDataDir(), 'logs'));
     const logDir = app.getPath('logs');
     fs.mkdirSync(logDir, { recursive: true });
     mainLogPath = path.join(logDir, 'soundbot-main.log');
@@ -270,10 +315,6 @@ function redactLegacyConfigSecrets(configData) {
 function migrateLegacyPlaintextSecrets() {
   const configPath = path.join(getUserDataDir(), 'ai_config.json');
   if (!fs.existsSync(configPath)) return { success: true, migrated: 0 };
-  if (!isSecureStorageAvailable()) {
-    console.warn('[Secrets] Legacy plaintext migration pending: OS secure storage is unavailable');
-    return { success: false, pending: true, migrated: 0 };
-  }
 
   let parsed;
   try {
@@ -286,6 +327,10 @@ function migrateLegacyPlaintextSecrets() {
   const { sanitized, migrated } = redactLegacyConfigSecrets(parsed);
   const hasApiKeyFields = JSON.stringify(parsed) !== JSON.stringify(sanitized);
   if (!hasApiKeyFields) return { success: true, migrated: 0 };
+  if (!isSecureStorageAvailable()) {
+    console.warn('[Secrets] Legacy plaintext migration pending: OS secure storage is unavailable');
+    return { success: false, pending: true, migrated: 0 };
+  }
 
   const originalSecrets = { ...readSecureSecrets() };
   try {
@@ -348,7 +393,7 @@ function registerAudioProtocol() {
         : parsed.pathname;
       const filePath = decodeURIComponent(encodedPath);
 
-      if (!filePath || !path.isAbsolute(filePath) || !fs.existsSync(filePath)) {
+      if (!filePath || !path.isAbsolute(filePath) || !supportedAudioExtensions.has(path.extname(filePath).toLowerCase()) || !fs.existsSync(filePath)) {
         callback({ error: -6 });
         return;
       }
@@ -456,67 +501,6 @@ function verifyBackendIntegrity(backendDir) {
  * 自动检索模型目录
  * 优先级：环境变量 > 应用目录 > 用户数据目录 > 开发目录
  */
-function findModelsDir() {
-  // An explicit override is authoritative, including when it intentionally
-  // points at a missing directory for diagnostics. Falling through to the
-  // bundled model would make configuration mistakes and missing-model tests
-  // look healthy.
-  const envPath = process.env.SOUNDBOT_MODELS_PATH;
-  if (envPath) {
-    const explicitPath = path.resolve(envPath);
-    console.log(`[Models] Using explicit model directory: ${explicitPath}`);
-    return explicitPath;
-  }
-
-  const possiblePaths = [];
-
-  // 2. 应用资源目录
-  possiblePaths.push(path.join(process.resourcesPath, 'models'));
-  possiblePaths.push(path.join(getAppRootDir(), 'models'));
-
-  // 3. 用户数据目录
-  possiblePaths.push(path.join(getUserDataDir(), 'models'));
-
-  // 4. 开发环境
-  possiblePaths.push(path.join(__dirname, 'models'));
-  possiblePaths.push(path.join(__dirname, '..', 'models'));
-
-  console.log('[Models] Searching for models directory...');
-
-  // 查找第一个包含 clap 子目录的路径
-  for (const modelsPath of possiblePaths) {
-    const clapDir = path.join(modelsPath, 'clap');
-    console.log(`[Models] Checking: ${modelsPath}`);
-    if (fs.existsSync(clapDir) && fs.statSync(clapDir).isDirectory()) {
-      console.log(`[Models] ✓ Found models directory: ${modelsPath}`);
-      return modelsPath;
-    }
-  }
-
-  // 没找到，返回第一个路径（用于错误提示）
-  const defaultPath = possiblePaths[0] || path.join(getUserDataDir(), 'models');
-  console.log(`[Models] ✗ Models not found, using default: ${defaultPath}`);
-  return defaultPath;
-}
-
-/**
- * 检查模型是否存在
- */
-function checkModels() {
-  const modelsDir = findModelsDir();
-  const clapDir = path.join(modelsDir, 'clap');
-
-  return {
-    exists: fs.existsSync(clapDir) && fs.statSync(clapDir).isDirectory(),
-    path: modelsDir
-  };
-}
-
-// ==================== 后端管理 ====================
-
-/**
- * 查找可用端口（从 startPort 开始递增）
- */
 function findFreePort(startPort) {
   return new Promise((resolve) => {
     const server = net.createServer();
@@ -557,13 +541,6 @@ async function startBackend() {
     updateBackendEndpoint(freePort);
   }
 
-  // 检查模型
-  const modelStatus = checkModels();
-  if (!modelStatus.exists) {
-    console.warn('[Backend] Model files not found:', modelStatus.path);
-    console.warn('[Backend] Starting without CLAP; management and keyword search remain available.');
-  }
-
   // 获取后端可执行文件
   const backendExe = getBackendExecutable();
   if (!backendExe) {
@@ -580,7 +557,8 @@ async function startBackend() {
   const env = {
     ...process.env,
     SOUNDBOT_PORT: String(backendPort),
-    SOUNDBOT_MODELS_PATH: modelStatus.path,
+    SOUNDBOT_IPC_TOKEN: desktopToken,
+    SOUNDBOT_REQUIRE_DESKTOP_TOKEN: '1',
     SOUNDBOT_USER_DATA_DIR: getUserDataDir(),
     PYTHONUNBUFFERED: '1',
     PYTHONIOENCODING: 'utf-8'
@@ -588,7 +566,6 @@ async function startBackend() {
 
   console.log(`[Backend] Starting backend: ${backendExe}`);
   console.log(`[Backend] Working directory: ${backendDir}`);
-  console.log(`[Backend] Model path: ${env.SOUNDBOT_MODELS_PATH}`);
 
   try {
     // 启动后端进程
@@ -624,7 +601,7 @@ async function startBackend() {
       if (text) console.log(`[Backend] ${text}`);
       stdoutHandshakeBuffer = `${stdoutHandshakeBuffer}${rawText}`;
       const match = stdoutHandshakeBuffer.match(/BOUND_PORT=(\d{1,5})/);
-      if (match) {
+      if (match && !portHandshakeSettled) {
         try {
           updateBackendEndpoint(Number(match[1]));
           console.log(`[Backend] Confirmed bound port ${backendPort}`);
@@ -662,7 +639,7 @@ async function startBackend() {
     const announcedPort = await Promise.race([
       portHandshake,
       new Promise((resolve) => {
-        handshakeTimer = setTimeout(() => resolve(null), 10000);
+        handshakeTimer = setTimeout(() => resolve(null), 90000);
       })
     ]);
     clearTimeout(handshakeTimer);
@@ -691,8 +668,8 @@ async function waitForBackendHealth(timeoutMs = 120000) {
 
   while (Date.now() - startedAt < timeoutMs) {
     if (!backendProcess || backendProcess.exitCode !== null) {
-      const code = backendProcess ? backendProcess.exitCode : 'unknown';
-      return { success: false, error: `后端进程意外退出 (code: ${code})` };
+      const code = backendProcess?.exitCode ?? 'unknown';
+      return { success: false, error: '后端进程意外退出 (code: {code})', errorArgs: { code } };
     }
     const controller = new AbortController();
     const requestTimer = setTimeout(() => controller.abort(), 2000);
@@ -820,7 +797,10 @@ async function throwBackendResponseError(response) {
 }
 
 async function requestBackendJson(url, options = {}) {
-  const response = await fetch(url, options);
+  if (new URL(url).origin !== backendOrigin) throw new Error('本地后端地址无效');
+  const headers = new Headers(options.headers);
+  headers.set('X-SoundBot-IPC', desktopToken);
+  const response = await fetch(url, { ...options, headers, redirect: 'error' });
 
   if (!response.ok) {
     await throwBackendResponseError(response);
@@ -947,6 +927,10 @@ function applyPersistentSecretUpdates(updates) {
 
 async function hydrateBackendAISecrets() {
   if (backendSecretsHydrated) return;
+  if (Object.keys(readSecureSecrets()).length === 0) {
+    backendSecretsHydrated = true;
+    return;
+  }
   if (!isSecureStorageAvailable()) {
     console.warn('[Secrets] Backend credential hydration skipped: secure storage unavailable');
     return;
@@ -987,24 +971,9 @@ function requireProjectId(value) {
 }
 
 function createBackendRequest(action, data = {}) {
-  const filePath = typeof data === 'string' ? data : (data.filePath || data.path || '');
-  const encodedPath = encodeURIComponent(filePath);
-
   switch (action) {
     case 'health':
       return { url: `${apiBaseUrl}/health` };
-    case 'scan-only':
-      return {
-        url: `${apiBaseUrl}/scan-only`,
-        options: {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            folder_path: data.folderPath,
-            recursive: data.recursive ?? true
-          })
-        }
-      };
     case 'import-async':
       return {
         url: `${apiBaseUrl}/projects/${encodeURIComponent(requireProjectId(data.projectId))}/imports`,
@@ -1046,94 +1015,9 @@ function createBackendRequest(action, data = {}) {
           })
         }
       };
-    case 'index-status':
-      return { url: `${apiBaseUrl}/index/status` };
-    case 'indexed-files':
-      return { url: `${apiBaseUrl}/files` };
-    case 'db-files':
-      return { url: `${apiBaseUrl}/db/files` };
-    case 'db-file':
-      return { url: `${apiBaseUrl}/db/file/${encodedPath}` };
-    case 'db-file-tags':
-      return {
-        url: `${apiBaseUrl}/db/file/${encodeURIComponent(data.path)}/tags`,
-        options: {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tags: data.tags || [] })
-        }
-      };
-    case 'db-file-delete':
-      return {
-        url: `${apiBaseUrl}/db/file/${encodedPath}`,
-        options: { method: 'DELETE' }
-      };
-    case 'db-stats':
-      return { url: `${apiBaseUrl}/db/stats` };
-    case 'audio-url':
-      return { localOnly: true, result: { success: true, url: `${apiBaseUrl}/audio/${encodedPath}` } };
-    case 'waveform':
-      return { url: `${backendOrigin}/api/waveform?path=${encodedPath}` };
     case 'waveform-by-id':
       return {
         url: `${apiBaseUrl}/files/${encodeURIComponent(data.fileId)}/waveform?project_id=${encodeURIComponent(data.projectId || 'default')}`
-      };
-    case 'waveforms-batch':
-      return {
-        url: `${apiBaseUrl}/waveforms/batch`,
-        options: {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            file_ids: Array.isArray(data.fileIds) ? data.fileIds : [],
-            project_id: data.projectId || 'default'
-          })
-        }
-      };
-    case 'export-clip':
-      return {
-        url: `${backendOrigin}/api/export/clip`,
-        options: {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            path: data.filePath,
-            start: data.start,
-            end: data.end,
-            temp_file: data.tempFile
-          })
-        }
-      };
-    case 'audio-fade':
-      return {
-        url: `${backendOrigin}/api/audio/fade`,
-        options: {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            path: data.filePath,
-            fade_in: data.fadeIn,
-            fade_out: data.fadeOut
-          })
-        }
-      };
-    case 'get-temp-dir':
-      return { url: `${apiBaseUrl}/config/temp-dir` };
-    case 'set-temp-dir':
-      return {
-        url: `${apiBaseUrl}/config/temp-dir`,
-        options: {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ temp_dir: data.tempDir })
-        }
-      };
-    case 'disk-space':
-      return { url: `${apiBaseUrl}/disk-space` };
-    case 'clear-temp-clips':
-      return {
-        url: `${apiBaseUrl}/temp-clips/clear`,
-        options: { method: 'POST' }
       };
     default:
       return null;
@@ -1185,12 +1069,13 @@ function createWindow() {
     width: 1440,
     height: 900,
     minWidth: 1200,
-    minHeight: 700,
-    title: 'SoundBot - AI 音效管理器',
+    minHeight: 720,
+    title: 'SoundBot',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      devTools: false,
       preload: path.join(__dirname, 'preload.js'),
       webSecurity: true,
       allowRunningInsecureContent: false
@@ -1198,6 +1083,25 @@ function createWindow() {
     titleBarStyle: 'default',
     show: false,
     backgroundColor: '#0a0a0a'
+  });
+  const contents = mainWindow.webContents;
+  contents.once('did-finish-load', () => {
+    if (!contents.isDestroyed()) {
+      contents.setVisualZoomLevelLimits(1, 1).catch(error => {
+        console.warn('[Renderer] Could not set visual zoom limits:', error.message);
+      });
+    }
+  });
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  mainWindow.webContents.on('will-navigate', event => event.preventDefault());
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    const key = input.key.toLowerCase();
+    const modifier = input.control || input.meta;
+    if (key === 'f12' ||
+        (modifier && ['+', '-', '=', '0'].includes(key)) ||
+        (modifier && (input.shift || input.alt) && ['i', 'j', 'c'].includes(key))) {
+      event.preventDefault();
+    }
   });
 
   // A preload failure removes every desktop API from the renderer while the
@@ -1216,22 +1120,35 @@ function createWindow() {
     }
   });
 
-  // 设置 CSP
-  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+  const webRequest = mainWindow.webContents.session.webRequest;
+  webRequest.onBeforeSendHeaders((details, callback) => {
+    const requestHeaders = { ...details.requestHeaders };
+    const windowId = mainWindow?.webContents?.id;
+    if (windowId && details.webContentsId === windowId && new URL(details.url).origin === backendOrigin) {
+      for (const name of Object.keys(requestHeaders)) {
+        if (name.toLowerCase() === 'x-soundbot-ipc') delete requestHeaders[name];
+      }
+      requestHeaders['X-SoundBot-IPC'] = desktopToken;
+    }
+    callback({ requestHeaders });
+  });
+  webRequest.onHeadersReceived((details, callback) => {
+    if (!mainWindow || details.webContentsId !== mainWindow.webContents.id || details.resourceType !== 'mainFrame') {
+      callback({ responseHeaders: details.responseHeaders });
+      return;
+    }
     callback({
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
           "default-src 'self'; " +
-          "script-src 'self' 'unsafe-inline'; " +
+          "script-src 'self'; " +
           "style-src 'self' 'unsafe-inline'; " +
           "font-src 'self'; " +
           "img-src 'self' data: blob:; " +
-          `media-src 'self' blob: soundmind-audio: ${backendOrigin}; ` +
-          `connect-src 'self' ${backendOrigin} ${backendWsOrigin} ` +
-          "https://api.openai.com https://api.moonshot.cn https://api.anthropic.com " +
-          "https://api.deepseek.com https://api.siliconflow.cn " +
-          "https://generativelanguage.googleapis.com;"
+          `media-src 'self' blob: soundbot-audio: ${backendOrigin}; ` +
+          `connect-src 'self' ${backendOrigin} ${backendWsOrigin}; ` +
+          "object-src 'none'; base-uri 'none'; frame-src 'none';"
         ]
       }
     });
@@ -1239,7 +1156,20 @@ function createWindow() {
 
   // 加载页面
   const indexPath = path.join(__dirname, 'index.html');
-  mainWindow.loadFile(indexPath);
+  mainWindow.loadFile(indexPath, { query: savedInterfaceLocale ? { locale: savedInterfaceLocale } : {} });
+
+  mainWindow.on('close', (event) => {
+    if (!mainWindow.hasUnsavedMiddlewareEdits) return;
+    const answer = dialog.showMessageBoxSync(mainWindow, {
+      type: 'warning',
+      buttons: [t('继续编辑'), t('丢弃编辑并退出')],
+      defaultId: 0,
+      cancelId: 0,
+      message: t('中间件工作台中有未交付的编辑。')
+    });
+    if (answer === 0) event.preventDefault();
+    else mainWindow.hasUnsavedMiddlewareEdits = false;
+  });
 
   // 窗口关闭处理
   mainWindow.on('closed', () => {
@@ -1256,10 +1186,10 @@ function createWindow() {
 function createMenu() {
   const template = [
     {
-      label: '文件',
+      label: t('文件'),
       submenu: [
         {
-          label: '导入文件夹',
+          label: t('导入文件夹'),
           accelerator: 'CmdOrCtrl+O',
           click: () => {
             mainWindow.webContents.send('menu-import-folder');
@@ -1267,7 +1197,7 @@ function createMenu() {
         },
         { type: 'separator' },
         {
-          label: '退出',
+          label: t('退出'),
           accelerator: process.platform === 'darwin' ? 'Cmd+Q' : 'Ctrl+Q',
           click: () => {
             app.quit();
@@ -1276,28 +1206,14 @@ function createMenu() {
       ]
     },
     {
-      label: '编辑',
+      label: t('编辑'),
       submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
+        { role: 'undo', label: t('撤销') },
+        { role: 'redo', label: t('重做') },
         { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' }
-      ]
-    },
-    {
-      label: '视图',
-      submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { role: 'toggleDevTools', accelerator: 'F12' },
-        { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
-        { type: 'separator' },
-        { role: 'togglefullscreen' }
+        { role: 'cut', label: t('剪切') },
+        { role: 'copy', label: t('复制') },
+        { role: 'paste', label: t('粘贴') }
       ]
     }
   ];
@@ -1365,14 +1281,6 @@ function setupIpcHandlers() {
   });
 
   // 文件对话框
-  ipcMain.handle('dialog-open', async (event, options) => {
-    return await showOwnedOpenDialog(event, options);
-  });
-
-  ipcMain.handle('dialog-save', async (event, options) => {
-    return await dialog.showSaveDialog(mainWindow, options);
-  });
-
   ipcMain.handle('dialog-message', async (event, options) => {
     return await dialog.showMessageBox(mainWindow, options);
   });
@@ -1383,21 +1291,6 @@ function setupIpcHandlers() {
     let requestKey = null;
     let requestController = null;
     try {
-      if (action === 'start-server') {
-        const result = await ensureBackendStarted();
-        return result?.success === false
-          ? toBackendError(new Error(result.error || '后端启动失败'), { action, code: 'BACKEND_START_FAILED' })
-          : result;
-      }
-
-      if (action === 'stop-server') {
-        return await stopBackend();
-      }
-
-      if (action === 'runtime-config') {
-        return getRuntimeConfig();
-      }
-
       const startupResult = await ensureBackendStarted();
       if (!startupResult.success) {
         return toBackendError(new Error(startupResult.error || '后端未就绪'), {
@@ -1412,10 +1305,6 @@ function setupIpcHandlers() {
           action,
           code: 'UNKNOWN_BACKEND_ACTION'
         });
-      }
-
-      if (requestConfig.localOnly) {
-        return requestConfig.result;
       }
 
       const requestId = data && typeof data === 'object'
@@ -1527,40 +1416,6 @@ function setupIpcHandlers() {
     }
   });
 
-  ipcMain.handle('secure-secret', async (event, action, payload = {}) => {
-    try {
-      if (action === 'status') {
-        return { success: true, ...getSafeStorageStatus() };
-      }
-
-      validateSecretKey(payload.key);
-      if (!isSecureStorageAvailable()) {
-        return { success: false, code: 'ENCRYPTION_UNAVAILABLE', error: '系统安全存储当前不可用' };
-      }
-
-      if (action === 'set') {
-        setStoredSecret(payload.key, payload.value);
-        return { success: true };
-      }
-
-      if (action === 'get' || action === 'has') {
-        // Deliberately expose existence only.  Renderer code must never be
-        // able to retrieve an already stored plaintext credential.
-        return { success: true, exists: hasEncryptedSecret(payload.key) };
-      }
-
-      if (action === 'delete') {
-        const existed = deleteStoredSecret(payload.key);
-        return { success: true, existed };
-      }
-
-      return { success: false, code: 'UNKNOWN_SECRET_ACTION', error: `未知密钥操作: ${action}` };
-    } catch (error) {
-      console.error('[Secrets] IPC error:', error);
-      return { success: false, code: 'SECRET_STORE_ERROR', error: error.message };
-    }
-  });
-
   ipcMain.handle('wait-backend-ready', async (event, timeoutMs = 60000) => {
     const startupResult = await ensureBackendStarted();
     if (!startupResult.success) {
@@ -1576,7 +1431,6 @@ function setupIpcHandlers() {
     const error = await shell.openPath(logDir);
     return { success: !error, error: error || null, path: logDir };
   });
-  ipcMain.handle('get-app-path', () => getAppRootDir());
   ipcMain.handle('check-full-disk-access', async () => {
     if (process.platform !== 'darwin') {
       return true;
@@ -1607,7 +1461,8 @@ function setupIpcHandlers() {
       name: path.basename(filePath),
       size: stats.size,
       type: extension,
-      lastModified: stats.mtimeMs
+      lastModified: stats.mtimeMs,
+      isDirectory: stats.isDirectory()
     };
   }
 
@@ -1616,10 +1471,11 @@ function setupIpcHandlers() {
       switch (action) {
         case 'select-audio': {
           const result = await showOwnedOpenDialog(event, {
+            title: t('导入文件…'),
             ...payload,
             properties: ['openFile', 'multiSelections'],
             filters: [
-              { name: 'Audio Files', extensions: supportedAudioFilterExtensions }
+              { name: t('音频文件'), extensions: supportedAudioFilterExtensions }
             ]
           });
 
@@ -1641,6 +1497,7 @@ function setupIpcHandlers() {
         }
         case 'select-folder': {
           const result = await showOwnedOpenDialog(event, {
+            title: t('导入文件夹…'),
             ...payload,
             properties: ['openDirectory']
           });
@@ -1704,24 +1561,126 @@ function setupIpcHandlers() {
     }
   });
 
-  // 拖拽文件
-  ipcMain.handle('start-drag', async (event, filePath) => {
+  ipcMain.handle('choose-daw-directory', async (event) => {
+    if (event.sender !== mainWindow?.webContents) throw new Error('窗口不可用');
+    const result = await showOwnedOpenDialog(event, {
+      title: t('选择 DAW 工程媒体目录'),
+      properties: ['openDirectory']
+    });
+    if (result.canceled || !result.filePaths[0]) return null;
+    dawDirectory = fs.realpathSync(result.filePaths[0]);
+    dragDeliveries.clear();
+    return dawDirectory;
+  });
+
+  ipcMain.handle('desktop-media', async (event, action, data = {}) => {
+    const handlers = {
+      prepare: () => ['/delivery', { ...data, directory: dawDirectory }],
+      cleanup: () => ['/cleanup', { paths: Array.isArray(data.paths) ? data.paths : [] }],
+      disconnect: () => ['/middleware/disconnect', {}],
+      select: () => [`/middleware/sources/${encodeURIComponent(data.id)}/select`, {}],
+      writeback: () => ['/middleware/deliver', data],
+      restore: () => [`/wwise/backups/${encodeURIComponent(data.id)}/restore`, {}],
+      'remove-plugin': () => [`/effects/plugins/${encodeURIComponent(data.id)}/remove`, {}]
+    };
     try {
-      if (!filePath || !fs.existsSync(filePath)) {
-        return { success: false, error: '文件不存在' };
+      if (event.sender !== mainWindow?.webContents) throw new Error('窗口不可用');
+      if (action === 'add-plugin') {
+        const options = { title: t('选择本地 VST3 插件'), properties: [data.directory ? 'openDirectory' : 'openFile'] };
+        if (!data.directory) options.filters = [{ name: 'VST3', extensions: ['vst3'] }];
+        const choice = await showOwnedOpenDialog(event, options);
+        if (choice.canceled || !choice.filePaths[0]) return null;
+        return await requestBackendJson(apiBaseUrl + '/effects/plugins', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: choice.filePaths[0] })
+        });
       }
-
-      const iconPath = path.join(__dirname, 'assets', 'audio-icon.png');
-      const finalIconPath = fs.existsSync(iconPath) ? iconPath : undefined;
-
-      mainWindow.webContents.startDrag({
-        file: filePath,
-        icon: finalIconPath
+      if (action === 'connect') {
+        const host = data.host;
+        let selection;
+        if (host === 'wwise') {
+          selection = { url: data.url };
+        } else {
+          if (!Object.hasOwn(middlewareProjects, host)) throw new Error('未知媒体操作');
+          selection = middlewareFolders.get(host);
+          if (!selection || data.pick === true) {
+            const profile = middlewareProjects[host];
+            const project = await showOwnedOpenDialog(event, {
+              title: t('选择 {host} 工程', { host: profile.name }),
+              properties: ['openFile'], filters: [{ name: profile.name, extensions: [profile.extension] }]
+            });
+            if (project.canceled || !project.filePaths[0]) return null;
+            const projectPath = fs.realpathSync(project.filePaths[0]);
+            const folder = path.join(path.dirname(projectPath), profile.folder);
+            const source = await showOwnedOpenDialog(event, {
+              title: t('选择工程素材目录'),
+              defaultPath: fs.statSync(folder, { throwIfNoEntry: false })?.isDirectory() ? folder : path.dirname(projectPath),
+              properties: ['openDirectory']
+            });
+            if (source.canceled || !source.filePaths[0]) return null;
+            selection = { project_path: projectPath, source_directory: fs.realpathSync(source.filePaths[0]) };
+          }
+        }
+        const result = await requestBackendJson(apiBaseUrl + '/middleware/connect', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'X-SoundBot-IPC': desktopToken },
+          body: JSON.stringify({ host, ...selection })
+        });
+        if (host !== 'wwise') middlewareFolders.set(host, selection);
+        return result;
+      }
+      if (!Object.hasOwn(handlers, action)) throw new Error('未知媒体操作');
+      if (action === 'prepare' && !dawDirectory) throw new Error('请先选择 DAW 媒体目录');
+      const [route, body] = handlers[action]();
+      const result = await requestBackendJson(apiBaseUrl + route, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-SoundBot-IPC': desktopToken },
+        body: JSON.stringify(body)
       });
-
-      return { success: true };
+      if (action !== 'prepare') return result;
+      if (body.directory !== dawDirectory) throw new Error('DAW 目录已更换，请重新准备拖出');
+      const id = randomUUID();
+      if (dragDeliveries.size >= 64) dragDeliveries.delete(dragDeliveries.keys().next().value);
+      const stat = fs.lstatSync(result.path);
+      if (!stat.isFile()) throw new Error('成品文件不可用');
+      dragDeliveries.set(id, { path: result.path, size: stat.size, modified: stat.mtimeMs });
+      return { id, name: result.name };
     } catch (error) {
-      return { success: false, error: error.message };
+      return toBackendError(error, { action });
+    }
+  });
+
+  ipcMain.on('start-drag', (event, deliveryId) => {
+    if (event.sender !== mainWindow?.webContents) return;
+    try {
+      const delivery = dragDeliveries.get(deliveryId);
+      const file = delivery?.path;
+      const stat = file && fs.lstatSync(file, { throwIfNoEntry: false });
+      if (!stat?.isFile() || stat.size !== delivery.size || stat.mtimeMs !== delivery.modified) {
+        throw new Error('成品已移动或改变，请重新准备拖出');
+      }
+      event.sender.startDrag({ file, icon: path.join(__dirname, 'assets', 'audio-icon.png') });
+    } catch (error) {
+      event.sender.send('delivery-error', error.message);
+    }
+  });
+
+  ipcMain.on('editing-dirty', (_event, dirty) => {
+    if (mainWindow) mainWindow.hasUnsavedMiddlewareEdits = dirty === true;
+  });
+  ipcMain.on('interface-language', (event, language) => {
+    if (event.sender !== mainWindow?.webContents) return;
+    const next = locale.normalize(language);
+    if (!next) return;
+    if (savedInterfaceLocale !== next) saveInterfaceLocale(next);
+    if (interfaceLocale.locale !== next) {
+      interfaceLocale = locale.create(next);
+      createMenu();
+    }
+  });
+
+  ipcMain.handle('reveal-file', (_event, file) => {
+    if (typeof file === 'string' && path.isAbsolute(file) && fs.existsSync(file)) {
+      shell.showItemInFolder(file);
     }
   });
 
@@ -1744,11 +1703,12 @@ function createSplashWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: true
+      sandbox: true,
+      devTools: false
     }
   });
 
-  splashWindow.loadFile(path.join(__dirname, 'splash.html'));
+  splashWindow.loadFile(path.join(__dirname, 'splash.html'), { query: { locale: interfaceLocale.locale } });
   splashWindow.webContents.on('will-navigate', (event, targetUrl) => {
     if (targetUrl.startsWith('soundbot-action://open-logs')) {
       event.preventDefault();
@@ -1792,26 +1752,28 @@ function closeSplashWindow() {
 
 app.whenReady().then(async () => {
   initializeMainLogging();
+  loadInterfaceLocale();
   registerAudioProtocol();
+  if (!app.isPackaged && app.dock) app.dock.setIcon(path.join(__dirname, 'build', 'icon.png'));
 
   // 创建启动窗口
   createSplashWindow();
   
   // 先启动后端
-  updateSplashStatus('正在启动后端服务...', '检查模型文件');
+  updateSplashStatus(t('正在启动后端服务…'), t('打开本地音效库'));
   const result = await ensureBackendStarted();
   
   if (!result.success) {
     console.error('[App] Backend startup failed:', result.error);
     updateSplashStatus(
-      '启动失败',
-      `${result.error || '未知错误'} · 请重新安装或查看应用日志`,
+      t('启动失败'),
+      t('{reason} · 请重新安装或查看应用日志', { reason: t(locale.has(result.error) ? result.error : '未知错误', result.errorArgs) }),
       true
     );
     return;
   }
   
-  updateSplashStatus('服务已就绪', '正在加载界面...');
+  updateSplashStatus(t('服务已就绪'), t('正在加载界面...'));
   
   // 后端启动成功后再创建主窗口
   createWindow();
@@ -1820,13 +1782,13 @@ app.whenReady().then(async () => {
   mainWindow.once('ready-to-show', () => {
     if (rendererPreloadFailure || !rendererBridgeReady) {
       const reason = rendererPreloadFailure
-        ? '桌面桥接组件加载失败'
-        : '桌面桥接组件未完成初始化';
+        ? t('桌面桥接组件加载失败')
+        : t('桌面桥接组件未完成初始化');
       console.error('[Renderer] Bridge startup assertion failed:', {
         rendererBridgeReady,
         rendererPreloadFailure
       });
-      updateSplashStatus('界面加载失败', `${reason} · 请重新安装应用`, true);
+      updateSplashStatus(t('界面加载失败'), t('{reason} · 请重新安装应用', { reason }), true);
       mainWindow.destroy();
       return;
     }
@@ -1836,9 +1798,6 @@ app.whenReady().then(async () => {
     // 通知前端后端已就绪
     mainWindow.webContents.send('backend-ready', { success: true });
     
-    if (process.argv.includes('--dev')) {
-      mainWindow.webContents.openDevTools();
-    }
   });
 });
 
@@ -1859,6 +1818,11 @@ app.on('activate', () => {
 });
 
 app.on('before-quit', async (event) => {
+  if (mainWindow?.hasUnsavedMiddlewareEdits && !quitInProgress) {
+    event.preventDefault();
+    mainWindow.close();
+    return;
+  }
   if (quitInProgress) {
     return;
   }
