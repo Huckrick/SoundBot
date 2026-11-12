@@ -349,6 +349,8 @@ class BuildScriptReliabilityTests(unittest.TestCase):
             soundbot_build, "verify_native_backend_bundle"
         ), mock.patch.object(
             soundbot_build, "verify_packaged_models"
+        ), mock.patch.object(
+            soundbot_build, "prepare_electron_distribution"
         ), mock.patch.object(soundbot_build, "run_command") as run:
             soundbot_build.build_electron("windows", install_dependencies=False)
 
@@ -383,10 +385,26 @@ class BuildScriptReliabilityTests(unittest.TestCase):
             soundbot_build, "verify_native_backend_bundle"
         ), mock.patch.object(
             soundbot_build, "verify_packaged_models"
+        ), mock.patch.object(
+            soundbot_build, "prepare_electron_distribution"
         ), mock.patch.object(soundbot_build, "run_command"):
             soundbot_build.build_electron("macos")
 
         install.assert_called_once_with()
+
+    def test_electron_packaging_requires_both_notices_after_install(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            electron = root / "node_modules" / "electron"
+            (electron / "dist").mkdir(parents=True)
+            (electron / "dist" / "LICENSE").write_text("license", encoding="utf-8")
+            with mock.patch.object(soundbot_build, "PROJECT_ROOT", root), mock.patch.object(
+                soundbot_build, "run_command"
+            ) as run:
+                with self.assertRaisesRegex(RuntimeError, "LICENSES.chromium.html"):
+                    soundbot_build.prepare_electron_distribution("macos", {"ELECTRON_OVERRIDE_DIST_PATH": "custom"})
+            self.assertEqual(run.call_args.args[0], ["node", str(electron / "install.js")])
+            self.assertNotIn("ELECTRON_OVERRIDE_DIST_PATH", run.call_args.kwargs["env"])
 
     def test_windows_npm_command_preserves_argument_boundaries(self) -> None:
         command = [

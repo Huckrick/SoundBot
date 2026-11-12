@@ -25,10 +25,13 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertRegex(self.text, r"(?m)^  PYTHONUTF8: '1'$")
         self.assertRegex(self.text, r"(?m)^  PYTHONIOENCODING: 'utf-8'$")
 
-    def test_manual_builds_cannot_create_a_release(self) -> None:
+    def test_manual_release_rebuilds_require_an_existing_tag_and_create_a_draft(self) -> None:
         self.assertIn("  workflow_dispatch:\n", self.text)
         self.assertIn("      - 'v*'\n", self.text)
-        self.assertIn("    if: github.event_name == 'push' && github.ref_type == 'tag'", self.text)
+        self.assertIn("REQUESTED_TAG: ${{ inputs.release_tag }}", self.text)
+        self.assertIn("DRAFT=false", self.text)
+        self.assertIn('git checkout --detach "$TAG_SHA"', self.text)
+        self.assertIn("    if: needs.validate-release.outputs.release_draft == 'true'", self.text)
         self.assertNotIn("--draft=false", self.text)
         self.assertNotIn("inputs.tag_name", self.text)
         self.assertIn("ref: ${{ github.sha }}", self.text)

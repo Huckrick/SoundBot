@@ -420,6 +420,24 @@ def official_npm_environment() -> dict[str, str]:
     return environment
 
 
+def prepare_electron_distribution(target_platform: str, environment: dict[str, str]) -> None:
+    """Materialize the locked Electron download before copying its notices."""
+    electron = PROJECT_ROOT / "node_modules" / "electron"
+    install_env = dict(environment)
+    install_env.pop("ELECTRON_OVERRIDE_DIST_PATH", None)
+    install_env.pop("electron_use_remote_checksums", None)
+    install_env.pop("npm_config_electron_use_remote_checksums", None)
+    install_env["ELECTRON_INSTALL_PLATFORM"], install_env["ELECTRON_INSTALL_ARCH"] = {
+        "macos": ("darwin", "arm64"),
+        "windows": ("win32", "x64"),
+    }[target_platform]
+    run_command(["node", str(electron / "install.js")], cwd=PROJECT_ROOT, env=install_env, capture=False)
+    for name in ("LICENSE", "LICENSES.chromium.html"):
+        notice = electron / "dist" / name
+        if not notice.is_file() or notice.stat().st_size == 0:
+            raise RuntimeError(f"Electron distribution is missing its license notice: {name}")
+
+
 def build_electron(target_platform: str = None, install_dependencies: bool = True):
     """
     构建 Electron 应用
@@ -442,6 +460,9 @@ def build_electron(target_platform: str = None, install_dependencies: bool = Tru
     # third-party mirror. GitHub Actions already has a clean config, while this
     # explicit environment makes developer builds deterministic as well.
     build_env = official_npm_environment()
+    if target_platform not in {"macos", "windows"}:
+        raise RuntimeError(f"未知构建平台: {target_platform}")
+    prepare_electron_distribution(target_platform, build_env)
 
     if target_platform == "macos":
         log("构建 macOS 应用...")
@@ -460,8 +481,6 @@ def build_electron(target_platform: str = None, install_dependencies: bool = Tru
             env=build_env,
             capture=False,
         )
-    else:
-        raise RuntimeError(f"未知构建平台: {target_platform}")
     
     log("Electron 构建完成", "SUCCESS")
 

@@ -5,12 +5,17 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing release tag to rebuild and stage as a draft. Leave empty for a preview build.'
+        required: false
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: soundbot-build-${{ github.event_name }}-${{ github.ref }}
+  group: soundbot-build-${{ inputs.release_tag || github.ref_name }}
   cancel-in-progress: false
 
 env:
@@ -28,9 +33,11 @@ jobs:
       contents: read
     env:
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      REQUESTED_TAG: ${{ inputs.release_tag }}
     outputs:
       release_tag: ${{ steps.release-source.outputs.tag }}
       release_sha: ${{ steps.release-source.outputs.sha }}
+      release_draft: ${{ steps.release-source.outputs.draft }}
       prerelease: ${{ steps.release-source.outputs.prerelease }}
     steps:
       - name: Checkout code
@@ -47,26 +54,40 @@ jobs:
           set -euo pipefail
           HEAD_SHA="$(git rev-parse HEAD)"
           test "$HEAD_SHA" = "$(git rev-parse "$GITHUB_SHA^{commit}")"
-          RELEASE_TAG="v$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')"
+          RELEASE_TAG="$REQUESTED_TAG"
           if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
-            test "$GITHUB_REF" = "refs/tags/$RELEASE_TAG" || {
-              echo "::error::Release tag must match $RELEASE_TAG"
-              exit 1
-            }
+            RELEASE_TAG="${GITHUB_REF#refs/tags/}"
+          elif [[ -n "$RELEASE_TAG" && "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]]; then
+            echo "::error::Run an existing release tag rebuild from the default branch"
+            exit 1
+          fi
+          DRAFT=false
+          if [[ -n "$RELEASE_TAG" ]]; then
+            git check-ref-format "refs/tags/$RELEASE_TAG"
             git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"
             git cat-file -t "refs/tags/$RELEASE_TAG" | grep -qx tag || {
               echo "::error::Release tags must be annotated or signed"
               exit 1
             }
-            TAG_SHA="$(git rev-list -n 1 "$RELEASE_TAG")"
-            test "$TAG_SHA" = "$HEAD_SHA"
+            TAG_SHA="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+            if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then test "$TAG_SHA" = "$HEAD_SHA"; fi
             git merge-base --is-ancestor "$TAG_SHA" "origin/$DEFAULT_BRANCH" || {
               echo "::error::Release tag must be reachable from $DEFAULT_BRANCH"
               exit 1
             }
+            git checkout --detach "$TAG_SHA"
+            HEAD_SHA="$TAG_SHA"
+            DRAFT=true
           fi
+          SOURCE_TAG="v$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')"
+          if [[ "$DRAFT" == "true" && "$RELEASE_TAG" != "$SOURCE_TAG" ]]; then
+            echo "::error::Release tag must match $SOURCE_TAG"
+            exit 1
+          fi
+          RELEASE_TAG="$SOURCE_TAG"
           echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
           echo "sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "draft=$DRAFT" >> "$GITHUB_OUTPUT"
           if [[ "$RELEASE_TAG" == "v0.2.0" || "$RELEASE_TAG" == *-* ]]; then
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
           else
@@ -171,6 +192,9 @@ jobs:
 
       - name: Install Node dependencies
         run: npm ci --progress=false
+
+      - name: Materialize Electron and its license notices
+        run: node node_modules/electron/install.js
 
       - name: Build backend and Electron with the canonical script
         run: python scripts/build.py --platform macos --release-tag "$RELEASE_TAG" --skip-dependency-install
@@ -412,6 +436,9 @@ jobs:
 
       - name: Install Node dependencies
         run: npm ci --progress=false
+
+      - name: Materialize Electron and its license notices
+        run: node node_modules/electron/install.js
 
       - name: Test sandboxed Electron preload bridge
         shell: powershell
@@ -683,7 +710,7 @@ jobs:
           retention-days: 7
 
   create-release:
-    if: github.event_name == 'push' && github.ref_type == 'tag'
+    if: needs.validate-release.outputs.release_draft == 'true'
     needs: [validate-release, build-macos, build-windows]
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -723,6 +750,7 @@ jobs:
             --tag "$RELEASE_TAG" \
             --write-release-notes release-notes.md
           SOURCE_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$RELEASE_TAG"
+          SOURCE_SHA="$(git rev-parse HEAD)"
           RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           cat >> release-notes.md <<EOF
 
@@ -731,8 +759,13 @@ jobs:
           - macOS 14+ Apple Silicon 使用 DMG，Windows 10/11 x64 使用 EXE。安装包对应的 SHA-256 在同一发行条目的校验清单中。 / Use the DMG for macOS 14+ on Apple Silicon and the EXE for Windows 10/11 x64. Compare your download with the checksum list in this release.
           - 两平台均通过本机架构构建、安装包验证、音频格式及桌面启动和试听测试。宿主版本的实机结果另行记录。 / Both platforms passed native builds, package verification, audio format checks, and desktop startup and playback tests. Host compatibility results are recorded separately.
           - 标准 CI 产物供维护者验收，未配置发布者签名凭据。 / Standard CI produces review installers without publisher signing credentials.
+          - 源码提交 / Source commit: $SOURCE_SHA. 构建流程提交 / Workflow commit: $GITHUB_SHA.
 
-          [对应源码 / Tagged source]($SOURCE_URL) · [构建记录 / Build run]($RUN_URL) · [安装与支持 / Installation and support]($SOURCE_URL#readme) · [分发审查 / Distribution review]($SOURCE_URL/docs/release-review.md)
+          ### 界面语言 / Interface languages
+
+          在 **设置 → 常规 → 语言** 切换简体中文、繁體中文、日本語、English、Português (Brasil) 和 Español。素材名称、源标签及第三方插件界面保留原文。 / In **Settings → General → Language**, choose Simplified Chinese, Traditional Chinese, Japanese, English, Brazilian Portuguese, or Spanish. Asset names, source tags, and third-party plug-in interfaces stay in their original language.
+
+          [对应源码 / Tagged source]($SOURCE_URL) · [构建记录 / Build run]($RUN_URL) · [安装与支持 / Installation and support]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY#readme) · [分发审查 / Distribution review]($SOURCE_URL/docs/release-review.md)
           EOF
 
       - name: Assemble and verify exact release assets
@@ -764,7 +797,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG_SHA="$(git rev-list -n 1 "$RELEASE_TAG")"
+          TAG_SHA="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
           test "$TAG_SHA" = "${{ needs.validate-release.outputs.release_sha }}"
 
           if gh release view "$RELEASE_TAG" --json isDraft > release-state.json 2>/dev/null; then

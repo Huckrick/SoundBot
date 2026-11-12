@@ -18,6 +18,7 @@ Installers are written to `dist-electron/`. Packaging uses the source allowlist 
 | --- | --- |
 | `Validate` | 检查仓库数据、凭据、版本、代码和测试。 / Checks repository data, credentials, version metadata, and tests. |
 | 手动运行 `Build Installers` / Run `Build Installers` manually | 构建选定提交并在 Actions 提供 macOS、Windows 产物。 / Builds the selected commit and makes both platform artifacts available in Actions. |
+| 从 `main` 重建已有版本 / Rebuild an existing release from `main` | 在 `release_tag` 填已有的附注标签。新版工作流从原标签提交构建并验收，成功后生成草稿。 / Enter the existing annotated tag in `release_tag`. The current workflow builds and tests the original tagged commit, then creates a draft. |
 | 推送经批准的附注版本标签 / Push an approved annotated version tag | 仅当标签与源码版本一致且提交已进入默认分支时构建。两平台通过后创建 Release 草稿。 / Builds a matching tag on the default branch history and creates a release draft after both platforms pass. |
 | 检查并发布草稿 / Review and publish the draft | 核对两端安装包、校验值、签名与实机验收结果，再在 Releases 确认发布。 / Review the installers, hashes, signatures, and platform results before publishing the draft. |
 
