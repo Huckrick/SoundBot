@@ -1018,8 +1018,9 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
             <select id="llmProvider"><option>openai</option><option>lm_studio</option><option>ollama</option><option>kimi</option><option>deepseek</option><option>siliconflow</option><option value="custom">自定义</option></select>
             <label for="llmModel">模型</label><input id="llmModel" type="text">
             <label for="llmUrl">服务地址</label><input id="llmUrl" type="text">
-            <label for="llmKey">API 密钥</label><input id="llmKey" type="password" autocomplete="off">
+            <label for="llmKey">服务 API 密钥</label><input id="llmKey" type="password" autocomplete="off" aria-describedby="assistantKeyHelp">
             </div>
+            <p id="assistantKeyHelp">仅填写服务提供的 API 密钥。使用或保存密钥时，系统可能请求访问安全存储。</p>
             <div class="set-row">
               <label><input type="checkbox" id="llmClearKey"> 清除已存密钥</label>
               <button class="ghost-btn" id="btnTestAI">测试连接</button>
@@ -1032,8 +1033,7 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
             <h4>致谢与许可</h4>
             <p>第三方许可随源码及发行包提供。</p>
           </section>
-          <div class="set-row"><label>诊断</label><button class="ghost-btn" id="btnOpenLogs">打开日志</button>
-            <button class="ghost-btn hidden" id="btnPrivacy">磁盘访问设置</button></div>
+          <div class="set-row"><label>诊断</label><button class="ghost-btn" id="btnOpenLogs">打开日志</button></div>
         </section>
       </div>
     </div>

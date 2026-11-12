@@ -161,16 +161,22 @@ app = FastAPI(
 app.include_router(media_router)
 
 
+def _has_desktop_access(connection) -> bool:
+    if os.getenv("SOUNDBOT_REQUIRE_DESKTOP_TOKEN") != "1":
+        return True
+    expected = os.getenv("SOUNDBOT_IPC_TOKEN", "")
+    supplied = connection.headers.get("x-soundbot-ipc", "")
+    return bool(expected) and hmac.compare_digest(expected.encode(), supplied.encode())
+
+
 @app.middleware("http")
 async def authorize_desktop_request(request, call_next):
-    if (os.getenv("SOUNDBOT_REQUIRE_DESKTOP_TOKEN") == "1"
-        and request.method != "OPTIONS" and request.url.path != "/api/v1/health"):
-        expected = os.getenv("SOUNDBOT_IPC_TOKEN", "")
-        supplied = request.headers.get("x-soundbot-ipc", "")
-        if not expected or not hmac.compare_digest(expected.encode(), supplied.encode()):
-            return JSONResponse(status_code=403, content={
-                "code": "desktop_required", "message": "此请求需要从 SoundBot 桌面发起"
-            })
+    if (request.method != "OPTIONS"
+        and (request.method, request.url.path) != ("GET", "/api/v1/health")
+        and not _has_desktop_access(request)):
+        return JSONResponse(status_code=403, content={
+            "code": "desktop_required", "message": "此请求需要从 SoundBot 桌面发起"
+        })
     return await call_next(request)
 
 
@@ -263,7 +269,9 @@ async def websocket_scan_progress(websocket: WebSocket, client_id: str):
     - scan_complete: {"type": "scan_complete", "task_id": "xxx", "data": {...}}
     - scan_error: {"type": "scan_error", "task_id": "xxx", "data": {...}}
     """
-    logger.info(f"[WS] WebSocket 连接尝试: client_id={client_id}, origin={websocket.headers.get('origin')}")
+    if not _has_desktop_access(websocket):
+        await websocket.close(code=1008)
+        return
     ws_manager = get_ws_manager()
     await ws_manager.connect(websocket, client_id)
     logger.info(f"[WS] WebSocket 连接成功: client_id={client_id}")

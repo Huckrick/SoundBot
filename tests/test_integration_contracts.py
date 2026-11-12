@@ -8,7 +8,9 @@ import tempfile
 import unittest
 from unittest import mock
 
+from fastapi.testclient import TestClient
 from pydantic import ValidationError
+from starlette.websockets import WebSocketDisconnect
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -26,6 +28,23 @@ import main
 from core.audio_service import FileFingerprint, WaveformResult
 from core.database import AudioFileRecord, DatabaseManager
 from models import schemas
+
+
+class DesktopAccessTests(unittest.TestCase):
+    def test_http_and_websocket_require_the_desktop_token(self) -> None:
+        with mock.patch.dict(os.environ, {
+            "SOUNDBOT_REQUIRE_DESKTOP_TOKEN": "1", "SOUNDBOT_IPC_TOKEN": "test-local-token",
+        }), TestClient(main.app) as client:
+            self.assertEqual(client.get("/api/v1/health").status_code, 200)
+            self.assertEqual(client.get("/api/v1/runtime/capabilities").status_code, 403)
+            with self.assertRaises(WebSocketDisconnect):
+                with client.websocket_connect("/ws/scan/fixture"):
+                    self.fail("the WebSocket accepted an unauthenticated client")
+            with client.websocket_connect("/ws/scan/fixture", headers={
+                "X-SoundBot-IPC": "test-local-token",
+            }) as websocket:
+                websocket.send_json({"type": "ping"})
+                self.assertEqual(websocket.receive_json(), {"type": "pong"})
 
 
 def _artifact_state(manager: DatabaseManager, project_id: str, kind: str) -> str:

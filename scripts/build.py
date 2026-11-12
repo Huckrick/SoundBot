@@ -445,8 +445,9 @@ def build_electron(target_platform: str = None, install_dependencies: bool = Tru
 
     if target_platform == "macos":
         log("构建 macOS 应用...")
+        identity = build_env.get("CSC_NAME") or "-"
         run_command(
-            ["npx", "--no-install", "electron-builder", "--mac", "--arm64"],
+            ["npx", "--no-install", "electron-builder", "--mac", "--arm64", f"--config.mac.identity={identity}"],
             cwd=PROJECT_ROOT,
             env=build_env,
             capture=False,

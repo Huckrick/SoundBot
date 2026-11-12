@@ -13,6 +13,7 @@ import platform
 from importlib.metadata import distribution
 from pathlib import Path
 
+from packaging.requirements import Requirement
 from PyInstaller.utils.hooks import collect_all, collect_submodules, copy_metadata
 
 # ==================== 路径设置 ====================
@@ -85,14 +86,17 @@ for pkg in _collect_all_packages:
     except Exception as e:
         print(f'Warning: collect_all({pkg}) failed: {e}')
 
-# Preserve PyAV distribution metadata and its bundled license notices.
-try:
-    datas += copy_metadata('av')
-    datas += copy_metadata('pedalboard')
-    datas += copy_metadata('mutagen')
-    datas += copy_metadata('pillow')
-except Exception as e:
-    print(f'Warning: copying audio runtime metadata failed: {e}')
+# Ship the metadata and license files supplied by each platform's locked wheels.
+for line in (backend_dir / 'requirements.txt').read_text(encoding='utf-8').splitlines():
+    if not line.strip() or line.lstrip().startswith('#'):
+        continue
+    requirement = Requirement(line)
+    if requirement.marker and not requirement.marker.evaluate():
+        continue
+    installed = distribution(requirement.name)
+    if installed.version not in requirement.specifier:
+        raise RuntimeError(f'{requirement.name} {installed.version} differs from {requirement}')
+    datas += copy_metadata(requirement.name)
 
 # auditwheel/delvewheel may put FFmpeg libraries in an ``av.libs`` sibling
 # directory rather than inside the import package.  Collect every native file

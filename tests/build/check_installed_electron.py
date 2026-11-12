@@ -370,6 +370,13 @@ def _renderer_smoke_expression(
   if (health?.status !== 'healthy' || health?.audio_decoder_available !== true) {{
     throw new Error(`bundled audio decoder is unavailable: ${{JSON.stringify(health)}}`);
   }}
+  if (api.checkFullDiskAccess || api.openPrivacySettings) {{
+    throw new Error('renderer still exposes a full disk access request');
+  }}
+  const assistant = await api.aiConfig.get();
+  if (!assistant?.llm?.provider || !(await api.aiConfig.prepareChat())?.success) {{
+    throw new Error('the optional assistant bridge is unavailable without saved keys');
+  }}
 
   const runtime = await api.runtime.getConfig();
   if (!runtime?.apiV1Base?.startsWith('http://127.0.0.1:')) {{
@@ -663,6 +670,13 @@ def main() -> int:
     fixture_root.mkdir(parents=True, exist_ok=True)
     windows = os.name == "nt"
     resources = executable.parent / "resources" if windows else executable.parent.parent / "Resources"
+    for relative in (
+        "SoundBot.txt", "THIRD_PARTY_AUDIO_NOTICES.txt", "electron/LICENSE",
+        "electron/LICENSES.chromium.html", "ffmpeg/COPYING.LGPLv3", "ffmpeg/COPYING.GPLv3",
+    ):
+        notice = resources / "licenses" / relative
+        if not notice.is_file() or notice.stat().st_size == 0:
+            raise FileNotFoundError(f"installed license notice is missing: {relative}")
     backend_executable = resources / "backend" / "soundbot-backend" / (
         "soundbot-backend.exe" if windows else "soundbot-backend"
     )

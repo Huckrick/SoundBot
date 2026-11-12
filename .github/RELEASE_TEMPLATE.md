@@ -1,6 +1,6 @@
 # SoundBot
 
-**Version / 版本:** 1.0.0<br>
+**Version / 版本:** 1.0.1<br>
 **Status / 状态:** Stable / 稳定版<br>
 
 ## 功能 / Features
@@ -20,6 +20,6 @@
 
 ## 验收 / Verification
 
-记录两平台的原生包、冻结音频矩阵、实际 Electron 试听、宿主工程及 VST3 兼容性结果。使用真实实测值更新发行说明。 / Record native package, frozen audio matrix, Electron audition, host project, and VST3 compatibility results. Use measured results in release notes.
+记录两平台的安装、音频格式、试听和宿主验收结果。确认 SHA-256、签名状态、对应源码及第三方许可，再由维护者确认是否发布草稿。 / Record installer, audio format, playback, and host results. Check SHA-256, signing status, corresponding source, and third-party notices before the maintainer publishes the draft.
 
-[用户指南](../README.md) · [English guide](../README.en.md) · [GNU GPL v3 or later](../LICENSE)
+[用户指南 / User guide](../README.md) · [发行审查 / Release review](../docs/release-review.md) · [GNU GPL v3 or later](../LICENSE)

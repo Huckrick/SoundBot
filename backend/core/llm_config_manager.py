@@ -484,6 +484,10 @@ class LLMConfigManager:
                         self._merge_config(DEFAULT_CONFIG, loaded)
                     )
                     if _contains_plaintext_secret(loaded):
+                        if os.environ.get("SOUNDBOT_REQUIRE_DESKTOP_TOKEN") == "1":
+                            # The desktop migrates legacy credentials on an explicit
+                            # assistant action. Reading settings must not discard them.
+                            return _config_for_disk(merged)
                         logger.warning(
                             "检测到旧版明文 AI 密钥；已仅加载到当前进程内存并从 JSON 配置移除"
                         )

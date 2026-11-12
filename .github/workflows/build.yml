@@ -102,6 +102,13 @@ jobs:
           node tests/frontend/check_renderer_contract.js
           node tests/frontend/check_localization.js
 
+      - name: Check runtime and packaging dependency advisories
+        run: |
+          python -m venv "$RUNNER_TEMP/soundbot-audit"
+          "$RUNNER_TEMP/soundbot-audit/bin/python" -m pip install pip-audit==2.10.1
+          "$RUNNER_TEMP/soundbot-audit/bin/python" -m pip_audit --disable-pip --no-deps -r backend/requirements.txt
+          npm audit --audit-level=high
+
       - name: Verify version and bilingual changelog synchronization
         env:
           RELEASE_TAG: ${{ steps.release-source.outputs.tag }}
@@ -303,6 +310,7 @@ jobs:
         run: |
           APP_PATH=$(find dist-electron -type d -name 'SoundBot.app' -print -quit)
           test -n "$APP_PATH" || { echo "::error::packaged SoundBot.app not found"; exit 1; }
+          codesign --verify --deep --strict "$APP_PATH"
           BACKEND_PATH="$APP_PATH/Contents/Resources/backend/soundbot-backend/soundbot-backend"
 
           export SOUNDBOT_PORT=18766
@@ -714,6 +722,18 @@ jobs:
           python tests/build/verify_release_metadata.py \
             --tag "$RELEASE_TAG" \
             --write-release-notes release-notes.md
+          SOURCE_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$RELEASE_TAG"
+          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          cat >> release-notes.md <<EOF
+
+          ### 安装与验收 / Install and verification
+
+          - macOS 14+ Apple Silicon 使用 DMG，Windows 10/11 x64 使用 EXE。安装包对应的 SHA-256 在同一发行条目的校验清单中。 / Use the DMG for macOS 14+ on Apple Silicon and the EXE for Windows 10/11 x64. Compare your download with the checksum list in this release.
+          - 两平台均通过本机架构构建、安装包验证、音频格式及桌面启动和试听测试。宿主版本的实机结果另行记录。 / Both platforms passed native builds, package verification, audio format checks, and desktop startup and playback tests. Host compatibility results are recorded separately.
+          - 标准 CI 产物供维护者验收，未配置发布者签名凭据。 / Standard CI produces review installers without publisher signing credentials.
+
+          [对应源码 / Tagged source]($SOURCE_URL) · [构建记录 / Build run]($RUN_URL) · [安装与支持 / Installation and support]($SOURCE_URL#readme) · [分发审查 / Distribution review]($SOURCE_URL/docs/release-review.md)
+          EOF
 
       - name: Assemble and verify exact release assets
         run: |

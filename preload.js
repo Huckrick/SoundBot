@@ -123,7 +123,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   aiConfig: {
     get: () => invokeAIConfig('get'),
     save: (config) => invokeAIConfig('save', config),
-    test: (config) => invokeAIConfig('test', config)
+    test: (config) => invokeAIConfig('test', config),
+    prepareChat: () => invokeAIConfig('prepare-chat')
   },
 
   backendStatus: {
@@ -137,12 +138,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // 平台信息
   platform: process.platform,
-
-  // 检查完全磁盘访问权限（macOS）
-  checkFullDiskAccess: () => ipcRenderer.invoke('check-full-disk-access'),
-
-  // 打开隐私设置（macOS）
-  openPrivacySettings: () => ipcRenderer.invoke('open-privacy-settings'),
 
   // Keep the renderer surface deliberately small; unsupported and unused IPC
   // contracts were removed in v0.2.0.

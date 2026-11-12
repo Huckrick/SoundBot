@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -56,8 +57,7 @@ class SecretConfigTests(unittest.TestCase):
 
             manager = self._manager(root)
 
-            # Backward compatibility for this process: Electron migrates the
-            # same values to safeStorage before starting the backend.
+            # A standalone development backend can still read older configs.
             self.assertEqual(
                 manager.get_current_llm_config().api_key, "legacy-llm-secret"
             )
@@ -69,6 +69,17 @@ class SecretConfigTests(unittest.TestCase):
             self.assertNotIn("legacy-llm-secret", persisted)
             self.assertNotIn("legacy-embedding-secret", persisted)
             self.assertNotIn('"api_key"', persisted)
+
+    def test_desktop_settings_read_preserves_legacy_file_until_explicit_migration(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config_file = root / "ai_config.json"
+            original = json.dumps({"llm": {"openai": {"api_key": "legacy-key"}}})
+            config_file.write_text(original, encoding="utf-8")
+            with mock.patch.dict(os.environ, {"SOUNDBOT_REQUIRE_DESKTOP_TOKEN": "1"}):
+                manager = self._manager(root)
+            self.assertFalse(manager.get_public_llm_config()["openai"]["has_api_key"])
+            self.assertEqual(config_file.read_text(encoding="utf-8"), original)
 
     def test_omitted_secret_preserves_memory_and_empty_string_clears(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -4,6 +4,19 @@ Release history for SoundBot. / SoundBot 版本记录。
 
 ## [Unreleased] / 未发布
 
+## [1.0.1] - 2026-11-12
+
+### Security / 安全
+
+- Updated the networking dependencies and packaging toolchain to address reported advisories. The tag build checks both dependency locks. / 更新网络依赖和打包工具以修复已报告的告警，标签构建会检查两套依赖锁。
+- Restricted the desktop scan WebSocket to the same per-launch credential as other local data routes, and denied browser permission requests from the desktop UI. / 扫描 WebSocket 与其他本地数据接口共用每次启动的访问凭据，桌面界面拒绝浏览器权限申请。
+- Moved access to the system credential store to explicit assistant actions and removed the full disk access shortcut. / 只有主动使用助手时才访问系统安全存储，移除全磁盘访问入口。
+
+### Changed / 变更
+
+- Configured the Windows installer for the current user and removed unused macOS runtime entitlements. The app asks before loading a selected VST3 plug-in and identifies that action as local code execution. / Windows 安装器按当前用户配置，精简 macOS 运行时权限。加载所选 VST3 前说明插件会执行本机代码并请用户确认。
+- Included project, runtime, and codec license notices in the installers and expanded bilingual download, support, privacy, and release verification guidance. / 安装包附带项目、运行时和编解码器许可证说明，补齐双语下载、支持、隐私和发行验收指南。
+
 ## [1.0.0] - 2026-11-12
 
 ### Added / 新增
@@ -150,7 +163,8 @@ Release history for SoundBot. / SoundBot 版本记录。
 - The Windows release gate starts the frozen backend with a clean `PATH` and no system FFmpeg, then requires the complete format matrix, exact waveforms, CLAP, Chroma, hybrid search, `win-unpacked`, and NSIS installer integrity checks to pass before publishing. / Windows 发布门禁会在干净 `PATH`、无系统 FFmpeg 下启动冻结后端，并要求全格式矩阵、精确波形、CLAP、Chroma、混合搜索、`win-unpacked` 与 NSIS 安装包完整性检查全部通过后才允许发布。
 - CI builds Windows x64 and macOS arm64 only on native runners and blocks release creation if any functional smoke test, model check, metadata check, package check, or installer check fails. / CI 仅在原生 runner 构建 Windows x64 与 macOS arm64，并在任一功能冒烟、模型、元数据、应用包或安装包检查失败时阻止创建 Release。
 
-[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/Huckrick/SoundBot/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Huckrick/SoundBot/compare/v0.2.1-beta.3...v1.0.0
 [0.2.1-beta.3]: ../../compare/v0.2.1-beta.2...v0.2.1-beta.3
 [0.2.1-beta.2]: ../../compare/v0.2.1-beta.1...v0.2.1-beta.2

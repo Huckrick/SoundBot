@@ -5,7 +5,7 @@
  * 前后端一体化打包，无需单独安装 Python 环境
  */
 
-const { app, BrowserWindow, Menu, ipcMain, dialog, protocol, shell, safeStorage } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, protocol, shell, safeStorage, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -209,25 +209,8 @@ function writeSecureSecrets(secrets) {
   secureSecretsCache = secrets;
 }
 
-function getSafeStorageStatus() {
-  const encryptionAvailable = safeStorage.isEncryptionAvailable();
-  let backend = null;
-  if (encryptionAvailable && typeof safeStorage.getSelectedStorageBackend === 'function') {
-    try {
-      backend = safeStorage.getSelectedStorageBackend();
-    } catch (error) {
-      console.warn('[Secrets] Failed to inspect safeStorage backend:', error);
-    }
-  }
-  // Linux's basic_text backend is obfuscation, not OS-backed encryption.  It
-  // is outside the supported release targets and must not be advertised as a
-  // secure credential store.
-  const available = encryptionAvailable && backend !== 'basic_text';
-  return { available, backend };
-}
-
-function isSecureStorageAvailable() {
-  return getSafeStorageStatus().available;
+async function isSecureStorageAvailable() {
+  return ['darwin', 'win32'].includes(process.platform) && await safeStorage.isAsyncEncryptionAvailable();
 }
 
 function secretKeyFor(scope, provider) {
@@ -242,17 +225,22 @@ function hasEncryptedSecret(key) {
   return typeof secrets[key] === 'string' && secrets[key].length > 0;
 }
 
-function decryptStoredSecret(key) {
+async function decryptStoredSecret(key) {
   validateSecretKey(key);
-  if (!isSecureStorageAvailable()) return null;
   const encoded = readSecureSecrets()[key];
   if (!encoded) return null;
-  return safeStorage.decryptString(Buffer.from(encoded, 'base64'));
+  if (!await isSecureStorageAvailable()) {
+    const error = new Error('已保存密钥当前无法由系统安全存储解密');
+    error.code = 'ENCRYPTION_UNAVAILABLE';
+    throw error;
+  }
+  const { result } = await safeStorage.decryptStringAsync(Buffer.from(encoded, 'base64'));
+  return result;
 }
 
-function setStoredSecret(key, value) {
+async function setStoredSecret(key, value) {
   validateSecretKey(key);
-  if (!isSecureStorageAvailable()) {
+  if (!await isSecureStorageAvailable()) {
     const error = new Error('系统安全存储当前不可用');
     error.code = 'ENCRYPTION_UNAVAILABLE';
     throw error;
@@ -262,8 +250,8 @@ function setStoredSecret(key, value) {
     error.code = 'INVALID_SECRET';
     throw error;
   }
-  const secrets = { ...readSecureSecrets() };
-  secrets[key] = safeStorage.encryptString(value).toString('base64');
+  const encrypted = await safeStorage.encryptStringAsync(value);
+  const secrets = { ...readSecureSecrets(), [key]: encrypted.toString('base64') };
   writeSecureSecrets(secrets);
 }
 
@@ -312,7 +300,7 @@ function redactLegacyConfigSecrets(configData) {
   return { sanitized, migrated };
 }
 
-function migrateLegacyPlaintextSecrets() {
+async function migrateLegacyPlaintextSecrets() {
   const configPath = path.join(getUserDataDir(), 'ai_config.json');
   if (!fs.existsSync(configPath)) return { success: true, migrated: 0 };
 
@@ -327,7 +315,7 @@ function migrateLegacyPlaintextSecrets() {
   const { sanitized, migrated } = redactLegacyConfigSecrets(parsed);
   const hasApiKeyFields = JSON.stringify(parsed) !== JSON.stringify(sanitized);
   if (!hasApiKeyFields) return { success: true, migrated: 0 };
-  if (!isSecureStorageAvailable()) {
+  if (migrated.length && !await isSecureStorageAvailable()) {
     console.warn('[Secrets] Legacy plaintext migration pending: OS secure storage is unavailable');
     return { success: false, pending: true, migrated: 0 };
   }
@@ -336,7 +324,7 @@ function migrateLegacyPlaintextSecrets() {
   try {
     for (const { key, value } of migrated) {
       if (!hasEncryptedSecret(key)) {
-        setStoredSecret(key, value);
+        await setStoredSecret(key, value);
       }
     }
     const temporaryPath = `${configPath}.tmp-${process.pid}`;
@@ -528,7 +516,6 @@ function updateBackendEndpoint(port) {
  * 启动后端服务
  */
 async function startBackend() {
-  migrateLegacyPlaintextSecrets();
   if (backendProcess) {
     console.log('[Backend] Backend service already running');
     return { success: true };
@@ -705,9 +692,7 @@ async function waitForBackendHealth(timeoutMs = 120000) {
 
 async function ensureBackendStarted() {
   if (backendProcess) {
-    const result = await waitForBackendHealth();
-    if (result.success) await hydrateBackendAISecrets();
-    return result;
+    return await waitForBackendHealth();
   }
 
   if (backendStartupPromise) {
@@ -715,10 +700,6 @@ async function ensureBackendStarted() {
   }
 
   backendStartupPromise = startBackend()
-    .then(async (result) => {
-      if (result.success) await hydrateBackendAISecrets();
-      return result;
-    })
     .finally(() => {
       if (!backendProcess) {
         backendStartupPromise = null;
@@ -844,7 +825,7 @@ function normalizeSecretUpdate(value) {
   return { action, value: null };
 }
 
-function resolveSecretForRequest(scope, provider, update) {
+async function resolveSecretForRequest(scope, provider, update) {
   const key = secretKeyFor(scope, provider);
   const normalized = normalizeSecretUpdate(update);
   if (normalized.action === 'set') {
@@ -853,21 +834,16 @@ function resolveSecretForRequest(scope, provider, update) {
   if (normalized.action === 'clear') {
     return { key, ...normalized, resolved: '' };
   }
-  if (hasEncryptedSecret(key) && !isSecureStorageAvailable()) {
-    const error = new Error('已保存密钥当前无法由系统安全存储解密');
-    error.code = 'ENCRYPTION_UNAVAILABLE';
-    throw error;
-  }
-  return { key, ...normalized, resolved: decryptStoredSecret(key) || '' };
+  return { key, ...normalized, resolved: await decryptStoredSecret(key) || '' };
 }
 
-function prepareAIConfigRequest(payload = {}) {
+async function prepareAIConfigRequest(payload = {}) {
   const llmProvider = String(payload.llm_provider || '');
   const embeddingProvider = String(payload.embedding_provider || '');
   // Deriving the key also validates provider identifiers before any store or
   // backend operation occurs.
-  const llmSecret = resolveSecretForRequest('llm', llmProvider, payload.llm_secret);
-  const embeddingSecret = resolveSecretForRequest(
+  const llmSecret = await resolveSecretForRequest('llm', llmProvider, payload.llm_secret);
+  const embeddingSecret = await resolveSecretForRequest(
     'embedding', embeddingProvider, payload.embedding_secret
   );
   const llmConfig = stripRendererSecretFields(payload.llm_config);
@@ -903,7 +879,6 @@ function overlaySecureSecretStatus(responseData) {
       }
     }
   }
-  result.secure_storage = getSafeStorageStatus();
   return result;
 }
 
@@ -915,10 +890,10 @@ function restoreSecretStore(snapshot) {
   writeSecureSecrets({ ...(snapshot || {}) });
 }
 
-function applyPersistentSecretUpdates(updates) {
+async function applyPersistentSecretUpdates(updates) {
   for (const update of updates) {
     if (update.action === 'set') {
-      setStoredSecret(update.key, update.value);
+      await setStoredSecret(update.key, update.value);
     } else if (update.action === 'clear') {
       deleteStoredSecret(update.key);
     }
@@ -931,33 +906,22 @@ async function hydrateBackendAISecrets() {
     backendSecretsHydrated = true;
     return;
   }
-  if (!isSecureStorageAvailable()) {
-    console.warn('[Secrets] Backend credential hydration skipped: secure storage unavailable');
-    return;
-  }
-  try {
-    const current = await requestBackendJson(`${apiBaseUrl}/ai/config`);
-    const llmProvider = current?.llm?.provider;
-    const embeddingProvider = current?.embedding?.provider;
-    if (!llmProvider || !embeddingProvider) return;
-    const prepared = prepareAIConfigRequest({
-      llm_provider: llmProvider,
-      llm_config: current?.llm?.config?.[llmProvider] || {},
-      llm_secret: { action: 'keep' },
-      embedding_provider: embeddingProvider,
-      embedding_config: current?.embedding?.config?.[embeddingProvider] || {},
-      embedding_secret: { action: 'keep' }
-    });
-    await requestBackendJson(`${apiBaseUrl}/ai/config`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(prepared.body)
-    });
-    backendSecretsHydrated = true;
-    console.log('[Secrets] Backend runtime credentials hydrated');
-  } catch (error) {
-    console.warn('[Secrets] Backend credential hydration failed:', error?.code || error?.message);
-  }
+  const current = await requestBackendJson(`${apiBaseUrl}/ai/config`);
+  const llmProvider = current?.llm?.provider;
+  const embeddingProvider = current?.embedding?.provider;
+  if (!llmProvider || !embeddingProvider) throw new Error('助手请求失败');
+  const prepared = await prepareAIConfigRequest({
+    llm_provider: llmProvider,
+    llm_config: current.llm.config?.[llmProvider] || {},
+    embedding_provider: embeddingProvider,
+    embedding_config: current.embedding.config?.[embeddingProvider] || {}
+  });
+  await requestBackendJson(`${apiBaseUrl}/ai/config`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(prepared.body)
+  });
+  backendSecretsHydrated = true;
 }
 
 function requireProjectId(value) {
@@ -1124,7 +1088,8 @@ function createWindow() {
   webRequest.onBeforeSendHeaders((details, callback) => {
     const requestHeaders = { ...details.requestHeaders };
     const windowId = mainWindow?.webContents?.id;
-    if (windowId && details.webContentsId === windowId && new URL(details.url).origin === backendOrigin) {
+    if (windowId && details.webContentsId === windowId &&
+        [backendOrigin, backendWsOrigin].includes(new URL(details.url).origin)) {
       for (const name of Object.keys(requestHeaders)) {
         if (name.toLowerCase() === 'x-soundbot-ipc') delete requestHeaders[name];
       }
@@ -1357,8 +1322,11 @@ function setupIpcHandlers() {
   // Credential-aware AI config proxy.  Plaintext keys never cross back from
   // the Electron main process into the renderer and are never persisted by
   // the Python backend.
-  ipcMain.handle('ai-config', async (event, action, payload = {}) => {
+  async function handleAIConfig(event, action, payload = {}) {
     try {
+      if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) {
+        throw new Error('窗口不可用');
+      }
       const startupResult = await ensureBackendStarted();
       if (!startupResult.success) {
         return {
@@ -1373,18 +1341,28 @@ function setupIpcHandlers() {
         return overlaySecureSecretStatus(result);
       }
 
-      if (!['save', 'test'].includes(action)) {
+      if (!['save', 'test', 'prepare-chat'].includes(action)) {
         return { success: false, code: 'UNKNOWN_AI_CONFIG_ACTION', error: '未知 AI 配置操作' };
       }
 
-      const prepared = prepareAIConfigRequest(payload);
+      if (!(await migrateLegacyPlaintextSecrets()).success) {
+        const error = new Error('旧版助手密钥迁移未完成。请检查系统安全存储后重试。');
+        error.code = 'LEGACY_CREDENTIAL_MIGRATION_PENDING';
+        throw error;
+      }
+      if (action === 'prepare-chat') {
+        await hydrateBackendAISecrets();
+        return { success: true };
+      }
+
+      const prepared = await prepareAIConfigRequest(payload);
       const snapshot = action === 'save' ? snapshotSecretStore() : null;
       try {
         if (action === 'save') {
           // Persist first, then roll back if the metadata/backend update fails.
           // This makes the secure store and runtime configuration one logical
           // transaction from the renderer's perspective.
-          applyPersistentSecretUpdates(prepared.updates);
+          await applyPersistentSecretUpdates(prepared.updates);
         }
         const result = await requestBackendJson(
           `${apiBaseUrl}/ai/config${action === 'test' ? '/test' : ''}`,
@@ -1414,6 +1392,12 @@ function setupIpcHandlers() {
         status: Number.isInteger(error?.status) ? error.status : null
       };
     }
+  }
+  let pendingAIConfig = Promise.resolve();
+  ipcMain.handle('ai-config', (event, action, payload) => {
+    const request = pendingAIConfig.then(() => handleAIConfig(event, action, payload));
+    pendingAIConfig = request.catch(() => {});
+    return request;
   });
 
   ipcMain.handle('wait-backend-ready', async (event, timeoutMs = 60000) => {
@@ -1430,26 +1414,6 @@ function setupIpcHandlers() {
     const logDir = app.getPath('logs');
     const error = await shell.openPath(logDir);
     return { success: !error, error: error || null, path: logDir };
-  });
-  ipcMain.handle('check-full-disk-access', async () => {
-    if (process.platform !== 'darwin') {
-      return true;
-    }
-
-    try {
-      fs.readdirSync(app.getPath('documents'));
-      return true;
-    } catch (error) {
-      return false;
-    }
-  });
-  ipcMain.handle('open-privacy-settings', async () => {
-    if (process.platform !== 'darwin') {
-      return { success: false, error: '仅支持 macOS' };
-    }
-
-    await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles');
-    return { success: true };
   });
 
   function toImportFileInfo(filePath) {
@@ -1590,6 +1554,15 @@ function setupIpcHandlers() {
         if (!data.directory) options.filters = [{ name: 'VST3', extensions: ['vst3'] }];
         const choice = await showOwnedOpenDialog(event, options);
         if (choice.canceled || !choice.filePaths[0]) return null;
+        const approval = await dialog.showMessageBox(mainWindow, {
+          type: 'warning',
+          message: t('加载 VST3 插件「{name}」？', { name: path.basename(choice.filePaths[0]) }),
+          detail: t('插件将在本机执行代码。请只加载你信任的来源提供的插件。'),
+          buttons: [t('取消'), t('加载插件')],
+          defaultId: 0,
+          cancelId: 0
+        });
+        if (approval.response !== 1) return null;
         return await requestBackendJson(apiBaseUrl + '/effects/plugins', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ path: choice.filePaths[0] })
@@ -1753,6 +1726,8 @@ function closeSplashWindow() {
 app.whenReady().then(async () => {
   initializeMainLogging();
   loadInterfaceLocale();
+  session.defaultSession.setPermissionCheckHandler(() => false);
+  session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
   registerAudioProtocol();
   if (!app.isPackaged && app.dock) app.dock.setIcon(path.join(__dirname, 'build', 'icon.png'));
 

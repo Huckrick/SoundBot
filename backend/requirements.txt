@@ -1,27 +1,29 @@
 annotated-doc==0.0.4
 annotated-types==0.7.0
-anyio==4.12.1
+anyio==4.16.0
 av==18.0.0
-certifi==2026.2.25
+certifi==2026.10.23
 click==8.3.1
-fastapi==0.135.1
+colorama==0.4.6; sys_platform == "win32"
+fastapi==0.162.5
 h11==0.16.0
 httpcore==1.0.9
 httptools==0.7.1
 httpx==0.28.1
-idna==3.11
+idna==3.20
 jieba==0.42.1
 mutagen==1.47.0
 numpy==2.4.3
+opentelemetry-api==1.45.2
 pedalboard==0.9.22
 pillow==13.0.0
 pydantic==2.12.5
 pydantic_core==2.41.5
 python-dotenv==1.2.2
 PyYAML==6.0.3
-starlette==0.52.1
+starlette==1.10.0
 typing-inspection==0.4.2
-typing_extensions==4.15.0
+typing_extensions==4.16.0
 uvicorn==0.42.0
 uvloop==0.22.1; sys_platform != "win32"
 watchfiles==1.1.1

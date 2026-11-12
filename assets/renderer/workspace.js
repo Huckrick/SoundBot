@@ -1519,6 +1519,12 @@
         const message = input.value.trim();
         if (!message) return;
         input.value = '';
+        try {
+            await desktop.aiConfig.prepareChat();
+        } catch (error) {
+            if (!input.value) input.value = message;
+            throw error;
+        }
         $('aiMsgs').append(el('div', message, 'ai-msg user'));
         const bubble = el('div', null, 'ai-msg bot');
         setText(bubble, () => t('正在检索…'));
@@ -1772,8 +1778,6 @@
             if ($('ovSettings').classList.contains('show') && !$('settings-vst').classList.contains('hidden')) attempt(() => fx()?.settings());
         });
         on('btnOpenLogs', () => desktop.backendStatus.openLogs());
-        $('btnPrivacy').classList.toggle('hidden', desktop.platform !== 'darwin');
-        on('btnPrivacy', () => desktop.openPrivacySettings());
         on('btnSaveAI', () => updateAssistant('save'));
         on('btnTestAI', () => updateAssistant('test'));
         $('llmProvider').onchange = showProvider;

@@ -1,22 +1,13 @@
 # Repository policy / 仓库政策
 
-SoundBot is published as a source-transparent release repository under
-`GPL-3.0-or-later`. It is not currently operated as a community contribution or
-support project.
+SoundBot is maintained by Huckrick. Forking and modification are welcome under the project license. Only the owner may create or update upstream branches.
 
-SoundBot 以 `GPL-3.0-or-later` 许可公开源码和发布产物，但当前不作为社区贡献或技术支持项目运营。
+SoundBot 由 Huckrick 维护。欢迎按项目许可证 Fork 和修改。原仓库的分支由所有者创建和更新。
 
-- Issues, Pull Requests, Discussions, Projects, public support requests, code
-  submissions, and data submissions are not accepted. / 不接收 Issue、Pull
-  Request、Discussion、Project、公开支持请求、代码提交或数据提交。
-- Do not send or publish API keys, credentials, audio samples, databases, logs,
-  private paths, or other personal data. / 请勿发送或公开 API 密钥、凭据、音频样本、
-  数据库、日志、私人路径或其他个人数据。
-- Forking and modification remain permitted under the license, but a fork has no
-  write access to this repository. / 依据许可证可以 fork 和修改，但 fork 不拥有本仓库写权限。
-- Releases are produced only by the owner through the annotated-tag workflow
-  documented in the bilingual README. / 发布仅由所有者通过双语 README 中记录的
-  annotated-tag 工作流完成。
+Public comments on commits are welcome for brief feedback. Include the app version, OS, and the steps needed to describe the issue. Keep passwords, API keys, raw logs, personal paths, source audio, and databases out of comments. Pull Requests, Issues, and Discussions are closed.
 
-This policy does not grant any additional repository permission or open an
-external submission channel. / 本政策不授予额外仓库权限，也不会开放外部提交入口。
+欢迎在提交下公开留言。说明应用版本、系统和简短的复现步骤即可。请勿在评论中发布密码、API 密钥、原始日志、私人路径、音频原件或数据库。Pull Request、Issue 和 Discussion 保持关闭。
+
+For install, upgrade, and troubleshooting instructions, see the [bilingual README](../README.md). For suspected vulnerabilities, see the [security policy](SECURITY.md).
+
+安装、升级及常见问题见[双语 README](../README.md)。疑似漏洞的处理方式见[安全政策](SECURITY.md)。

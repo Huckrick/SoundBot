@@ -21,13 +21,15 @@ Installers are written to `dist-electron/`. Packaging uses the source allowlist 
 | 推送经批准的附注版本标签 / Push an approved annotated version tag | 仅当标签与源码版本一致且提交已进入默认分支时构建。两平台通过后创建 Release 草稿。 / Builds a matching tag on the default branch history and creates a release draft after both platforms pass. |
 | 检查并发布草稿 / Review and publish the draft | 核对两端安装包、校验值、签名与实机验收结果，再在 Releases 确认发布。 / Review the installers, hashes, signatures, and platform results before publishing the draft. |
 
-发行资产名称为 `SoundBot-<version>-arm64.dmg`、`SoundBot-Setup-<version>.exe` 和 `SHA256SUMS.txt`。从 Release 的版本页面复制这三个文件的链接。新版本发布后同步更新两个 README 的下载区。
+发行资产名称为 `SoundBot-<version>-arm64.dmg`、`SoundBot-Setup-<version>.exe` 和 `SHA256SUMS.txt`。用户从同一个发行条目取得安装包和校验值。草稿自动写入对应源码、构建记录及支持链接。
 
-The release assets are `SoundBot-<version>-arm64.dmg`, `SoundBot-Setup-<version>.exe`, and `SHA256SUMS.txt`. Use the asset links from the published version page and update the download sections in both README files.
+The release assets are `SoundBot-<version>-arm64.dmg`, `SoundBot-Setup-<version>.exe`, and `SHA256SUMS.txt`. Download an installer and its checksum from the same release. Draft notes include the tagged source, build run, and support links.
 
 构建验收覆盖冻结后端解码、安装包结构、实际桌面应用启动、导入、搜索和试听。对外分发前在最低支持系统上验收，记录宿主兼容性。当前本地预览签名与对外分发签名分开验收。正式包需要配置 macOS 签名和公证、Windows 签名，并在干净环境验证。
 
-Package checks cover frozen audio decoding, installer contents, desktop startup, import, search, and playback. Before distribution, verify the minimum supported OS versions and host compatibility. Configure and verify macOS signing and notarization and Windows signing in a clean environment for a public installer.
+Package checks cover frozen audio decoding, installed license notices, desktop startup, import, search, and playback. Before distribution, verify the minimum supported OS versions and host compatibility. Review publisher signing and source availability on both platforms. [分发审查 / Distribution review](release-review.md)
+
+macOS 待审构建默认使用本地临时签名。使用正式签名时，在受控构建机显式配置 `CSC_NAME` 和签名凭据，随后核验公证结果。 / macOS review builds use ad hoc signing by default. Set `CSC_NAME` explicitly with the publisher credentials on a controlled build machine and verify the notarization result.
 
 ## 后续检索扩展 / Optional search extensions
 

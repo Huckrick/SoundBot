@@ -1,6 +1,6 @@
 {
   "name": "soundbot",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "SoundBot - local-first sound effects library and middleware workspace",
   "main": "main.js",
   "scripts": {
@@ -24,7 +24,7 @@
   "license": "GPL-3.0-or-later",
   "devDependencies": {
     "electron": "45.3.1",
-    "electron-builder": "26.8.1"
+    "electron-builder": "26.18.0"
   },
   "build": {
     "appId": "com.soundbot.app",
@@ -87,6 +87,8 @@
     },
     "nsis": {
       "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
@@ -111,6 +113,24 @@
       }
     },
     "extraResources": [
+      {
+        "from": "LICENSE",
+        "to": "licenses/SoundBot.txt"
+      },
+      {
+        "from": "tests/build/licenses/THIRD_PARTY_AUDIO_NOTICES.txt",
+        "to": "licenses/THIRD_PARTY_AUDIO_NOTICES.txt"
+      },
+      {
+        "from": "build/licenses",
+        "to": "licenses/ffmpeg",
+        "filter": ["COPYING.*"]
+      },
+      {
+        "from": "node_modules/electron/dist",
+        "to": "licenses/electron",
+        "filter": ["LICENSE", "LICENSES.chromium.html"]
+      },
       {
         "from": "dist/backend/soundbot-backend",
         "to": "backend/soundbot-backend"

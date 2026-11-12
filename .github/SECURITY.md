@@ -1,28 +1,23 @@
 # Security policy / 安全政策
 
-## Supported release / 支持版本
+## Supported versions / 支持版本
 
-Only the current `0.2.x` prerelease line receives security maintenance. Older
-source snapshots and binaries are unsupported. / 当前仅 `0.2.x` 预发布系列接受安全维护；
-更早的源码快照与二进制不再支持。
+Security fixes are prepared for the current 1.0.x line. Check the published Releases page for the latest supported installer and its validation record. The 0.2.x prereleases are archival builds.
 
-## Repository security controls / 仓库安全控制
+安全修复面向当前 1.0.x 系列。请在发行页查看最新已发布安装包和验证记录。0.2.x 预发行包已归档。 [Releases / 发行页](https://github.com/Huckrick/SoundBot/releases)
 
-The repository uses GitHub Secret Scanning and Push Protection, CodeQL,
-dependency alerts, immutable Releases, SHA-256 inventories, artifact
-attestations, pinned GitHub Actions, and a current-tree privacy gate. / 本仓库使用
-GitHub Secret Scanning 与 Push Protection、CodeQL、依赖告警、不可变 Release、
-SHA-256 清单、产物证明、固定 SHA 的 GitHub Actions，以及当前源码树隐私门禁。
+## Reporting and credentials / 报告与凭据
 
-## No external submission channel / 不开放外部提交入口
+Use commit comments for brief public feedback. Keep vulnerability details, credentials, raw logs, audio, database exports, and personal paths out of public comments. Private vulnerability reporting is currently unavailable. Published advisories appear under Security on GitHub.
 
-Issues, Pull Requests, Discussions, Projects, and private vulnerability reports
-are disabled. The project currently does not accept external vulnerability
-reports, diagnostic archives, code, audio, databases, logs, credentials, or
-personal data. / Issue、Pull Request、Discussion、Project 与私密漏洞报告均已关闭；
-项目当前不接收外部漏洞报告、诊断压缩包、代码、音频、数据库、日志、凭据或个人数据。
+提交评论适合简短的公开反馈。请勿在公开评论中披露漏洞细节、凭据、原始日志、音频、数据库或私人路径。当前未开通私密漏洞报告。公开安全公告在 GitHub 的 Security 页面查看。 [Advisories / 安全公告](https://github.com/Huckrick/SoundBot/security/advisories)
 
-Never publish a suspected secret. Revoke or rotate the credential first, then
-remove it from the current source tree. A new commit does not erase older Git
-objects. / 切勿公开疑似密钥；应先吊销或轮换凭据，再从当前源码树移除。新的提交不会
-抹除旧 Git 对象。
+If a credential was exposed, revoke or rotate it with its issuer. Removing it in a later commit leaves older Git objects intact.
+
+如果凭据已泄露，请在签发服务处吊销或轮换。后续提交删除凭据并不会清除旧 Git 对象。
+
+## Release checks / 发行检查
+
+The release build checks source-tree hygiene, dependency advisories, installed files, native playback, and asset digests. Repository access and release settings are reviewed separately from application permissions. Signing status and the verified source and license inventory are part of release review.
+
+发行构建检查源码树、依赖告警、安装文件、原生试听和产物校验值。仓库权限与应用权限分别核对。签名状态及对应源码和许可证清单纳入发行审查。 [Release review / 发行审查](../docs/release-review.md)

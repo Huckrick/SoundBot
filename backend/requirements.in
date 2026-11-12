@@ -3,7 +3,7 @@
 # requirements.txt is the resolved core runtime lock.
 
 av==18.0.0
-fastapi==0.135.1
+fastapi==0.162.5
 httpx==0.28.1
 jieba==0.42.1
 mutagen==1.47.0
