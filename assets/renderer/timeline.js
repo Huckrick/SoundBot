@@ -25,6 +25,11 @@
     let busy = false;
     let grid = 0.25;
     let snap = true;
+    let autoCrossfade = true;
+    let zoom = 1;
+    let zoomReference = 8;
+    let editingClip = false;
+    const expanded = new Map();
     let previewGeneration = 0;
     const minClip = 0.01;
     const limit = (value, lo, hi) => Math.max(lo, Math.min(hi, value));
@@ -61,6 +66,10 @@
         source = null;
         tracks = [];
         selectedTrack = selectedClip = null;
+        zoom = 1;
+        zoomReference = 8;
+        autoCrossfade = true;
+        $('dawTracks').scrollLeft = 0;
         dirtyState(false);
         renderLog();
         render();
@@ -88,6 +97,17 @@
         }
         const tree = new Map();
         const visible = filtered.slice(0, 600);
+        const branchColors = new Map(visible.filter(item => item.color_path).map(item => [item.color_path, item.color]));
+        const prefix = host === 'wwise' ? '\\' : '';
+        const separator = host === 'wwise' ? '\\' : '/';
+        const scrollTop = root.scrollTop;
+        const colorize = (element, value) => {
+            if (!/^#[\da-f]{6}$/i.test(value || '')) return;
+            const swatch = el('span', null, 'wwise-color');
+            swatch.setAttribute('aria-hidden', 'true');
+            swatch.style.backgroundColor = value;
+            element.prepend(swatch);
+        };
         for (const item of visible) {
             let level = tree;
             const parts = (item.path || '').split(/[\\/]/).filter(Boolean);
@@ -97,23 +117,30 @@
             }
             level.set(item.id, { item });
         }
-        const build = (entries, depth = 0) => [...entries.entries()].map(([label, node]) => {
+        const build = (entries, parents = []) => [...entries.entries()].map(([label, node]) => {
+            const depth = parents.length;
             if (node.item) {
                 const leaf = button(node.item.name, () => choose(node.item), 'wwise-node');
+                colorize(leaf, node.item.color);
                 leaf.classList.toggle('sel', source?.id === node.item.id);
                 leaf.style.paddingLeft = `${depth * 10 + 10}px`;
                 leaf.title = node.item.path;
                 return leaf;
             }
+            const parts = [...parents, label];
+            const path = prefix + parts.join(separator);
             const branch = el('details');
-            branch.open = depth < 2 || Boolean(query);
+            branch.open = Boolean(query) || (expanded.get(path) ?? depth < 2);
             const title = el('summary', label, 'wwise-node');
+            if (!query) title.onclick = () => expanded.set(path, !branch.open);
+            colorize(title, branchColors.get(path));
             title.title = label;
             title.style.paddingLeft = `${depth * 10 + 8}px`;
-            branch.append(title, ...build(node.items, depth + 1));
+            branch.append(title, ...build(node.items, parts));
             return branch;
         });
         root.replaceChildren(...build(tree));
+        root.scrollTop = scrollTop;
         if (filtered.length > visible.length || connection.truncated) {
             root.append(el('p', t(connection.truncated
                 ? '素材目录超出扫描上限，请选择更具体的素材目录。'
@@ -164,6 +191,7 @@
         try {
             const result = await desktop.desktopMedia('connect', { host, pick, url: $('waapiUrl').value.trim() });
             if (!result) return;
+            if (connection?.project?.path !== result.project?.path || connection?.project?.id !== result.project?.id) expanded.clear();
             connection = result;
             if (host === 'wwise') localStorage.setItem('soundbot-waapi', $('waapiUrl').value.trim());
             deliveredFile = null;
@@ -188,6 +216,7 @@
         try {
             if (connection) await desktop.desktopMedia('disconnect');
             connection = null;
+            expanded.clear();
             if (nextHost === host) pendingClip = null;
             deliveredFile = null;
             host = nextHost;
@@ -218,6 +247,10 @@
                 duration: selected.duration, maxDuration: selected.duration, offset: 0, start: 0,
                 gain: 0, fade_in: 0, fade_out: 0 };
             tracks = [makeTrack({ label: '主源', clips: [mainClip] })];
+            zoom = 1;
+            zoomReference = timelineLength();
+            autoCrossfade = true;
+            $('dawTracks').scrollLeft = 0;
             selectedTrack = tracks[0].id;
             selectedClip = mainClip.id;
             dirtyState(false);
@@ -248,16 +281,18 @@
         node.style.left = `${clip.start / length * 100}%`;
         node.style.width = `${Math.max(0.25, clip.duration / length * 100)}%`;
         node.append(el('span', clip.name, 'clip-name'));
+        let paint = () => {};
         if (clip.peaks) {
             const canvas = el('canvas');
             canvas.style.pointerEvents = 'none';
             node.append(canvas);
-            requestAnimationFrame(() => {
+            paint = () => {
                 if (!canvas.isConnected) return;
                 const from = Math.floor(clip.offset / clip.maxDuration * clip.peaks.length);
                 const to = Math.ceil((clip.offset + clip.duration) / clip.maxDuration * clip.peaks.length);
                 waveform.drawMini(canvas, { waveformData: clip.peaks.slice(from, to), color: '#888' });
-            });
+            };
+            requestAnimationFrame(paint);
         }
         const startHandle = el('span', null, 'clip-trim left');
         const endHandle = el('span', null, 'clip-trim right');
@@ -265,6 +300,8 @@
         const fadeOut = el('span', null, 'clip-fade out');
         const fadeInHandle = el('span', null, 'clip-fade-handle in');
         const fadeOutHandle = el('span', null, 'clip-fade-handle out');
+        startHandle.title = t('裁剪起点');
+        endHandle.title = t('裁剪终点');
         node.append(startHandle, endHandle, fadeIn, fadeOut, fadeInHandle, fadeOutHandle);
         const setFades = () => {
             fadeIn.style.width = `${clip.fade_in / clip.duration * 100}%`;
@@ -272,6 +309,7 @@
         };
         setFades();
         let gesture;
+        let hoveredLane;
         node.onpointerdown = event => {
             if (event.button !== 0 || busy) return;
             event.stopPropagation();
@@ -281,7 +319,9 @@
             node.classList.add('sel');
             renderControls();
             gesture = { x: event.clientX, kind: event.target, start: clip.start,
-                offset: clip.offset, duration: clip.duration, fade_in: clip.fade_in, fade_out: clip.fade_out };
+                offset: clip.offset, duration: clip.duration, fade_in: clip.fade_in, fade_out: clip.fade_out,
+                left: lane.getBoundingClientRect().left };
+            editingClip = true;
             node.setPointerCapture(event.pointerId);
         };
         node.onpointermove = event => {
@@ -289,7 +329,7 @@
             const pixels = event.clientX - gesture.x;
             if (Math.abs(pixels) < 2 && !gesture.moved) return;
             if (!gesture.moved) { gesture.moved = true; pause(); }
-            const delta = pixels / lane.clientWidth * length;
+            const delta = (pixels + gesture.left - lane.getBoundingClientRect().left) / lane.clientWidth * length;
             if (gesture.kind === startHandle) {
                 const adjusted = limit(startAt(gesture.start + delta) - gesture.start,
                     -Math.min(gesture.start, gesture.offset), gesture.duration - minClip);
@@ -304,37 +344,112 @@
             } else if (gesture.kind === fadeOutHandle) {
                 clip.fade_out = limit(gesture.fade_out - delta, 0, clip.duration);
             } else {
-                clip.start = startAt(gesture.start + delta);
+                clip.start = Math.min(86400 - clip.duration, startAt(gesture.start + delta));
+                const next = document.elementFromPoint(event.clientX, event.clientY)?.closest('.track-lane');
+                if (hoveredLane !== next) {
+                    hoveredLane?.classList.remove('drop-target');
+                    hoveredLane = next;
+                    if (hoveredLane !== lane) hoveredLane?.classList.add('drop-target');
+                }
             }
             clip.fade_in = Math.min(clip.duration, clip.fade_in);
             clip.fade_out = Math.min(clip.duration, clip.fade_out);
             node.style.left = `${clip.start / length * 100}%`;
             node.style.width = `${clip.duration / length * 100}%`;
             setFades();
+            if (gesture.kind === startHandle || gesture.kind === endHandle) paint();
+            drawCrossfades(lane, track, length);
         };
-        node.onpointerup = node.onpointercancel = () => {
-            if (gesture?.moved) dirtyState(true);
+        const finish = cancelled => {
+            if (!gesture) return;
+            if (cancelled) {
+                for (const key of ['start', 'offset', 'duration', 'fade_in', 'fade_out']) clip[key] = gesture[key];
+            } else if (gesture.moved) {
+                const destination = tracks.find(item => item.id === hoveredLane?.dataset.trackId);
+                if (destination && destination !== track) {
+                    track.clips = track.clips.filter(item => item !== clip);
+                    destination.clips.push(clip);
+                    selectedTrack = destination.id;
+                }
+                dirtyState(true);
+            }
+            hoveredLane?.classList.remove('drop-target');
             gesture = null;
+            editingClip = false;
             render();
         };
+        node.onpointerup = () => finish(false);
+        node.onpointercancel = node.onlostpointercapture = () => finish(true);
         return node;
     }
 
+    function drawCrossfades(lane, track, length) {
+        lane.querySelectorAll('.clip-crossfade').forEach(marker => marker.remove());
+        if (!autoCrossfade) return;
+        const ordered = [...track.clips].sort((a, b) => a.start - b.start);
+        for (const [index, right] of ordered.entries()) {
+            const left = ordered[index - 1];
+            if (!left || left.start >= right.start) continue;
+            const end = left.start + left.duration;
+            if (end <= right.start || end >= right.start + right.duration) continue;
+            const region = el('span', null, 'clip-crossfade');
+            region.style.left = `${right.start / length * 100}%`;
+            region.style.width = `${(end - right.start) / length * 100}%`;
+            region.setAttribute('aria-hidden', 'true');
+            lane.append(region);
+        }
+    }
+
+    function syncRulerScroll() {
+        $('dawRuler').style.transform = `translateX(${-$('dawTracks').scrollLeft}px)`;
+    }
+
+    function layoutTimeline() {
+        const tracksBox = $('dawTracks');
+        const viewport = $('dawRulerViewport');
+        const visibleWidth = viewport.clientWidth - (tracksBox.offsetWidth - tracksBox.clientWidth);
+        if (visibleWidth < 1) return;
+        const width = `${Math.ceil(visibleWidth * Math.max(1, zoom * timelineLength() / zoomReference))}px`;
+        tracksBox.style.setProperty('--lane-width', width);
+        $('dawRuler').style.setProperty('--lane-width', width);
+        syncRulerScroll();
+    }
+
+    function changeZoom(factor) {
+        const ruler = $('dawRuler');
+        const box = $('dawTracks');
+        const visible = $('dawRulerViewport').clientWidth;
+        const position = playback.active && !state.dockEditing ? playback.currentTime() : state.position;
+        const playheadPixel = position / timelineLength() * ruler.clientWidth - box.scrollLeft;
+        const anchor = playheadPixel >= 0 && playheadPixel <= visible ? playheadPixel : visible / 2;
+        const fraction = (box.scrollLeft + anchor) / (ruler.clientWidth || 1);
+        if (factor === 1) zoomReference = timelineLength();
+        zoom = factor === 1 ? 1 : limit(zoom * factor, 1, 16);
+        layoutTimeline();
+        box.scrollLeft = Math.max(0, fraction * ruler.clientWidth - anchor);
+        syncRulerScroll();
+        $('timelineZoomReset').textContent = `${Math.round(zoom * 100)}%`;
+    }
+
     function render() {
+        if (editingClip) return;
         $('wwiseObjName').textContent = source?.name || t('选择工程音频源');
         $('wwiseObjPath').textContent = source?.path || '';
         $('dawTrackCount').textContent = t('轨道：{count}', { count: tracks.length });
         $('dawDuration').textContent = fmt(duration());
         $('btnAddTrack').disabled = !target || busy;
+        $('timelineCrossfade').setAttribute('aria-pressed', String(autoCrossfade));
+        $('timelineZoomReset').textContent = `${Math.round(zoom * 100)}%`;
         const ruler = $('dawRuler');
         ruler.replaceChildren();
         const length = timelineLength();
-        const markEvery = Math.max(1, Math.ceil(length / 12));
+        const markEvery = Math.max(0.125, 2 ** Math.ceil(Math.log2(zoomReference / zoom / 12)), length / 240);
         for (let time = 0; time < length; time += markEvery) {
-            const marker = el('span', fmt(time).slice(0, 5), 'grid-line major');
+            const marker = el('span', fmt(time).slice(0, markEvery < 1 ? 8 : 5), 'grid-line major');
             marker.style.left = `${time / length * 100}%`;
             ruler.append(marker);
         }
+        ruler.append(el('span', null, 'ruler-playhead'));
         $('dawTracks').replaceChildren(...tracks.map(track => {
             const row = el('div', null, 'daw-track');
             row.classList.toggle('sel', track.id === selectedTrack);
@@ -395,6 +510,7 @@
             head.append(title, controls, channels);
             head.onclick = () => { selectedTrack = track.id; selectedClip = null; renderControls(); };
             const lane = el('div', null, 'track-lane');
+            lane.dataset.trackId = track.id;
             if (snap) lane.style.backgroundSize = `${grid / length * 100}% 100%`;
             const getTime = event => limit((event.clientX - lane.getBoundingClientRect().left) / lane.clientWidth * length, 0, length);
             lane.onclick = event => {
@@ -418,7 +534,8 @@
                 lane.classList.remove('drop-target');
                 const id = event.dataTransfer.getData(clipDragType);
                 if (!target || busy || !id) return;
-                const edit = state.dockEditing && state.selected?.id === id ? ui.editorClip()
+                const edit = ui.libraryDrag?.id === id ? wholeAsset(ui.libraryDrag)
+                    : state.dockEditing && state.selected?.id === id ? ui.editorClip()
                     : dockDrag?.id === id ? wholeAsset(dockDrag) : null;
                 if (!edit) return;
                 event.preventDefault();
@@ -428,9 +545,15 @@
                 attempt(() => addClip(edit.clip, edit.item, false, position));
             };
             lane.append(...track.clips.map(clip => clipEditor(clip, track, lane, length)));
+            drawCrossfades(lane, track, length);
+            const handle = el('span', null, 'lane-playhead');
+            handle.setAttribute('aria-hidden', 'true');
+            handle.title = t('拖动播放头');
+            lane.append(handle);
             row.append(head, lane);
             return row;
         }));
+        layoutTimeline();
         renderControls();
         syncTransport();
     }
@@ -499,6 +622,14 @@
         selectedClip = next.id;
         dirtyState(true);
         render();
+        if (next.file_id && !next.peaks) {
+            const params = new URLSearchParams({ project_id: state.library.id });
+            api.get(`/api/v1/files/${encodeURIComponent(next.file_id)}/waveform?${params}`).then(data => {
+                if (!tracks.some(current => current.clips.includes(next))) return;
+                next.peaks = data.peaks;
+                render();
+            }).catch(() => {});
+        }
     }
 
     function stageClip(clip, item) {
@@ -513,6 +644,11 @@
             item: { ...item, peaks: ui.cachedPeaks(item) },
             clip: { file_id: item.id, offset: 0, duration: item.duration, gain: 0, fade_in: 0, fade_out: 0 }
         };
+    }
+
+    function stageWholeAsset(item) {
+        const edit = wholeAsset(item);
+        if (edit) stageClip(edit.clip, edit.item);
     }
 
     function insertDock(newTrack, position = state.position) {
@@ -555,13 +691,19 @@
     }
 
     async function loadDock() {
-        if (!state.library || state.workspace !== 'wwise') return;
         dockRequest?.abort();
+        if (!state.library) {
+            dockItems = [];
+            dockSelection = null;
+            renderDock();
+            return;
+        }
+        if (state.workspace !== 'wwise') return;
         const request = dockRequest = new AbortController();
         const q = $('miniSearch').value;
         const library = state.library.id;
         const result = await api.get(route(`/catalog?${new URLSearchParams({ q, limit: 24 })}`), { signal: request.signal });
-        if (request.signal.aborted || library !== state.library.id || state.workspace !== 'wwise') return;
+        if (request.signal.aborted || library !== state.library?.id || state.workspace !== 'wwise') return;
         dockItems = result.files;
         dockSelection = dockItems.find(item => item.id === dockSelection?.id);
         renderDock();
@@ -569,11 +711,12 @@
 
     function mixRequest() {
         return {
-            project_id: state.library.id,
+            project_id: state.library?.id || 'default',
             rate: target.sample_rate,
             channels: target.channels,
             tracks: tracks.map(track => ({
                 gain: track.gain, mute: track.mute, solo: track.solo, channels: track.channels,
+                auto_crossfade: autoCrossfade,
                 effects: fx.enabled(track.effects),
                 clips: track.clips.map(({ id, name, maxDuration, peaks, ...clip }) => clip)
             }))
@@ -639,10 +782,70 @@
     function playhead(time) {
         const progress = limit(time / timelineLength(), 0, 1);
         document.querySelectorAll('.track-lane').forEach(lane => lane.style.setProperty('--play', String(progress)));
+        const marker = $('dawRuler').querySelector('.ruler-playhead');
+        if (marker) marker.style.left = `${progress * 100}%`;
     }
 
     function bind() {
         const on = (id, fn) => { $(id).onclick = () => attempt(fn); };
+        const viewport = $('dawRulerViewport');
+        const box = $('dawTracks');
+        box.addEventListener('scroll', syncRulerScroll, { passive: true });
+        new ResizeObserver(layoutTimeline).observe(box);
+        const resizeTimeline = factor => { changeZoom(factor); render(); };
+        on('timelineZoomIn', () => resizeTimeline(1.5));
+        on('timelineZoomOut', () => resizeTimeline(1 / 1.5));
+        on('timelineZoomReset', () => resizeTimeline(1));
+        on('timelineCrossfade', () => {
+            if (busy) return;
+            pause();
+            autoCrossfade = !autoCrossfade;
+            if (target) dirtyState(true);
+            render();
+        });
+        for (const area of [viewport, box]) area.addEventListener('wheel', event => {
+            if (!event.ctrlKey && !event.metaKey) return;
+            event.preventDefault();
+            resizeTimeline(event.deltaY < 0 ? 1.25 : 0.8);
+        }, { passive: false });
+        let scrub;
+        const seek = event => {
+            const ruler = $('dawRuler').getBoundingClientRect();
+            if (!ruler.width) return;
+            state.position = limit((event.clientX - ruler.left) / ruler.width * timelineLength(), 0, duration());
+            syncTransport();
+        };
+        for (const area of [viewport, box]) {
+            area.onpointerdown = event => {
+                if (event.button !== 0 || !target || busy || scrub ||
+                    (area === box && !event.target.closest('.lane-playhead'))) return;
+                event.preventDefault();
+                ui.closeDockEditor();
+                scrub = { id: event.pointerId, resume: playback.active };
+                pause();
+                area.setPointerCapture(event.pointerId);
+                seek(event);
+            };
+            area.onpointermove = event => { if (scrub?.id === event.pointerId) seek(event); };
+            area.onpointerup = event => {
+                if (scrub?.id !== event.pointerId) return;
+                seek(event);
+                const resume = scrub.resume;
+                scrub = null;
+                if (resume && state.position < duration()) attempt(play);
+            };
+            area.onlostpointercapture = () => { scrub = null; };
+        }
+        viewport.onkeydown = event => {
+            if (!target || busy || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+            event.preventDefault();
+            ui.closeDockEditor();
+            const position = playback.active ? playback.currentTime() : state.position;
+            pause();
+            state.position = event.key === 'Home' ? 0 : event.key === 'End' ? duration()
+                : limit(position + (event.key === 'ArrowLeft' ? -grid : grid), 0, duration());
+            syncTransport();
+        };
         $('waapiUrl').value = localStorage.getItem('soundbot-waapi') || $('waapiUrl').value;
         for (const id of ['middlewareHost', 'middlewareSettingsHost']) {
             $(id).onchange = event => {
@@ -722,7 +925,7 @@
 
     window.SoundBotTimeline = {
         show: async () => { renderTree(); render(); await loadDock(); }, duration, renderTree, loadDock,
-        hasLibraryClips, discard, stageClip, play, playhead,
+        hasLibraryClips, discard, stageClip, stageWholeAsset, play, playhead,
         isBusy: () => busy,
         refreshLabels: () => {
             renderHostLabels();

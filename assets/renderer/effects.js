@@ -19,7 +19,7 @@
         ] }
     };
     const defaults = kind => ({
-        kind, on: kind === 'eq',
+        kind, on: false,
         values: Object.fromEntries((builtins[kind].controls || []).map(([key, , , , value]) => [key, value])),
         ...(kind === 'eq' && { bands: equalizer.defaults() })
     });

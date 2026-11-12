@@ -4,9 +4,7 @@
     let context;
     let master;
     let splitter;
-    let nativeMeter;
     let analysisBus;
-    let analysisGain;
     let loudnessNode;
     let meterEpoch = 0;
     let momentary = null;
@@ -21,13 +19,14 @@
     function stop() {
         session?.abort.abort();
         session = null;
-        nativeMeter?.disconnect();
-        nativeMeter = null;
         momentary = null;
         meterEpoch++;
         loudnessNode?.port.postMessage(meterEpoch);
         audio.pause();
-        audio.removeAttribute('src');
+        if (audio.hasAttribute('src')) {
+            audio.removeAttribute('src');
+            audio.load();
+        }
         for (const node of nodes) node.stop();
         nodes.clear();
     }
@@ -35,9 +34,7 @@
     function setVolume(value, silent) {
         volume = value;
         muted = silent;
-        audio.volume = muted ? 0 : volume;
-        if (master) master.gain.value = audio.volume;
-        if (analysisGain) analysisGain.gain.value = audio.volume;
+        if (master) master.gain.value = muted ? 0 : volume;
     }
 
     function currentTime() {
@@ -49,12 +46,11 @@
         context = new AudioContext();
         master = context.createGain();
         master.connect(context.destination);
+        audio.crossOrigin = 'anonymous';
+        context.createMediaElementSource(audio).connect(master);
         analysisBus = context.createGain();
         analysisBus.channelCount = 2;
         analysisBus.channelCountMode = 'explicit';
-        analysisBus.channelInterpretation = 'discrete';
-        analysisGain = context.createGain();
-        analysisGain.connect(analysisBus);
         master.connect(analysisBus);
         splitter = context.createChannelSplitter(2);
         analysisBus.connect(splitter);
@@ -79,7 +75,7 @@
     }
 
     function levels() {
-        if (!session || !samples || (session.native && !nativeMeter) || muted) return [0, 0];
+        if (!session || !samples || muted) return [0, 0];
         return analyzers.map(analyser => {
             analyser.getFloatTimeDomainData(samples);
             let peak = 0;
@@ -89,42 +85,24 @@
     }
 
     function spectrum() {
-        if (!session || !spectra || (session.native && !nativeMeter) || muted) return null;
+        if (!session || !spectra || muted) return null;
         for (const [index, analyser] of analyzers.entries()) analyser.getFloatFrequencyData(spectra[index]);
         return { channels: spectra, hzPerBin: context.sampleRate / analyzers[0].fftSize };
     }
 
-    async function monitorNative(active) {
-        try {
-            const stream = audio.captureStream();
-            const attach = async () => {
-                if (session !== active || !stream.getAudioTracks().length) return;
-                ensureContext();
-                await context.resume();
-                if (session !== active || nativeMeter) return;
-                nativeMeter = context.createMediaStreamSource(stream);
-                nativeMeter.connect(analysisGain);
-            };
-            stream.addEventListener('addtrack', () => attach().catch(() => {}), { signal: active.abort.signal });
-            await attach();
-        } catch {
-            // Native decoding and audio output continue if capture is unavailable.
-        }
-    }
-
     async function playSource(url, offset, onEnd) {
         stop();
-        const active = { abort: new AbortController(), clock: () => audio.currentTime, native: true };
+        const active = { abort: new AbortController(), clock: () => audio.currentTime };
         session = active;
-        audio.src = url;
-        audio.volume = muted ? 0 : volume;
-        if (offset > 0) audio.currentTime = offset;
-        audio.addEventListener('ended', () => {
-            if (session === active) { stop(); onEnd(); }
-        }, { once: true, signal: active.abort.signal });
         try {
-            await audio.play();
-            if (session === active) void monitorNative(active);
+            ensureContext();
+            const resumed = context.resume();
+            audio.src = url;
+            if (offset > 0) audio.currentTime = offset;
+            audio.addEventListener('ended', () => {
+                if (session === active) { stop(); onEnd(); }
+            }, { once: true, signal: active.abort.signal });
+            await Promise.all([resumed, audio.play()]);
         } catch (error) {
             if (session === active) stop();
             throw error;

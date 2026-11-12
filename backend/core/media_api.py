@@ -9,9 +9,10 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Header, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from config import AUDIO_FORMAT_CAPABILITIES
 from core import delivery, middleware, vst, wwise
 from core.audio_service import AudioServiceError, get_audio_service
 from core.database import get_db_manager
@@ -58,6 +59,7 @@ class TrackRequest(BaseModel):
     solo: bool = False
     channels: Literal[1, 2] | None = None
     effects: list[EffectRequest] = Field(default_factory=list, max_length=12)
+    auto_crossfade: bool = False
 
 
 class MixRequest(BaseModel):
@@ -151,7 +153,8 @@ def _mix_request(request):
     tracks = []
     for track in request.tracks:
         clips = tuple(_clip(request.project_id, clip)[0] for clip in track.clips)
-        tracks.append(Track(clips, track.gain, track.mute, track.solo, track.channels, _effects(track.effects)))
+        tracks.append(Track(clips, track.gain, track.mute, track.solo, track.channels,
+                            _effects(track.effects), track.auto_crossfade))
     if sum(len(track.clips) for track in tracks) > 128:
         raise ValueError("单次预览或写回最多支持 128 个剪辑")
     duration = max((clip.start + clip.duration for track in tracks for clip in track.clips), default=0)
@@ -165,6 +168,15 @@ def _stream(blocks, rate, channels, frames):
         raise ValueError("预览时长超出 WAV 限制")
     return StreamingResponse(wave_stream(blocks, rate, channels, frames), media_type="audio/wav",
                              headers={"Cache-Control": "no-store"})
+
+
+@router.get("/files/{file_id}/source")
+def native_source(file_id: str, project_id: str):
+    path = Path(_record(project_id, file_id).path)
+    capability = AUDIO_FORMAT_CAPABILITIES.get(path.suffix.lower())
+    if not capability:
+        raise HTTPException(415, "不支持的音频格式")
+    return FileResponse(path, media_type=capability["mime_type"])
 
 
 @router.get("/files/{file_id}/stream")

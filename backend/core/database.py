@@ -2201,7 +2201,7 @@ class DatabaseManager:
         Returns:
             是否成功
         """
-        if project_id == "default" or not is_safe_project_id(project_id):
+        if not is_safe_project_id(project_id):
             return False
         try:
             with self.get_cursor() as cursor:

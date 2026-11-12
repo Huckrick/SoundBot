@@ -36,6 +36,7 @@ class Track:
     solo: bool = False
     channels: int | None = None
     effects: tuple[Effect, ...] = ()
+    auto_crossfade: bool = False
 
 
 def read_region(path, offset, frames, rate, channels):
@@ -146,28 +147,48 @@ def _clip_blocks(clip, channels, rate, start, stop):
     return _skip_frames(apply_effects(read(0), rate, channels, clip.effects, measure=lambda: read(0)), start)
 
 
+def _crossfades(regions):
+    """Find boundary overlaps between consecutive clips on a track."""
+    transitions = [[] for _ in regions]
+    ordered = sorted(enumerate(regions), key=lambda item: item[1][0])
+    for (a, (a_start, a_end)), (b, (b_start, b_end)) in zip(ordered, ordered[1:]):
+        if a_start < b_start < a_end < b_end:
+            transitions[a].append((b_start, a_end, False))
+            transitions[b].append((b_start, a_end, True))
+    return transitions
+
+
 def _track_blocks(track, rate, channels, origin, stop):
     active = []
+    regions = [(round(clip.start * rate), round(clip.start * rate) + round(clip.duration * rate))
+               for clip in track.clips]
+    crossfades = _crossfades(regions) if track.auto_crossfade else [()] * len(regions)
     try:
-        for clip in track.clips:
-            left = round(clip.start * rate)
-            right = left + round(clip.duration * rate)
+        for clip, (left, right), fades in zip(track.clips, regions, crossfades):
             if right <= origin or left >= stop:
                 continue
             blocks = _clip_blocks(clip, channels, rate, max(0, origin-left), min(stop, right)-left)
-            active.append((left, right, _RegionReader(blocks, channels)))
+            active.append((left, right, _RegionReader(blocks, channels), fades))
         gain = 10 ** (track.gain / 20)
         for position in range(origin, stop, BLOCK):
             end = min(position + BLOCK, stop)
             block = np.zeros((end-position, channels), dtype=np.float32)
-            for left, right, reader in active:
+            for left, right, reader, fades in active:
                 begin, finish = max(position, left), min(end, right)
                 if begin >= finish:
                     continue
-                block[begin-position:finish-position] += reader.take(finish-begin)
+                samples = reader.take(finish-begin)
+                for fade_start, fade_end, fade_in in fades:
+                    if finish <= fade_start or begin >= fade_end:
+                        continue
+                    first = max(begin, fade_start)
+                    last = min(finish, fade_end)
+                    blend = (np.arange(first, last) - fade_start) / max(1, fade_end - fade_start - 1)
+                    samples[first-begin:last-begin] *= (blend if fade_in else 1 - blend)[:, None]
+                block[begin-position:finish-position] += samples
             yield block * gain
     finally:
-        for _, _, reader in active:
+        for _, _, reader, _ in active:
             reader.blocks.close()
 
 

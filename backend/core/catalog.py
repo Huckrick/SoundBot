@@ -739,6 +739,19 @@ def list_jobs(db, project_id):
     return [import_status(db, job_id) for job_id in ids]
 
 
+def active_jobs(db):
+    with db.get_cursor() as cur:
+        return [dict(row) for row in cur.execute("""
+            SELECT j.id, j.project_id, j.kind, j.state, j.processed, p.name AS library_name,
+                   i.discovered, i.imported, i.unchanged, i.failures,
+                   CASE WHEN i.source_id IS NULL THEN json_array_length(i.files_json) END AS expected
+            FROM jobs j JOIN projects p ON p.id=j.project_id
+            LEFT JOIN catalog_imports i ON i.job_id=j.id
+            WHERE j.state IN ('pending', 'running')
+            ORDER BY j.created_at, j.rowid
+        """)]
+
+
 def rebuild_job(db, job_id):
     try:
         with _WRITE_LOCK, db.get_cursor() as cur:

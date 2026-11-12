@@ -486,6 +486,11 @@ async def import_project_files(project_id: str, request: schemas.ProjectImportRe
     )
 
 
+@app.get("/api/v1/jobs/active")
+async def active_background_jobs():
+    return await asyncio.to_thread(catalog.active_jobs, get_db_manager())
+
+
 @app.get("/api/v1/jobs/{job_id}")
 async def get_background_job(job_id: str):
     job = await asyncio.to_thread(catalog.import_status, get_db_manager(), job_id)
@@ -1259,8 +1264,6 @@ async def update_project(project_id: str, request: schemas.UpdateProjectRequest)
 @app.delete("/api/v1/projects/{project_id}")
 async def delete_project(project_id: str):
     db = _require_library(project_id)
-    if project_id == "default":
-        raise SoundBotAPIError("default_project_protected", "默认音效库不能移除")
     _projects_deleting.add(project_id)
     try:
         db.request_project_job_cancellation(project_id)
@@ -1268,7 +1271,8 @@ async def delete_project(project_id: str):
             if not await asyncio.to_thread(db.delete_project, project_id):
                 raise SoundBotAPIError("project_delete_failed", "移除音效库失败", status_code=503)
         if config.CURRENT_PROJECT_ID == project_id:
-            config.CURRENT_PROJECT_ID = "default"
+            projects = db.get_all_projects()
+            config.CURRENT_PROJECT_ID = projects[0]["id"] if projects else "default"
         return {"success": True}
     finally:
         _projects_deleting.discard(project_id)

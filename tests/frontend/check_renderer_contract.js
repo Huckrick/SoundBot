@@ -65,7 +65,8 @@ async function main() {
   }
   assert(workspace.includes('desktop.fileImport.selectFolder'), 'native folder selection is missing');
   assert(workspace.includes("route('/imports', libraryId)"), 'imports are not scoped to the chosen library');
-  assert(workspace.includes("api.get(route('/jobs'))"), 'job polling is missing');
+  assert(workspace.includes("api.get(route('/jobs', library))") && workspace.includes("api.get('/api/v1/jobs/active')"),
+    'library history and global active job polling are missing');
   assert(workspace.includes('state.cursor = result.next_cursor'), 'cursor continuation is missing');
   assert(workspace.includes('waveform.renderMain(canvas'), 'main waveform is not wired to the canvas');
   assert(workspace.includes('visiblePreviews()') && workspace.includes('[...waves].slice(0, 2)'),

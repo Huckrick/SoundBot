@@ -517,7 +517,7 @@ def _renderer_smoke_expression(
       state: record.waveform_state,
     }});
   }}
-  workspace.playback.setVolume(0, true);
+  workspace.playback.setVolume(0.25, false);
   const audition = async (filename) => {{
     const row = [...document.querySelectorAll('#rows .row')].find(
       item => item.title.split(/[\\\\/]/).at(-1) === filename
@@ -527,7 +527,15 @@ def _renderer_smoke_expression(
     row.click();
     await until(() => workspace.playback.currentTime() > 0.01, `playing ${{filename}}`);
     const ms = Math.round(performance.now() - start);
+    if (workspace.state.effects.find(effect => effect.kind === 'eq')?.on !== false) {{
+      throw new Error('equalizer must start bypassed');
+    }}
+    await until(() => workspace.playback.levels().some(level => level > 0.01) &&
+      Number.isFinite(workspace.playback.momentary), `live meter for ${{filename}}`);
     document.getElementById('btnStop').click();
+    if (workspace.playback.levels().some(Boolean) || workspace.playback.momentary !== null) {{
+      throw new Error('playback meters must clear on stop');
+    }}
     return ms;
   }};
   const auditionMs = {{ native: await audition(expectedNames[0]), streamed: await audition(wmaRecord.filename) }};

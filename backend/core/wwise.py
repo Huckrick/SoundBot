@@ -39,6 +39,13 @@ _connected_project: tuple[str, str] | None = None
 _selected: tuple[str, Selection] | None = None
 _lock = asyncio.Lock()
 _SOURCE_FIELDS = ["id", "name", "type", "path", "parent", "originalWavFilePath"]
+# Wwise exposes its effective object color as a palette index.
+_COLORS = (
+    None, '#373ec8', '#1a55cb', '#086868', '#186d18', '#56730d', '#787211',
+    '#795815', '#78440d', '#72392c', '#892424', '#7d267d', '#732b97', '#5937ae',
+    '#6b6fc2', '#6383c5', '#438989', '#539353', '#80983e', '#a09827', '#ab7a42',
+    '#ae7a42', '#ae6656', '#b95b5b', '#aa505b', '#9b56bd', '#8760e2',
+)
 
 
 def _local_url(url):
@@ -81,8 +88,14 @@ class _WAAPI:
     async def sources(self):
         return await self.objects("$ from type AudioFileSource", _SOURCE_FIELDS)
 
-    async def sounds(self):
-        return await self.objects("$ from type Sound", ["id", "path", "@IsVoice"])
+    async def sounds(self, *, colors=False):
+        fields = ["id", "path", "@IsVoice"]
+        if colors:
+            try:
+                return await self.objects("$ from type Sound", [*fields, "@@Color"])
+            except ValueError:
+                pass  # Older authoring versions may not expose the property.
+        return await self.objects("$ from type Sound", fields)
 
 
 @asynccontextmanager
@@ -112,15 +125,20 @@ async def connect(url):
         async with _connection(target_url) as client:
             project = await client.project()
             rows = await client.sources()
-            sounds = {item["id"]: item for item in await client.sounds() if item.get("@IsVoice") is False}
+            sounds = {item["id"]: item for item in await client.sounds(colors=True) if item.get("@IsVoice") is False}
         _url = target_url
         _connected_project = project["path"], project["id"]
         _selected = None
-        return {"project": project, "sources": [
-            {"id": item["id"], "name": item["name"], "path": item["path"]}
-            for item in rows
-            if _parent(item) in sounds and item.get("originalWavFilePath")
-        ]}
+        sources = []
+        for item in rows:
+            sound = sounds.get(_parent(item))
+            if not sound or not item.get("originalWavFilePath"):
+                continue
+            index = sound.get("@@Color")
+            color = _COLORS[index] if type(index) is int and 0 <= index < len(_COLORS) else None
+            sources.append({"id": item["id"], "name": item["name"], "path": item["path"],
+                            "color": color, "color_path": sound.get("path")})
+        return {"project": project, "sources": sources}
 
 
 async def disconnect():

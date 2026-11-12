@@ -21,7 +21,7 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 
 import main
-from core import catalog, delivery, wwise
+from core import catalog, delivery, editing, wwise
 from core.database import DatabaseManager, get_db_manager, reset_db_manager
 
 
@@ -95,6 +95,54 @@ class CoreDeliveryTests(unittest.TestCase):
         response = self.client.get("/api/v1/projects/default/catalog", params=params)
         self.assertEqual(response.status_code, 200, response.text)
         return response.json()
+
+    def test_remove_last_library_keeps_sources_and_stays_empty_after_reopen(self):
+        source = audio_file(self.root / "source.wav")
+        self.client.post("/api/v1/projects/default/imports", json={"file_paths": [str(source)]}).raise_for_status()
+        file_id = self.items()["files"][0]["id"]
+        self.client.delete("/api/v1/projects/default").raise_for_status()
+        self.assertEqual(self.client.get("/api/v1/projects").json()["projects"], [])
+        self.assertEqual(self.client.get(f"/api/v1/files/{file_id}/source?project_id=default").status_code, 404)
+        self.assertTrue(source.is_file())
+        reset_db_manager()
+        self.assertEqual(get_db_manager().get_all_projects(), [])
+        created = self.client.post("/api/v1/projects", json={"name": "New library"}).json()["project_id"]
+        self.assertEqual(self.client.get(f"/api/v1/projects/{created}").json()["file_count"], 0)
+
+    def test_active_jobs_and_ranged_native_source(self):
+        source = audio_file(self.root / "source.wav")
+        job_id = catalog.create_import(get_db_manager(), "default", paths=[str(source)])
+        (job,) = self.client.get("/api/v1/jobs/active").json()
+        self.assertEqual((job["id"], job["state"], job["expected"], job["processed"]), (job_id, "pending", 1, 0))
+        catalog.run_import(get_db_manager(), job_id)
+        self.assertEqual(self.client.get("/api/v1/jobs/active").json(), [])
+        file_id = self.items()["files"][0]["id"]
+        with patch.dict(os.environ, {"SOUNDBOT_REQUIRE_DESKTOP_TOKEN": "1"}):
+            route = f"/api/v1/files/{file_id}/source?project_id=default"
+            self.assertEqual(self.client.get(route).status_code, 403)
+            response = self.client.get(route, headers={**self.headers, "Origin": "null", "Range": "bytes=0-11"})
+        self.assertEqual(response.status_code, 206, response.text)
+        self.assertEqual(response.headers["access-control-allow-origin"], "null")
+        self.assertEqual(response.content, source.read_bytes()[:12])
+
+    def test_overlap_crossfade_matches_full_mix_when_seeking(self):
+        import numpy as np
+
+        def read_region(path, offset, frames, rate, channels):
+            yield np.full((frames, channels), 0.2 if path.name == "a.wav" else 0.6, dtype=np.float32)
+
+        rate = 8000
+        clips = (editing.Clip(Path("a.wav"), 0, 1), editing.Clip(Path("b.wav"), 0.5, 1))
+        with patch.object(editing, "read_region", read_region):
+            track = editing.Track(clips, auto_crossfade=True)
+            whole = np.concatenate(list(editing.mix([track], rate, 1, 1.5)))[:, 0]
+            sought = np.concatenate(list(editing.mix([track], rate, 1, 1.5, start=0.75)))[:, 0]
+            unblended = np.concatenate(list(editing.mix([editing.Track(clips)], rate, 1, 1.5)))[:, 0]
+        self.assertAlmostEqual(float(whole[4000]), 0.2, places=5)
+        self.assertAlmostEqual(float(whole[7999]), 0.6, places=5)
+        self.assertAlmostEqual(float(whole[6000]), 0.4, places=3)
+        self.assertAlmostEqual(float(unblended[6000]), 0.8, places=5)
+        np.testing.assert_allclose(sought, whole[6000:])
 
     def test_import_metadata_fts_rescan_and_exclusion(self):
         folder = self.root / "input"
@@ -372,8 +420,9 @@ class CoreDeliveryTests(unittest.TestCase):
             async def sources(self):
                 return [source]
 
-            async def sounds(self):
-                return [{"id": "sound", "@IsVoice": False}]
+            async def sounds(self, *, colors=False):
+                row = {"id": "sound", "path": "\\Actor-Mixer\\Sound", "@IsVoice": False}
+                return [{**row, "@@Color": 3} if colors else row]
 
         from contextlib import asynccontextmanager
 
@@ -382,7 +431,8 @@ class CoreDeliveryTests(unittest.TestCase):
             yield Authoring()
 
         with patch.object(wwise, "_connection", local_authoring):
-            self.client.post("/api/v1/middleware/connect", headers=self.headers, json={"host": "wwise"}).raise_for_status()
+            connected = self.client.post("/api/v1/middleware/connect", headers=self.headers, json={"host": "wwise"}).raise_for_status().json()
+            self.assertEqual(connected["sources"][0]["color"], "#086868")
             selected = self.client.post("/api/v1/middleware/sources/source/select", headers=self.headers, json={})
             selected.raise_for_status()
             token = selected.json()["token"]

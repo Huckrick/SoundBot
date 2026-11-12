@@ -27,6 +27,11 @@
     let groupRevision = 0;
     let libraryEditor;
     let timelinePosition = 0;
+    let activeJobs = [];
+    let listDelivery;
+    let preparingListDelivery;
+    let libraryDrag;
+    let refreshRowsAfterDrag = false;
     let libraryPanel = 'tabDetail';
     let wwisePanel = 'tabDetail';
     const peakCache = new Map();
@@ -146,7 +151,7 @@
             }, start, onEnd);
         }
         if (!audio.requiresPlaybackSource({ filePath: item.path, format: item.format })) {
-            try { return await playback.playSource(audio.localSource(item.path), start, onEnd); }
+            try { return await playback.playSource(api.url(fileRoute(item.id, 'source')), start, onEnd); }
             catch (error) {
                 if (playbackId !== previewRevision || state.selected !== item) return;
                 if (error.name === 'NotAllowedError') throw error;
@@ -623,12 +628,13 @@
         for (const id of ['fadeIn', 'fadeOut', 'clipGain', 'clipName', 'dawRate', 'dawBits', 'dawChannels']) $(id).oninput = invalidateDelivery;
     }
 
-    async function loadLibraries(preferred) {
+    async function loadLibraries(preferred, expectedRevision) {
         const { projects } = await api.get('/api/v1/projects');
+        if (expectedRevision !== undefined && expectedRevision !== libraryRevision) return;
         state.libraries = projects;
         renderLibraryPicker();
         const active = projects.find(item => item.id === preferred) || projects[0];
-        if (active && state.library?.id !== active.id) await switchLibrary(active);
+        if (active?.id !== state.library?.id || !active) await switchLibrary(active || null);
         else if (active) state.library = active;
         if (state.library) $('contextPill').value = state.library.id;
     }
@@ -641,15 +647,20 @@
             return option;
         }));
         if (state.library) picker.value = state.library.id;
+        picker.disabled = !state.libraries.length;
+        if (picker.disabled) picker.append(el('option', t('新建音效库…')));
+        for (const id of ['btnRenameLib', 'btnRemoveLib', 'btnImport', 'impFile', 'impFolder', 'btnRebuild', 'btnCreateGroup', 'aiSend']) {
+            $(id).disabled = picker.disabled;
+        }
     }
 
     async function switchLibrary(library) {
-        if (!library) return;
         if (timeline()?.hasLibraryClips() && !await timeline().discard()) {
-            $('contextPill').value = state.library.id;
+            $('contextPill').value = state.library?.id || '';
             return;
         }
         const revision = ++libraryRevision;
+        listRequest?.abort();
         await select(null);
         state.library = library;
         state.filter = {};
@@ -658,13 +669,18 @@
         state.jobs = [];
         state.items = [];
         state.displayRows = [];
+        state.cursor = null;
+        state.total = 0;
+        listDelivery = null;
         state.dockEditing = false;
         libraryEditor = null;
         clipSessions.clear();
         peakCache.clear();
         artCache.clear();
         syncBottomStage();
-        localStorage.setItem('soundbot-library', library.id);
+        if (library) localStorage.setItem('soundbot-library', library.id);
+        else localStorage.removeItem('soundbot-library');
+        renderRows();
         await Promise.all([loadItems(true), renderTree(), refreshJobs(revision), timeline()?.loadDock()]);
     }
 
@@ -717,6 +733,8 @@
     }
 
     function renderRows() {
+        if (libraryDrag) { refreshRowsAfterDrag = true; return; }
+        refreshRowsAfterDrag = false;
         $('rowCount').textContent = t('结果：{count}', { count: state.total });
         renderBulkActions();
         const box = $('rows');
@@ -735,6 +753,20 @@
             }
             const row = el('div', null, `row ${state.selected?.id === item.id ? 'sel' : ''}`);
             row.dataset.fileId = item.id;
+            const playable = item.duration > 0 && !item.missing;
+            row.draggable = playable;
+            row.ondragstart = event => {
+                if (!playable) return event.preventDefault();
+                libraryDrag = item;
+                $('mainWorkspace').classList.add('library-dragging');
+                event.dataTransfer.setData(clipDragType, item.id);
+                event.dataTransfer.effectAllowed = 'copy';
+            };
+            row.ondragend = () => {
+                libraryDrag = null;
+                $('mainWorkspace').classList.remove('library-dragging');
+                if (refreshRowsAfterDrag) renderRows();
+            };
             const name = el('div', null, 'name');
             const check = el('input');
             check.type = 'checkbox';
@@ -747,6 +779,25 @@
             };
             const thumb = miniCanvas(item);
             name.append(check, assetCover(item), thumb, el('span', item.title || item.filename, 'file-title'));
+            if (playable) {
+                const handle = el('button', '↗', 'row-daw-drag');
+                handle.type = 'button';
+                handle.title = t('拖动整条音效到 DAW');
+                handle.setAttribute('aria-label', handle.title);
+                handle.draggable = true;
+                handle.onclick = event => { event.stopPropagation(); if (!listDragId(item)) attempt(() => prepareListDrag(item)); };
+                handle.onpointerdown = event => {
+                    if (event.button === 0 && state.dawDirectory && !listDragId(item)) attempt(() => prepareListDrag(item));
+                };
+                handle.ondragstart = event => {
+                    event.stopPropagation();
+                    event.preventDefault();
+                    const id = listDragId(item);
+                    if (id) desktop.startDrag(id);
+                    else attempt(() => prepareListDrag(item));
+                };
+                name.append(handle);
+            }
             row.append(name, el('span', fmt(item.duration), 'meta'),
                 el('span', item.sample_rate ? `${item.sample_rate / 1000}k` : '—', 'meta'),
                 el('span', item.channels || '—', 'meta'),
@@ -763,7 +814,9 @@
             const space = el('div'); space.style.height = `${(state.displayRows.length-last)*ROW}px`; parts.push(space);
         }
         if (state.cursor) parts.push(button(t('加载更多'), () => loadItems(), 'more'));
-        if (!parts.length) parts.push(el('div', state.search ? t('没有匹配的素材') : t('将音频或文件夹拖到这里'), 'empty'));
+        if (!parts.length) parts.push(state.library
+            ? el('div', state.search ? t('没有匹配的素材') : t('将音频或文件夹拖到这里'), 'empty')
+            : button(t('新建音效库…'), () => $('btnNewLib').click(), 'empty empty-library'));
         const offset = box.scrollTop;
         box.replaceChildren(...parts);
         box.scrollTop = offset;
@@ -951,8 +1004,12 @@
         closeFolderMenu();
         const generation = ++directoryRevision;
         const library = state.library?.id;
-        if (!library) return;
         const box = $('tree');
+        if (!library) {
+            $('treeLabel').hidden = true;
+            box.replaceChildren();
+            return;
+        }
         box.replaceChildren(button(t(state.view === 'fav' ? '全部收藏' : '全部素材'), () => setFilter({}), 'view-item tree-command'));
         const section = $('treeLabel');
         const label = { folder: '来源目录', tag: '标签与 UCS' }[state.view];
@@ -1099,8 +1156,10 @@
 
     let polling = false;
     async function refreshJobs(revision = libraryRevision) {
-        if (!state.library) return;
-        const jobs = await api.get(route('/jobs'));
+        const library = state.library?.id;
+        const [jobs, running] = await Promise.all([
+            library ? api.get(route('/jobs', library)) : [], api.get('/api/v1/jobs/active')
+        ]);
         if (revision !== libraryRevision) return;
         const updates = jobs.some(job => {
             const prior = state.jobs.find(item => item.id === job.id);
@@ -1109,22 +1168,38 @@
         const finished = jobs.some(job => job.kind === 'catalog_import' && job.state === 'completed' &&
             !state.jobs.some(previous => previous.id === job.id && previous.state === 'completed'));
         state.jobs = jobs;
-        setText($('jobName'), () => {
-            const active = state.jobs.filter(job => ['pending', 'running'].includes(job.state)).length;
-            return active ? `(${number(active)})` : '';
-        });
+        activeJobs = running;
+        renderJobTray();
         if ($('ovJobs').classList.contains('show')) renderJobs();
         if ((updates || finished) && $('rows').scrollTop < ROW && !listRequest) await loadItems(true);
-        if (finished) await Promise.all([renderTree(), loadLibraries(state.library.id), timeline()?.loadDock()]);
+        if (finished && revision === libraryRevision) {
+            await Promise.all([renderTree(), loadLibraries(library, revision), timeline()?.loadDock()]);
+        }
+    }
+
+    function renderJobTray() {
+        $('jobTray').hidden = !activeJobs.length;
+        if (!activeJobs.length) return;
+        const job = activeJobs.find(item => item.state === 'running') || activeJobs[0];
+        const label = t(job.kind === 'catalog_import' ? '导入' : '关键词索引');
+        $('jobName').textContent = `${label} · ${job.library_name}${activeJobs.length > 1 ? ` (+${number(activeJobs.length - 1)})` : ''}`;
+        const progress = $('jobProgress');
+        if (job.expected > 0) {
+            progress.max = job.expected;
+            progress.value = Math.min(job.processed, job.expected);
+        } else progress.removeAttribute('value');
+        $('jobCount').textContent = job.expected > 0
+            ? `${number(job.processed)} / ${number(job.expected)}`
+            : job.processed ? number(job.processed) : t(job.state === 'pending' ? '排队中' : '处理中');
     }
 
     function renderJobs() {
         const status = { pending: '排队中', running: '处理中', completed: '已完成', cancelled: '已暂停', failed: '已中断' };
-        const rows = state.jobs.map(job => {
+        const rows = [...activeJobs.filter(job => job.project_id !== state.library?.id), ...state.jobs].map(job => {
             const node = el('div', null, 'jobs-item');
             const title = job.kind === 'keyword_rebuild' ? t('关键词索引') : t('导入');
-            node.append(el('div', `${title} · ${t(job.stage === 'partial' ? '已完成，有失败项' : status[job.state] || '处理中，尚无状态')}`));
-            if (job.discovered !== undefined) node.append(el('div',
+            node.append(el('div', `${title} · ${t(job.stage === 'partial' ? '已完成，有失败项' : status[job.state] || '处理中，尚无状态')}${job.library_name ? ` · ${job.library_name}` : ''}`));
+            if (job.discovered != null) node.append(el('div',
                 t('已发现 {discovered} · 入库 {imported} · 未变更 {unchanged} · 失败 {failed}', { discovered: job.discovered, imported: job.imported, unchanged: job.unchanged, failed: job.failures })));
             if (job.error_message) {
                 const reason = el('p', describeError(job.error_message));
@@ -1167,6 +1242,7 @@
     }
 
     async function importFiles(folder) {
+        if (!state.library) return;
         const libraryId = state.library?.id;
         const picker = folder ? desktop.fileImport.selectFolder : desktop.fileImport.selectAudioFiles;
         const result = await picker({});
@@ -1290,14 +1366,35 @@
         const directory = await desktop.chooseDawDirectory();
         if (!directory) return null;
         state.dawDirectory = directory;
+        listDelivery = null;
         $('btnDawDirectory').textContent = directory.split(/[/\\]/).filter(Boolean).at(-1) || directory;
         $('btnDawDirectory').title = directory;
         invalidateDelivery();
         return directory;
     }
 
+    function listDragId(item) {
+        return listDelivery?.key === previewKey(item) && listDelivery.directory === state.dawDirectory ? listDelivery.id : null;
+    }
+
+    async function prepareListDrag(item) {
+        if (preparingListDelivery || state.preparing || !state.library || listDragId(item)) return;
+        const library = state.library.id;
+        const key = previewKey(item);
+        preparingListDelivery = true;
+        try {
+            const directory = state.dawDirectory || await chooseDaw();
+            if (!directory || library !== state.library?.id) return;
+            const clip = { file_id: item.id, duration: item.duration };
+            const result = await desktop.desktopMedia('prepare', { project_id: library, clip });
+            if (directory !== state.dawDirectory || library !== state.library?.id) return;
+            listDelivery = { key, directory, id: result.id };
+            say(t('整条音效已就绪，请再次拖到 DAW'));
+        } finally { preparingListDelivery = false; }
+    }
+
     async function prepareDrag() {
-        if (state.preparing) return;
+        if (state.preparing || preparingListDelivery) return;
         const clip = currentClip();
         if (!clip || !state.range) return;
         const projectId = state.library.id;
@@ -1515,6 +1612,7 @@
     }
 
     async function askAssistant() {
+        if (!state.library) return;
         const input = $('aiInput');
         const message = input.value.trim();
         if (!message) return;
@@ -1559,7 +1657,7 @@
                     bubble.append(summary);
                     for (const item of event.results) {
                         bubble.append(button(item.filename, () => {
-                            if (state.library.id === library) return select(item, true);
+                            if (state.library?.id === library) return select(item, true);
                             say(t('请切回结果所属的音效库'));
                         }, 'view-item'));
                     }
@@ -1670,6 +1768,19 @@
             });
         });
         document.querySelectorAll('#workspaceSwitch button').forEach(node => node.onclick = () => attempt(() => switchWorkspace(node.dataset.ws)));
+        const middlewareTab = document.querySelector('#workspaceSwitch [data-ws="wwise"]');
+        middlewareTab.ondragover = event => {
+            if (libraryDrag && event.dataTransfer.types.includes(clipDragType)) {
+                event.preventDefault();
+                attempt(() => switchWorkspace('wwise'));
+            }
+        };
+        middlewareTab.ondrop = event => {
+            if (!libraryDrag || !event.dataTransfer.types.includes(clipDragType)) return;
+            event.preventDefault();
+            const item = libraryDrag;
+            attempt(async () => { await switchWorkspace('wwise'); timeline()?.stageWholeAsset(item); });
+        };
         document.querySelectorAll('[data-close]').forEach(node => node.onclick = () => modal(node.dataset.close, false));
         document.querySelectorAll('.overlay').forEach(node => node.addEventListener('click', event => {
             if (event.target === node) modal(node.id, false);
@@ -1695,10 +1806,11 @@
             await loadLibraries(state.library.id);
         });
         on('btnRemoveLib', async () => {
-            if (!await confirm(t('移除音效库「{name}」？原音频文件会保留。', { name: state.library.name }))) return;
+            const library = state.library;
+            if (!library || !await confirm(t('移除音效库「{name}」？原音频文件会保留。', { name: libraryName(library) }))) return;
             if (timeline()?.hasLibraryClips() && !await timeline().discard()) return;
-            await api.delete(route());
-            await loadLibraries('default');
+            await api.delete(route('', library.id));
+            await loadLibraries();
         });
         on('impFile', () => importFiles(false));
         on('impFolder', () => importFiles(true));
@@ -1707,7 +1819,7 @@
             if (!event.dataTransfer.files.length) return;
             event.preventDefault();
             attempt(async () => {
-                const result = await desktop.fileImport.handleDropFiles([...event.dataTransfer.files].map(file => file.path));
+                const result = await desktop.fileImport.handleDropFiles([...event.dataTransfer.files]);
                 if (!result.success) throw new Error(result.error);
                 await addFiles(result.files);
             });
@@ -1730,7 +1842,7 @@
         on('btnDawDirectory', chooseDaw);
         on('btnBackDock', closeDockEditor);
         on('btnCreateGroup', createGroup);
-        desktop.onDeliveryError(message => { invalidateDelivery(); say(describeError(message)); });
+        desktop.onDeliveryError(message => { listDelivery = null; invalidateDelivery(); say(describeError(message)); });
         on('btnUseWwise', async () => {
             const editing = editorClip();
             if (!editing || timeline()?.isBusy()) return;
@@ -1738,6 +1850,7 @@
             timeline()?.stageClip(editing.clip, editing.item);
         });
         on('btnJobs', async () => { modal('ovJobs'); await refreshJobs(); });
+        on('btnJobHistory', async () => { modal('ovJobs'); await refreshJobs(); });
         on('btnRebuild', async () => { await api.post(route('/index/rebuild'), {}); await refreshJobs(); });
         on('btnGc', () => openCleanup());
         on('btnGcRun', () => openCleanup(true));
@@ -1754,6 +1867,7 @@
         desktop.setLanguage(i18n.language);
         $('languageSelect').onchange = event => i18n.setLanguage(event.target.value);
         window.addEventListener('soundbot-language', () => {
+            renderJobTray();
             desktop.setLanguage(i18n.language);
             $('searchInput').placeholder = t(isLibrary() ? '搜索音效、标签、UCS…' : '筛选工程素材…');
             $('btnFavorite').textContent = state.selected?.favorite ? t('取消收藏') : t('添加到收藏');
@@ -1834,7 +1948,8 @@
 
     window.SoundBotWorkspace = { $, state, api, desktop, playback, route, say, fmt, attempt, el, button, modal,
         confirm, syncTransport, stop, togglePlay, refreshAudition, switchWorkspace, select, locateLibraryItem, openDockEditor, closeDockEditor,
-        editorClip, miniCanvas, assetCover, scheduleMiniPeaks, cachedPeaks, clipDragType };
+        editorClip, miniCanvas, assetCover, scheduleMiniPeaks, cachedPeaks, clipDragType,
+        get libraryDrag() { return libraryDrag; } };
     document.addEventListener('DOMContentLoaded', () => attempt(async () => {
         if (!desktop) throw new Error('请在 SoundBot 桌面应用中打开');
         bind();

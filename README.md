@@ -18,7 +18,7 @@ SoundBot 把音效查找、剪辑和交付放在同一个桌面应用里。素�
 
 ### 下载和安装
 
-当前源码版本为 **v1.0.1（稳定版）**。安装包的发布状态以 GitHub Releases 为准。旧版保留在发行记录中，供查阅和回退。 [发行页](https://github.com/Huckrick/SoundBot/releases) · [更新日志](CHANGELOG.md)
+当前源码版本为 **v1.0.2（稳定版）**。安装包的发布状态以 GitHub Releases 为准。旧版保留在发行记录中，供查阅和回退。 [发行页](https://github.com/Huckrick/SoundBot/releases) · [更新日志](CHANGELOG.md)
 
 | 平台 | 发行文件 | 安装方式 |
 | --- | --- | --- |
@@ -32,6 +32,8 @@ SoundBot 把音效查找、剪辑和交付放在同一个桌面应用里。素�
 1. 新建音效库，拖入文件或目录。右键来源目录可检查变更。移动原文件后，用库内重定位关联新位置。
 2. 选择素材，试听并在底部波形框选。第一次拖到 DAW 时，选择工程媒体目录。成品就绪后从选区上沿拖出，交付的 WAV 留在该目录。
 3. 在中间件工作台编辑多轨。Wwise 通过本机 WAAPI 连接，可写回符合条件的 PCM WAV 并留存备份。FMOD Studio 和 CRI Atom Craft 接收渲染到工程素材目录的新 WAV，随后在宿主中导入或注册。 [宿主操作指南](docs/middleware.md)
+
+整条素材可从列表拖到「中间件工作台」标签或时间线，列表行上的拖拽手柄用于交付到 DAW。时间线上拖动标尺可定位播放头，拖动音频块两侧下半部可裁剪。同轨相邻剪辑部分重叠时，默认生成交叉淡化。
 
 ### 文件权限和隐私
 
@@ -62,7 +64,7 @@ SoundBot supports **Simplified Chinese, Traditional Chinese, Japanese, English, 
 
 ### Download and install
 
-The current source version is **v1.0.1 (stable)**. GitHub Releases shows which installers have been published. Older releases remain in the archive for reference and rollback. [Releases](https://github.com/Huckrick/SoundBot/releases) · [Changelog](CHANGELOG.md)
+The current source version is **v1.0.2 (stable)**. GitHub Releases shows which installers have been published. Older releases remain in the archive for reference and rollback. [Releases](https://github.com/Huckrick/SoundBot/releases) · [Changelog](CHANGELOG.md)
 
 | Platform | Release file | Installation |
 | --- | --- | --- |
@@ -76,6 +78,8 @@ Download the installer and `SHA256SUMS.txt` from the same release. Run `shasum -
 1. Create a library and drop in files or folders. Right-click a source folder to check for changes. If files move, use the library's relocation action to update their paths.
 2. Select a sound and mark a range in the bottom waveform. For the first DAW delivery, choose the project's media folder. Once the file is ready, drag from the top of the selection. The rendered WAV stays in the selected folder.
 3. Edit tracks in the middleware workspace. Wwise connects over local WAAPI and can write back eligible PCM WAV sources with a recovery backup. FMOD Studio and CRI Atom Craft receive a new WAV in their asset folder. Import or register it in the host. [Middleware guide](docs/middleware.md)
+
+Drag a full sound from the list onto the middleware workspace tab or timeline. Use the drag handle in the row to deliver it to a DAW. Drag along the timeline ruler to seek, and drag the lower part of either clip edge to trim. Partial overlaps between adjacent clips on the same track crossfade by default.
 
 ### Permissions and privacy
 

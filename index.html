@@ -219,6 +219,13 @@ html:lang(zh-TW){--font:'PingFang TC','Microsoft JhengHei',system-ui,sans-serif}
 .vol .v{font-size:11px;color:var(--tx3);min-width:32px}
 .vol.muted .v{text-decoration:line-through}
 .job-tray{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:11px;color:var(--tx2)}
+.job-tray[hidden]{display:none}
+#btnJobs{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:8px;max-width:235px}
+#jobName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#jobProgress{grid-column:1/-1;width:100%;height:5px;accent-color:var(--tx1)}
+.row-daw-drag{flex:none;width:22px;height:22px;border-radius:4px;color:var(--tx3);cursor:grab}
+.row-daw-drag:is(:hover,:focus-visible){background:var(--bg3);color:var(--tx1)}
+.empty-library{display:block;width:100%}
 .job-item{display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--line);border-radius:999px;padding:5px 12px;white-space:nowrap}
 .job-bar{width:64px;height:4px;border-radius:2px;background:var(--bg3);overflow:hidden}
 .job-bar i{display:block;height:100%;background:var(--tx1);border-radius:2px;transition:width .3s}
@@ -230,6 +237,7 @@ html:lang(zh-TW){--font:'PingFang TC','Microsoft JhengHei',system-ui,sans-serif}
 #libraryView,#wwiseView{flex:1;min-width:0;min-height:0;display:flex}
 #wwiseView{display:none}
 .main.wwise #libraryView{display:none}
+.main.wwise.library-dragging #libraryView{display:flex;position:fixed;inset:0;clip-path:inset(100%);pointer-events:none}
 .main.wwise #wwiseView{display:flex}
 .bottom-stage{height:224px;flex:none;position:relative;border-top:1px solid var(--line);background:var(--bg1);min-width:0;overflow:hidden;transition:height .24s cubic-bezier(.2,.8,.2,1)}
 .editor{position:absolute;inset:0;height:100%;display:flex;flex-direction:column;background:var(--bg1);min-width:0;transition:opacity .2s ease,transform .24s cubic-bezier(.2,.8,.2,1)}
@@ -307,16 +315,24 @@ html:lang(zh-TW){--font:'PingFang TC','Microsoft JhengHei',system-ui,sans-serif}
 .grid-precision{display:flex;align-items:center;gap:5px;font-size:10px}
 .grid-precision select,.track-channel{border:1px solid var(--line);border-radius:5px;background:var(--bg2);color:var(--tx2);font-family:var(--font);outline:none}
 .grid-precision select{height:25px;padding:0 5px;font-size:10px}
-#dawSessionHint{font-size:9.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .daw-ruler{height:30px;flex:none;display:grid;grid-template-columns:164px minmax(0,1fr);border-bottom:1px solid var(--line);background:var(--bg1)}
 .ruler-label{display:flex;align-items:center;padding:0 12px;font-size:9px;color:var(--tx3);letter-spacing:1px;border-right:1px solid var(--line)}
 .ruler-scale{position:relative;overflow:hidden}
+#dawRuler{width:var(--lane-width,100%);height:100%;overflow:visible;cursor:ew-resize;touch-action:none}
+.ruler-viewport{min-width:0;overflow:hidden}
+.timeline-tools{display:flex;align-items:center;gap:4px;flex:none}
+.timeline-tools button{min-width:23px;height:23px;padding:0 5px}
+.timeline-tools button[aria-pressed=true]{border-color:var(--tx2);color:var(--tx1)}
+.ruler-playhead{position:absolute;z-index:2;top:0;bottom:0;width:1px;background:var(--tx1);pointer-events:none}
+.ruler-playhead::before{content:"";position:absolute;left:-5px;top:0;border:5px solid transparent;border-top-color:var(--tx1)}
 .grid-line{position:absolute;z-index:0;top:0;bottom:0;width:0;border-left:1px solid var(--line);pointer-events:none}
 .grid-line.minor{border-left-color:var(--acc-dim)}
 .ruler-scale .grid-line.major{padding:4px 0 0 5px;font-size:9px;color:var(--tx3);font-variant-numeric:tabular-nums}
 .daw-tracks{flex:1;min-height:0;overflow:auto;background:var(--bg0)}
 .daw-track{height:96px;display:grid;grid-template-columns:164px minmax(0,1fr);border-bottom:1px solid var(--line);position:relative}
+.daw-track{width:calc(164px + var(--lane-width, 100% - 164px))}
 .track-head{padding:8px 10px 7px 12px;border-right:1px solid var(--line);background:var(--bg1);cursor:pointer;min-width:0}
+.track-head{position:sticky;left:0;z-index:9}
 .daw-track.sel .track-head{box-shadow:inset 2px 0 var(--acc);background:var(--bg2)}
 .track-title{display:flex;align-items:center;gap:6px;min-width:0;height:19px}
 .track-index{font-size:9px;color:var(--tx3);font-variant-numeric:tabular-nums;flex:none}
@@ -335,7 +351,10 @@ html:lang(zh-TW){--font:'PingFang TC','Microsoft JhengHei',system-ui,sans-serif}
 .track-channel{display:block;width:100%;height:19px;margin-top:5px;padding:0 5px;font-size:9px;cursor:pointer}
 .track-lane{position:relative;min-width:0;overflow:hidden;cursor:crosshair}
 .track-lane.drop-target{background-color:var(--acc-dim2);box-shadow:inset 0 0 0 1px var(--tx2)}
-.track-lane::after{content:"";position:absolute;z-index:8;top:0;bottom:0;left:calc(var(--play,0)*100%);width:1px;background:var(--tx1);box-shadow:0 0 8px var(--acc-glow);pointer-events:none}
+.clip-crossfade{position:absolute;z-index:5;top:9px;bottom:9px;pointer-events:none;border-inline:1px solid var(--tx2);background:linear-gradient(to bottom right,transparent 49%,var(--tx2) 50%,transparent 51%),linear-gradient(to top right,transparent 49%,var(--tx2) 50%,transparent 51%),var(--acc-dim2)}
+.wwise-color{display:inline-block;width:8px;height:8px;margin-right:6px;border-radius:2px;vertical-align:baseline}
+.lane-playhead{position:absolute;z-index:8;top:0;bottom:0;left:calc(var(--play,0)*100%);width:7px;transform:translateX(-3px);cursor:ew-resize;touch-action:none}
+.lane-playhead::after{content:"";position:absolute;top:0;bottom:0;left:3px;width:1px;background:var(--tx1);box-shadow:0 0 8px var(--acc-glow);pointer-events:none}
 .empty-track{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:10px;pointer-events:none}
 .daw-clip{position:absolute;z-index:2;top:9px;bottom:9px;min-width:18px;border:1px solid var(--line2);border-radius:7px;background:var(--bg2);overflow:hidden;cursor:grab;touch-action:none;transition:border-color .15s,box-shadow .15s}
 .daw-clip:hover{border-color:var(--tx3)}
@@ -645,6 +664,7 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
           <button id="btnNewLib">新建音效库…</button>
           <button id="btnRenameLib">重命名音效库…</button>
           <button id="btnRemoveLib">移除音效库…</button>
+          <button id="btnJobHistory">任务记录</button>
           <button id="btnGc">清理中心</button>
         </div>
       </div>
@@ -748,13 +768,18 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
               <option value="0.03125">1/32 秒</option>
             </select>
           </label>
-          <span id="dawSessionHint">磁吸 · 1/4 秒 · Clip 边缘裁剪 / 顶部淡变 / Delete 删除</span>
           <span class="spacer"></span>
+          <div class="timeline-tools">
+            <button class="ghost-btn" id="timelineCrossfade" aria-pressed="true">交叉淡化</button>
+            <button class="ghost-btn" id="timelineZoomOut" aria-label="缩小时间线">−</button>
+            <button class="ghost-btn" id="timelineZoomReset" aria-label="适应时间线">100%</button>
+            <button class="ghost-btn" id="timelineZoomIn" aria-label="放大时间线">+</button>
+          </div>
           <span id="dawDuration">00:00.000</span>
         </div>
         <div class="daw-ruler">
           <div class="ruler-label">轨道 / 时间线</div>
-          <div class="ruler-scale" id="dawRuler"></div>
+          <div class="ruler-viewport" id="dawRulerViewport" tabindex="0" aria-label="拖动播放头"><div class="ruler-scale" id="dawRuler"></div></div>
         </div>
         <div class="daw-tracks" id="dawTracks"></div>
         <div class="daw-log" id="wwiseLogs"><div class="log-empty" id="middlewareLogText" aria-live="polite"></div><button class="ghost-btn hidden" id="btnRevealMiddlewareFile">打开文件位置</button></div>
@@ -932,7 +957,7 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
       <input id="volRange" type="range" min="0" max="100" value="80" aria-label="音量">
       <span class="v" id="volVal">80%</span>
     </div>
-    <div class="job-tray"><button class="ghost-btn" id="btnJobs">任务 <span id="jobName"></span></button></div>
+    <div class="job-tray" id="jobTray" hidden><button class="ghost-btn" id="btnJobs" aria-label="任务"><span id="jobName"></span><span id="jobCount"></span><progress id="jobProgress" aria-label="导入进度"></progress></button></div>
   </footer>
 </div>
 

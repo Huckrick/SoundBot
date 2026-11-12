@@ -21,7 +21,7 @@
 // stay self-contained and only import Electron's renderer APIs. In
 // particular, requiring local JSON/CommonJS files here prevents the entire
 // contextBridge from being installed in packaged builds.
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 const BACKEND_ERROR_SENTINEL = '__soundbotBackendError';
 
@@ -75,7 +75,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // 打开文件夹选择对话框
     selectFolder: (options = {}) => ipcRenderer.invoke('file-import', 'select-folder', options),
     // 处理拖放的文件
-    handleDropFiles: (files) => ipcRenderer.invoke('file-import', 'handle-drop', files),
+    handleDropFiles: (files) => ipcRenderer.invoke('file-import', 'handle-drop',
+      files.map(file => webUtils.getPathForFile(file)).filter(Boolean)),
     // 获取文件信息
     getFileInfo: (filePath) => ipcRenderer.invoke('file-import', 'get-info', filePath),
     // 验证文件类型
