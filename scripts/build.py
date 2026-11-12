@@ -635,6 +635,8 @@ def main():
 
         target_platform = resolve_native_target(args.platform)
         verify_release_metadata(args.release_tag)
+        if not args.skip_electron:
+            run_command([sys.executable, str(PROJECT_ROOT / "scripts" / "prepare_misans.py")])
         
         # 清理旧构建
         clean_build_dirs(preserve_backend=args.skip_backend)

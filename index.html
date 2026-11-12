@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: soundbot-audio:; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; frame-src 'none'">
+<link rel="stylesheet" href="assets/misans.css">
 <title>SoundBot</title>
 <link rel="icon" href="./assets/soundbot.svg" type="image/svg+xml">
 <style>
@@ -36,7 +37,6 @@
 }
 :root{
   --r-lg:18px; --r-md:12px; --r-sm:8px;
-  --font:'PingFang SC','Microsoft YaHei',system-ui,sans-serif;
 }
 /* 主题切换瞬间的全表面过渡，平时不挂全局 transition */
 .theme-anim, .theme-anim *, .theme-anim *::before, .theme-anim *::after{
@@ -69,9 +69,6 @@ input,select,textarea{font-family:var(--font)}
 .weight-wrap{display:flex;align-items:center;gap:6px;padding-right:10px;color:var(--tx3);font-size:11px;flex:none}
 input[type=range]{-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;background:var(--bg3);cursor:pointer}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--tx1)}
-html:lang(zh-CN){--font:'MiSans VF','MiSans','PingFang SC','Microsoft YaHei',system-ui,sans-serif}
-html:lang(ja){--font:'Hiragino Sans','Yu Gothic UI','Meiryo',system-ui,sans-serif}
-html:lang(zh-TW){--font:'PingFang TC','Microsoft JhengHei',system-ui,sans-serif}
 .top-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
 .cap-badge{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--tx2);background:var(--acc-dim);padding:4px 10px;border-radius:999px;white-space:nowrap}
 .cap-dot{width:6px;height:6px;border-radius:50%;background:var(--tx1);animation:pulse 2.4s infinite}
@@ -1073,8 +1070,8 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
             </div>
             <details open>
               <summary>界面字体 · MiSans</summary>
-              <p>简体中文主界面优先使用系统已安装的 MiSans VF 或 MiSans。MiSans 由小米提供，MiSans Global 由小米联合 Monotype 和汉仪开发。</p>
-              <p>安装包不附带 MiSans，也不会下载字体。系统没有安装 MiSans 时，界面自动使用苹方、微软雅黑或系统默认字体。字体使用遵循小米发布的 MiSans 字体知识产权许可协议。</p>
+              <p>SoundBot 界面内嵌原版 MiSans 可变字体。简体中文和日语使用 MiSans，繁体中文使用 MiSans TC，英语、巴西葡萄牙语和西班牙语使用 MiSans Latin。字体随应用离线加载。</p>
+              <p>MiSans Global 由小米主导，联合 Monotype 和汉仪制作。字体版权归小米及相应权利人，使用遵循小米发布的 MiSans 字体知识产权许可协议。发行包的 licenses 文件夹保留许可原文。</p>
               <div class="credit-links">
                 <button class="ghost-btn" type="button" data-credit-link="misans">MiSans 官方介绍</button>
                 <button class="ghost-btn" type="button" data-credit-link="misans-license">MiSans 字体许可</button>

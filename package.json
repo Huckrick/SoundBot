@@ -40,6 +40,8 @@
       "index.html",
       "splash.html",
       "assets/*.js",
+      "assets/misans.css",
+      "assets/fonts/misans/*.ttf",
       "assets/renderer/*.js",
       "assets/soundbot.svg",
       "assets/audio-icon.png",
@@ -120,6 +122,10 @@
       {
         "from": "docs/credits.md",
         "to": "licenses/SoundBot-CREDITS.md"
+      },
+      {
+        "from": "build/licenses/MiSans-License.pdf",
+        "to": "licenses/MiSans-License.pdf"
       },
       {
         "from": "tests/build/licenses/THIRD_PARTY_AUDIO_NOTICES.txt",

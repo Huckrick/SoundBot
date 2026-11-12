@@ -7,8 +7,13 @@ Use Python 3.12 and Node.js 24 on the target OS. Build the DMG on Apple Silicon 
 ```bash
 python -m pip install --only-binary=av -r backend/requirements.txt -r backend/requirements-build.txt
 npm ci
+python scripts/prepare_misans.py --download
 python scripts/build.py --skip-dependency-install
 ```
+
+首次构建前阅读小米的 MiSans 许可，再运行字体准备命令。脚本从官网取得三套原版可变字体并校验 SHA-256，构建时嵌入应用。已有官方 `MiSans.zip`、`MiSans_TC.zip` 和 `MiSans_Latin.zip` 时，可改用 `python scripts/prepare_misans.py --archive-dir <目录>`。 [MiSans 官方许可](https://hyperos.mi.com/font/en/download/)
+
+Review Xiaomi’s MiSans license before preparing fonts. The command fetches three original variable fonts from Xiaomi and verifies their SHA-256 digests before embedding them. If you already have the three official ZIPs listed above, use `python scripts/prepare_misans.py --archive-dir <directory>` to prepare them offline. [Official MiSans license](https://hyperos.mi.com/font/en/download/)
 
 安装包输出到 `dist-electron/`。打包读取源码白名单和本次冻结后端。分类表可放在用户数据目录的 `ucs-keywords.xlsx`，或通过 `SOUNDBOT_UCS_PATH` 指定。音效库索引、备份和预览缓存由应用在用户数据目录创建。
 

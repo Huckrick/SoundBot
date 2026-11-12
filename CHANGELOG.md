@@ -4,7 +4,7 @@ Release history for SoundBot. / SoundBot 版本记录。
 
 ## [Unreleased] / 未发布
 
-- Expanded Settings → About with authorship, MiSans use and licensing, component references, and community thanks across all six interface languages. The installer includes the full credits. / 在六种界面语言中补全设置 → 关于的作者、MiSans 使用及许可、组件引用和社区致谢，安装包随附完整致谢文件。
+- Embedded the original MiSans, MiSans TC, and MiSans Latin variable fonts for all six interface languages. Expanded Settings → About with authorship, font licensing, component references, and community thanks. The installer includes the full credits and Xiaomi’s font agreement. / 六种界面语言均使用内嵌的原版 MiSans、MiSans TC 或 MiSans Latin 可变字体。设置 → 关于补全作者、字体许可、组件引用和社区致谢，安装包随附完整致谢及小米字体协议原文。
 
 ## [1.0.2] - 2026-11-12
 

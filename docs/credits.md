@@ -8,9 +8,13 @@ SoundBot 由 **Huckrick** 发起、开发和维护。© 2026 Huckrick 与 SoundB
 
 ## MiSans
 
-简体中文主界面优先使用系统已安装的 **MiSans VF** 或 **MiSans**。MiSans 由小米提供。MiSans Global 由小米联合 Monotype 和汉仪开发。安装包不附带字体文件，运行时也不从网络获取字体。未安装 MiSans 时依次使用苹方、微软雅黑或系统默认字体。MiSans 的使用遵循小米发布的字体知识产权许可协议。 [官方介绍](https://hyperos.mi.com/font/en/about/) · [官方许可协议](https://hyperos.mi.com/font-download/MiSans%E5%AD%97%E4%BD%93%E7%9F%A5%E8%AF%86%E4%BA%A7%E8%AE%B8%E5%8F%AF%E5%8D%8F%E8%AE%AE.pdf)
+SoundBot 的启动窗口和主界面使用原版 **MiSans Global** 可变字体。简体中文与日语使用 MiSans，繁体中文使用 MiSans TC，英语、巴西葡萄牙语与西班牙语使用 MiSans Latin。三套字体嵌入应用并离线加载。素材名称中的罕见字形由系统补齐。 [官方介绍](https://hyperos.mi.com/font/en/about/)
 
-The Simplified Chinese workspace prefers **MiSans VF** or **MiSans** if installed on your system. MiSans is provided by Xiaomi. Xiaomi developed MiSans Global with Monotype and Hanyi. The installer ships without these fonts, and the app uses only local fonts. When MiSans is unavailable, it falls back to PingFang SC, Microsoft YaHei, or the system default. Xiaomi's MiSans Font Intellectual Property License Agreement governs the font. [Official information](https://hyperos.mi.com/font/en/about/) · [Official license agreement](https://hyperos.mi.com/font-download/MiSans%E5%AD%97%E4%BD%93%E7%9F%A5%E8%AF%86%E4%BA%A7%E8%AE%B8%E5%8F%AF%E5%8D%8F%E8%AE%AE.pdf)
+The splash screen and workspace use the original **MiSans Global** variable fonts. SoundBot uses MiSans for Simplified Chinese and Japanese, MiSans TC for Traditional Chinese, and MiSans Latin for English, Brazilian Portuguese, and Spanish. The three fonts are embedded in the application and load offline. The system supplies rare glyphs that may occur in asset names. [Official information](https://hyperos.mi.com/font/en/about/)
+
+MiSans Global 由小米主导，联合 Monotype 和汉仪制作。字体保留原版权声明，适用小米的 MiSans 字体知识产权许可协议，许可原文随安装包提供。小米允许免费商用及在软件中嵌入，并对修改和单独分发设有限制。SoundBot 源码的 GPL 许可与字体许可各自适用。 [官方许可协议](https://hyperos.mi.com/font/en/download/) · [官方常见问题](https://hyperos.mi.com/font/faq)
+
+Xiaomi led MiSans Global and produced it with Monotype and Hanyi. The embedded fonts retain their original copyright notices and are governed by Xiaomi’s MiSans Font Intellectual Property License Agreement, which ships with the app. Xiaomi permits free commercial use and embedding in software under terms that restrict modification and standalone distribution. SoundBot’s GPL license covers its source code. [Official license agreement](https://hyperos.mi.com/font/en/download/) · [Official FAQ](https://hyperos.mi.com/font/en/faq/)
 
 ## 组件与引用 / Components and references
 

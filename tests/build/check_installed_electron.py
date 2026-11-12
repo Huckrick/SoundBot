@@ -465,6 +465,14 @@ def _renderer_smoke_expression(
   const originalLocale = language.value;
   const authorHeading = document.querySelector('#settings-about .credit-author h4');
   const miSansHeading = document.querySelector('#settings-about details summary');
+  const fontSamples = {{
+    'zh-CN': ['MiSans', '音效库'],
+    'zh-TW': ['MiSans TC', '音效庫'],
+    ja: ['MiSans', 'ライブラリ'],
+    en: ['MiSans Latin', 'Library'],
+    'pt-BR': ['MiSans Latin', 'Importação'],
+    es: ['MiSans Latin', 'Edición']
+  }};
   const folders = {{ 'zh-CN': '文件夹', 'zh-TW': '資料夾', ja: 'フォルダー', en: 'Folders', 'pt-BR': 'Pastas', es: 'Carpetas' }};
   const languages = [...language.options].map(option => option.value);
   if (languages.length !== 6 || new Set(languages).size !== 6) throw new Error('locale choices are incomplete');
@@ -480,6 +488,12 @@ def _renderer_smoke_expression(
     if (authorHeading?.textContent !== SoundBotI18n.t('作者与许可') ||
         miSansHeading?.textContent !== SoundBotI18n.t('界面字体 · MiSans')) {{
       throw new Error(`credits localization failed for ${{id}}`);
+    }}
+    const [family, sample] = fontSamples[id];
+    const primaryFont = getComputedStyle(document.body).fontFamily.split(',')[0].replaceAll('"', '').trim();
+    const faces = await document.fonts.load(`650 14px "${{family}}"`, sample);
+    if (primaryFont !== family || !faces.some(face => face.status === 'loaded')) {{
+      throw new Error(`embedded font ${{family}} did not load for ${{id}}`);
     }}
   }}
   viewIcons[2].click();
@@ -685,7 +699,8 @@ def main() -> int:
     windows = os.name == "nt"
     resources = executable.parent / "resources" if windows else executable.parent.parent / "Resources"
     for relative in (
-        "SoundBot.txt", "SoundBot-CREDITS.md", "THIRD_PARTY_AUDIO_NOTICES.txt", "electron/LICENSE",
+        "SoundBot.txt", "SoundBot-CREDITS.md", "MiSans-License.pdf",
+        "THIRD_PARTY_AUDIO_NOTICES.txt", "electron/LICENSE",
         "electron/LICENSES.chromium.html", "ffmpeg/COPYING.LGPLv3", "ffmpeg/COPYING.GPLv3",
     ):
         notice = resources / "licenses" / relative

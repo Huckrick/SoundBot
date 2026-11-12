@@ -21,7 +21,7 @@ const creditLinks = Object.freeze({
   license: `${projectUrl}/blob/main/LICENSE`,
   credits: `${projectUrl}/blob/main/docs/credits.md`,
   misans: 'https://hyperos.mi.com/font/en/about/',
-  'misans-license': 'https://hyperos.mi.com/font-download/MiSans%E5%AD%97%E4%BD%93%E7%9F%A5%E8%AF%86%E4%BA%A7%E8%AE%B8%E5%8F%AF%E5%8D%8F%E8%AE%AE.pdf',
+  'misans-license': 'https://hyperos.mi.com/font/en/download/',
   audio: `${projectUrl}/blob/main/tests/build/licenses/THIRD_PARTY_AUDIO_NOTICES.txt`,
   loudness: 'https://github.com/jiixyj/libebur128/blob/master/COPYING',
   ucs: 'https://universalcategorysystem.com/',

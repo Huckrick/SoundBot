@@ -191,6 +191,7 @@ Thumbs.db
 *.tmp
 *.temp
 *.part
+/assets/fonts/misans/
 
 # Test and static-analysis caches
 .pytest_cache/

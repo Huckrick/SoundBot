@@ -1,0 +1,32 @@
+@font-face {
+  font-family: "MiSans";
+  src: url("./fonts/misans/MiSansVF.ttf") format("truetype");
+  font-weight: 150 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MiSans TC";
+  src: url("./fonts/misans/MiSansTCVF.ttf") format("truetype");
+  font-weight: 150 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MiSans Latin";
+  src: url("./fonts/misans/MiSansLatinVF.ttf") format("truetype");
+  font-weight: 150 700;
+  font-display: swap;
+}
+
+:root {
+  --font: "MiSans Latin", "MiSans", "MiSans TC", sans-serif;
+}
+
+html:lang(zh-CN), html:lang(ja) {
+  --font: "MiSans", "MiSans TC", sans-serif;
+}
+
+html:lang(zh-TW) {
+  --font: "MiSans TC", "MiSans", sans-serif;
+}

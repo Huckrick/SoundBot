@@ -196,6 +196,9 @@ jobs:
       - name: Materialize Electron and its license notices
         run: node node_modules/electron/install.js
 
+      - name: Prepare original MiSans fonts for embedding
+        run: python scripts/prepare_misans.py --download
+
       - name: Build backend and Electron with the canonical script
         run: python scripts/build.py --platform macos --release-tag "$RELEASE_TAG" --skip-dependency-install
         env:
@@ -443,6 +446,9 @@ jobs:
       - name: Test sandboxed Electron preload bridge
         shell: powershell
         run: npx --no-install electron tests/frontend/check_electron_preload.js
+
+      - name: Prepare original MiSans fonts for embedding
+        run: python scripts/prepare_misans.py --download
 
       - name: Build backend and Electron with the canonical script
         shell: powershell
