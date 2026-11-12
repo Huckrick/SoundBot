@@ -1,6 +1,6 @@
 # SoundBot
 
-The open-source sound library that talks to your middleware.
+An open-source sound library manager for game audio. Search and edit your local sounds, then deliver them to middleware projects.
 
 The current source version is **v1.0.1 (stable)**. Published installers and their checksums are listed together in each release. [GitHub Releases](https://github.com/Huckrick/SoundBot/releases)
 

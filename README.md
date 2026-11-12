@@ -2,7 +2,7 @@
 
 <h1 align="center">SoundBot</h1>
 
-<p align="center">会和中间件对话的开源音效库。<br>The open-source sound library that talks to your middleware.</p>
+<p align="center">面向游戏音频的开源音效库管理器。在本地查找和剪辑音效，并交付到中间件工程。<br>An open-source sound library manager for game audio. Search and edit your local sounds, then deliver them to middleware projects.</p>
 
 <p align="center"><a href="#简体中文">简体中文</a> · <a href="#english">English</a> · <a href="https://github.com/Huckrick/SoundBot/releases">发行版本 / Releases</a></p>
 
