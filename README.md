@@ -12,6 +12,10 @@ SoundBot 把音效查找、剪辑和交付放在同一个桌面应用里。素�
 
 ![SoundBot 深色中文音效库](docs/images/library-zh-dark.png)
 
+### 界面语言
+
+支持 **简体中文、繁體中文、日本語、English、Português (Brasil)、Español** 共六种语言。在 **设置 → 常规 → 语言** 切换，选择会在下次启动时保留。语言设置适用于 SoundBot 的音效库、波形编辑器、中间件工作台、菜单和设置。素材文件名、源标签及第三方宿主或插件自带的文字保留原文。
+
 ### 下载和安装
 
 当前源码版本为 **v1.0.1（稳定版）**。安装包的发布状态以 GitHub Releases 为准。旧版保留在发行记录中，供查阅和回退。 [发行页](https://github.com/Huckrick/SoundBot/releases) · [更新日志](CHANGELOG.md)
@@ -51,6 +55,10 @@ SoundBot 把音效查找、剪辑和交付放在同一个桌面应用里。素�
 SoundBot brings sound library search, waveform editing, and delivery into one desktop app. Libraries reference the original files and index names, descriptions, tags, and UCS categories. Search works during imports, and waveforms are generated on demand. Details show audio properties, source tags, and embedded artwork. The editor includes range selection, fades, gain, parametric EQ, reverb, and live loudness metering.
 
 ![SoundBot light English middleware workspace](docs/images/workspace-en-light.png)
+
+### Interface languages
+
+SoundBot supports **Simplified Chinese, Traditional Chinese, Japanese, English, Brazilian Portuguese, and Spanish**. Choose a language in **Settings → General → Language**. SoundBot remembers the choice and applies it to the library, waveform editor, middleware workspace, menus, and settings. File names, source tags, and labels supplied by external hosts or plug-ins stay in their original language.
 
 ### Download and install
 
