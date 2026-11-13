@@ -41,6 +41,7 @@
             ...(bands && { bands: bands.filter(activeBand).map(band => ({ ...band })) })
         }));
     const editingPlugins = new WeakMap();
+    let openingPlugin;
     const pluginNames = new Map();
     let draggedPlugin;
     let current;
@@ -174,24 +175,61 @@
     }
 
     async function editPlugin(effect, context) {
-        if (editingPlugins.has(effect)) return;
+        if (editingPlugins.has(effect)) return desktop.desktopMedia('focus-plugin-editor', { instance: effect.instance });
         const instance = effect.instance;
-        const edit = (async () => {
-            const result = await desktop.desktopMedia('edit-plugin', {
-                id: effect.plugin_id, state: effect.plugin_state, values: effect.values, instance,
-                dark: document.documentElement.dataset.theme !== 'light'
-            });
+        return openPlugin(effect, context, { id: effect.plugin_id, instance, state: effect.plugin_state, values: effect.values });
+    }
+
+    async function openPlugin(effect, context, payload, candidate = false) {
+        if (openingPlugin) return;
+        const notice = el('dialog', null, 'plugin-loading');
+        const label = el('div', t('正在加载 VST3：{name}', { name: effect.name }));
+        notice.setAttribute('aria-label', label.textContent);
+        notice.append(label, el('progress'));
+        document.body.append(notice);
+        notice.show();
+        openingPlugin = effect;
+        const add = plugin => {
+            if (!candidate || effect.plugin_id || !plugin) return;
+            effect.plugin_id = plugin.id;
+            effect.name = plugin.name;
+            pluginNames.set(plugin.id, plugin.name);
+            context.chain.push(effect);
+            context.changed();
+        };
+        const edit = desktop.desktopMedia(candidate ? 'load-plugin-editor' : 'edit-plugin', {
+            ...payload, dark: document.documentElement.dataset.theme !== 'light'
+        });
+        const complete = edit.then(result => {
+            add(result?.plugin);
+            if (result?.editor_unavailable) say(t('无法打开 VST3 编辑窗口'));
             if (!result?.changed || !context.chain.includes(effect)) return;
             effect.plugin_state = result.state;
             effect.values = {};
             context.changed({ live: true });
-        })();
-        editingPlugins.set(effect, edit);
+        });
+        editingPlugins.set(effect, complete);
+        let ready = false;
+        const clear = () => { notice.remove(); if (openingPlugin === effect) openingPlugin = null; };
+        const poll = async () => {
+            while (!ready) {
+                await new Promise(resolve => setTimeout(resolve, 220));
+                if (ready) return;
+                const status = await api.get(`/api/v1/effects/editors/${effect.instance}`).catch(() => null);
+                if (!ready && status?.ready) {
+                    add(status.plugin);
+                    clear();
+                    if (current?.chain === context.chain) render();
+                    return;
+                }
+            }
+        };
         try {
-            context.changed({ live: true });
-            if (current?.chain === context.chain) render();
-            await edit;
+            void poll();
+            await complete;
         } finally {
+            ready = true;
+            clear();
             editingPlugins.delete(effect);
             if (current?.chain === context.chain) render();
         }
@@ -206,7 +244,7 @@
         }));
     }
 
-    async function preview(request, offset, onEnd) {
+    async function preview(request, offset, onEnd, onRendered) {
         const plugins = [request.master_effects || [], ...request.tracks.flatMap(track =>
             [track.effects || [], ...track.clips.map(clip => clip.effects || [])])].flat()
             .filter(effect => effect.plugin_id);
@@ -226,11 +264,11 @@
         try {
             await playback.playPCM(api.url('/api/v1/preview'), {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...request, request_id: requestId })
+                body: JSON.stringify({ ...request, include_tail: true, request_id: requestId })
             }, offset, onEnd, requestId ? () => {
                 void report();
                 interval = setInterval(report, 1500);
-            } : undefined);
+            } : undefined, onRendered);
         } finally {
             clearInterval(interval);
             if (requestId) void report();
@@ -275,8 +313,7 @@
                 node.classList.remove('vst-drop-top', 'vst-drop-bottom'));
         };
         const name = button(effect.name, () => attempt(() => editPlugin(effect, context)), 'vst-editor');
-        name.disabled = editingPlugins.has(effect);
-        name.title = t(name.disabled ? 'VST3 编辑窗口已打开' : '打开插件界面');
+        name.title = t(editingPlugins.has(effect) ? 'VST3 编辑窗口已打开' : '打开插件界面');
         name.setAttribute('aria-label', `${effect.name} · ${name.title}`);
         const toggle = iconButton('⏻', t('旁通插件'), () => {
             effect.on = !effect.on;
@@ -451,6 +488,7 @@
 
     async function pick() {
         const context = current;
+        if (openingPlugin) return;
         if (!context?.chain || context.chain.length >= 12) return say(t('单条效果链最多 12 个效果器'));
         const dialog = $('pluginDialog');
         const choices = $('pluginChoices');
@@ -477,16 +515,11 @@
                 choices.inert = true;
                 query.disabled = true;
                 try {
-                    const loaded = await desktop.desktopMedia('load-plugin', plugin);
-                    if (!loaded || !dialog.open || current?.chain !== context.chain) return;
-                    const effect = { kind: 'vst3', plugin_id: loaded.id, name: loaded.name, values: {}, on: true,
+                    if (current?.chain !== context.chain) return;
+                    const effect = { kind: 'vst3', name: plugin.name, values: {}, on: true,
                         instance: crypto.randomUUID().replaceAll('-', '') };
-                    pluginNames.set(loaded.id, loaded.name);
-                    context.chain.push(effect);
                     dialog.close();
-                    current.changed();
-                    render();
-                    await editPlugin(effect, current);
+                    await openPlugin(effect, context, { ...plugin, instance: effect.instance }, true);
                 } finally {
                     choices.inert = false;
                     query.disabled = false;

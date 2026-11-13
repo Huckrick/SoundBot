@@ -25,6 +25,9 @@
     let rowWindow;
     let rowNodes = new Map();
     let effectsPreviewTimer;
+    let renderedWave;
+    const waveDuration = () => Math.max(state.selected?.duration || 0, renderedWave?.duration || 0);
+    const auditionEnd = () => Math.max(state.range?.[1] ?? state.selected?.duration ?? 0, renderedWave?.duration || 0);
     let libraryRevision = 0;
     let directoryRevision = 0;
     let groupRevision = 0;
@@ -104,7 +107,7 @@
     function syncTransport() {
         const time = playback.active ? playback.currentTime() : state.position;
         $('tc').textContent = fmt(time);
-        $('tcTotal').textContent = `/ ${fmt(isSourceEditing() ? state.selected?.duration : timeline()?.duration())}`;
+        $('tcTotal').textContent = `/ ${fmt(isSourceEditing() ? auditionEnd() : timeline()?.auditionEnd())}`;
         $('btnPlay').classList.toggle('playing', playback.active);
         $('btnPlay').setAttribute('aria-pressed', String(playback.active));
         $('playIcon').innerHTML = playback.active
@@ -117,7 +120,7 @@
     function stop(reset = false) {
         if (playback.active && !reset) state.position = playback.currentTime();
         playback.stop();
-        if (reset) state.position = 0;
+        if (reset) { state.position = 0; renderedWave = null; }
         syncTransport();
     }
 
@@ -140,7 +143,7 @@
         const masterEffects = isLibrary() ? fx().enabled(libraryEffects, true) : [];
         const processed = range || edits?.gain || edits?.fade_in || edits?.fade_out || masterEffects.length;
         const offset = processed ? Math.max(range?.[0] || 0, state.position) : state.position;
-        const end = range?.[1] ?? item.duration;
+        const end = auditionEnd();
         const start = offset >= end ? (range?.[0] || 0) : offset;
         const playbackId = ++previewRevision;
         const onEnd = () => {
@@ -150,12 +153,18 @@
         };
         if (processed && edits) {
             const startRelative = start - edits.offset;
+            const rendered = (start > 0 && renderedWave) || playback.renderedPeaks(item.duration);
             return fx().preview({
                 project_id: state.library.id, tracks: [{ clips: [edits] }], master_effects: masterEffects,
                 rate: item.sample_rate || 48000, channels: masterEffects.some(effect => effect.kind === 'vst3') ? 2 : item.channels || 2,
                 start: startRelative
-            }, start, onEnd);
+            }, start, onEnd, (buffer, time) => {
+                if (playbackId !== previewRevision) return;
+                rendered.append(buffer, time);
+                renderedWave = rendered;
+            });
         }
+        renderedWave = null;
         if (!audio.requiresPlaybackSource({ filePath: item.path, format: item.format })) {
             try { return await playback.playSource(api.url(fileRoute(item.id, 'source')), start, onEnd); }
             catch (error) {
@@ -187,7 +196,7 @@
 
     function positionRangeHandles() {
         const waveArea = $('wave').closest('.wave-gesture');
-        const duration = state.selected?.duration || 0;
+        const duration = waveDuration();
         const fraction = time => Math.min(1, Math.max(0, time / duration * state.zoom - state.pan));
         const left = duration && state.range ? fraction(state.range[0]) : 0;
         const right = duration && state.range ? fraction(state.range[1]) : 0;
@@ -199,13 +208,26 @@
     function drawWave(position) {
         const item = state.selected;
         const canvas = $('wave');
-        const duration = item?.duration || 0;
+        const duration = waveDuration();
         if (!item || !state.waveform) {
             canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
             return;
         }
+        if (renderedWave && (!renderedWave.data || renderedWave.dirty !== renderedWave.duration)) {
+            const original = item.duration;
+            const useRendered = time => !state.range || (time >= state.range[0] && time < renderedWave.duration);
+            renderedWave.data = Float32Array.from({ length: 2000 }, (_, index) => {
+                const time = index / 2000 * duration;
+                const wet = useRendered(time) ? renderedWave.peakBetween(time, (index + 1) / 2000 * duration) : -1;
+                if (wet >= 0) return wet;
+                return time < original ? state.waveform[Math.floor(time / original * state.waveform.length)] || 0 : 0;
+            });
+            renderedWave.dirty = renderedWave.duration;
+            positionRangeHandles();
+            showRange();
+        }
         waveform.renderMain(canvas, {
-            waveformData: state.waveform, duration, zoomLevel: state.zoom,
+            waveformData: renderedWave?.data || state.waveform, duration, zoomLevel: state.zoom,
             scrollOffset: canvas.clientWidth * state.pan, progress: position / (duration || 1),
             activeColor: color('--tx1'), inactiveColor: color('--tx2'), inactiveOpacity: 0.6,
             backgroundColor: color('--bg0'), selectionColor: color('--tx1'),
@@ -220,9 +242,12 @@
         $('wOut').textContent = `${t('出点')} ${range ? fmt(range[1]) : '—'}`;
         $('wSel').textContent = range ? `${t('选区')} ${fmt(range[1] - range[0])}`
             : t('拖动波形框选');
+        const tail = Math.max(0, (renderedWave?.duration || 0) - (range?.[1] ?? state.selected?.duration ?? 0));
+        if (tail > 0.001) $('wSel').textContent += ` · ${t('效果尾音')} +${fmt(tail)}`;
     }
 
     function updateRange() {
+        renderedWave = null;
         showRange();
         positionRangeHandles();
         invalidateDelivery();
@@ -538,7 +563,7 @@
         };
         move.onpointermove = event => {
             if (moving?.pointer !== event.pointerId) return;
-            moveBy(moving.range, (event.clientX - moving.x) / canvas.clientWidth * state.selected.duration / state.zoom);
+            moveBy(moving.range, (event.clientX - moving.x) / canvas.clientWidth * waveDuration() / state.zoom);
         };
         move.onlostpointercapture = () => { moving = null; };
         move.onkeydown = event => {
@@ -564,17 +589,18 @@
         drag.onclick = event => {
             if (event.detail === 0 && isLibrary() && !state.delivery) attempt(prepareDrag);
         };
-        const timeAt = event => {
+        const timeAt = (event, duration = waveDuration()) => {
             const rect = canvas.getBoundingClientRect();
             const fraction = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
-            return (state.selected?.duration || 0) * (fraction + state.pan) / state.zoom;
+            return duration * (fraction + state.pan) / state.zoom;
         };
         canvas.onpointerdown = event => {
             if (!state.selected?.duration || event.button !== 0) return;
             const t = timeAt(event);
-            const threshold = state.selected.duration / canvas.clientWidth / state.zoom * 9;
+            const threshold = waveDuration() / canvas.clientWidth / state.zoom * 9;
             const edge = state.range?.findIndex(value => Math.abs(t - value) < threshold) ?? -1;
-            gesture = { x: event.clientX, anchor: edge < 0 ? t : state.range[1 - edge], previous: state.range };
+            gesture = { x: event.clientX, anchor: edge < 0 ? t : state.range[1 - edge], previous: state.range,
+                duration: waveDuration() };
             canvas.setPointerCapture(event.pointerId);
         };
         canvas.onpointermove = event => {
@@ -584,7 +610,7 @@
                 stop();
                 gesture.moved = true;
             }
-            state.range = [gesture.anchor, timeAt(event)].sort((a, b) => a - b);
+            state.range = [gesture.anchor, timeAt(event, gesture.duration)].map(time => Math.min(state.selected.duration, time)).sort((a, b) => a - b);
             updateRange();
         };
         canvas.onpointerup = event => {
@@ -593,9 +619,17 @@
                 const wasPlaying = playback.active;
                 previewRevision++;
                 stop();
-                state.range = null;
-                state.position = timeAt(event);
-                updateRange();
+                const time = timeAt(event);
+                state.position = time;
+                if (time <= (state.range?.[1] ?? state.selected.duration)) {
+                    state.range = null;
+                    updateRange();
+                } else if (time < (renderedWave?.duration || 0)) syncTransport();
+                else {
+                    state.range = null;
+                    state.position = Math.min(time, state.selected.duration);
+                    updateRange();
+                }
                 if (wasPlaying) attempt(playLibrary);
             } else {
                 state.position = state.range[0];
@@ -639,7 +673,7 @@
             });
         }, { passive: false });
         function updateZoom() {
-            const duration = state.selected?.duration || 1;
+            const duration = waveDuration() || 1;
             const center = state.range ? (state.range[0] + state.range[1]) / 2 : state.position;
             state.pan = Math.max(0, Math.min(state.zoom - 1, center / duration * state.zoom - 0.5));
             refreshZoom();
@@ -652,7 +686,14 @@
         new ResizeObserver(() => {
             if (isSourceEditing()) drawWave(playback.active ? playback.currentTime() : state.position);
         }).observe(canvas);
-        for (const id of ['fadeIn', 'fadeOut', 'clipGain', 'clipName', 'dawRate', 'dawBits', 'dawChannels']) $(id).oninput = invalidateDelivery;
+        for (const id of ['fadeIn', 'fadeOut', 'clipGain', 'clipName', 'dawRate', 'dawBits', 'dawChannels']) $(id).oninput = () => {
+            invalidateDelivery();
+            if (['fadeIn', 'fadeOut', 'clipGain'].includes(id)) {
+                renderedWave = null;
+                refreshAudition();
+                syncTransport();
+            }
+        };
     }
 
     async function loadLibraries(preferred, expectedRevision) {
@@ -1556,7 +1597,7 @@
         }
         peakRequest?.abort();
         playback.stop();
-        state.selected = state.range = state.waveform = null;
+        state.selected = state.range = state.waveform = renderedWave = null;
         state.workspace = which;
         $('mainWorkspace').classList.toggle('wwise', !isLibrary());
         $('bottomStage').classList.toggle('wwise', !isLibrary());
@@ -1592,7 +1633,11 @@
         libraryEffects ||= fx()?.create();
         fx()?.useRack(libraryEffects, t('音效库试听主输出'), ({ live } = {}) => {
             invalidateDelivery();
-            if (!live && isLibrary()) refreshAudition();
+            if (!live && isLibrary()) {
+                renderedWave = null;
+                refreshAudition();
+                syncTransport();
+            }
         }, state.selected?.sample_rate || 48000);
     }
 

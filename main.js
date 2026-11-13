@@ -1595,7 +1595,7 @@ function setupIpcHandlers() {
     };
     try {
       if (event.sender !== mainWindow?.webContents) throw new Error('窗口不可用');
-      if (action === 'load-plugin') {
+      if (action === 'load-plugin' || action === 'load-plugin-editor') {
         if (typeof data.id !== 'string' || !/^[a-f0-9]{64}$/.test(data.id)) throw new Error('未知媒体操作');
         const name = String(data.name || 'VST3').replace(/[\p{C}]/gu, '').slice(0, 200);
         const approved = await confirmInApp(mainWindow, 'plugin', {
@@ -1605,10 +1605,11 @@ function setupIpcHandlers() {
           confirm: t('加载插件')
         });
         if (!approved) return null;
-        return await requestBackendJson(apiBaseUrl + `/effects/plugins/${data.id}/load`, { method: 'POST' });
+        if (action === 'load-plugin') return await requestBackendJson(apiBaseUrl + `/effects/plugins/${data.id}/load`, { method: 'POST' });
       }
-      if (action === 'edit-plugin') {
-        if (typeof data.id !== 'string' || !/^[a-f0-9]{32}$/.test(data.id) ||
+      if (action === 'edit-plugin' || action === 'load-plugin-editor') {
+        const candidate = action === 'load-plugin-editor';
+        if (typeof data.id !== 'string' || !(candidate ? /^[a-f0-9]{64}$/ : /^[a-f0-9]{32}$/).test(data.id) ||
             typeof data.instance !== 'string' || !/^[a-f0-9]{32}$/.test(data.instance)) throw new Error('未知媒体操作');
         if (quitInProgress) return null;
         if (pluginEditorSessions.has(data.instance)) return null;
@@ -1620,7 +1621,7 @@ function setupIpcHandlers() {
           const owner = process.platform === 'win32'
             ? { handle: mainWindow.getNativeWindowHandle().readBigUInt64LE().toString(), pid: process.pid }
             : undefined;
-          return await requestBackendJson(apiBaseUrl + `/effects/plugins/${data.id}/edit`, {
+          return await requestBackendJson(apiBaseUrl + `/effects/plugins/${data.id}/${candidate ? 'load-editor' : 'edit'}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ state: data.state, values: data.values, instance: data.instance,
               dark: data.dark === true, owner })
@@ -1642,6 +1643,10 @@ function setupIpcHandlers() {
           await new Promise(resolve => setTimeout(resolve, 100));
         }
         return null;
+      }
+      if (action === 'focus-plugin-editor') {
+        if (typeof data.instance !== 'string' || !/^[a-f0-9]{32}$/.test(data.instance)) throw new Error('未知媒体操作');
+        return await requestBackendJson(apiBaseUrl + `/effects/editors/${data.instance}/focus`, { method: 'POST' });
       }
       if (action === 'connect') {
         const host = data.host;

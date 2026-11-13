@@ -1,6 +1,6 @@
 # SoundBot
 
-**Version / 版本:** 1.0.6<br>
+**Version / 版本:** 1.0.7<br>
 **Status / 状态:** Stable / 稳定版<br>
 
 ## 功能 / Features

@@ -16,6 +16,39 @@
     let muted = false;
     let nodes = new Set();
 
+    function renderedPeaks(nominalEnd) {
+        // Fixed time buckets keep samples aligned while bounding long previews.
+        const step = Math.max(0.01, (nominalEnd + 30) / 12000);
+        const peaks = new Float32Array(12002).fill(-1);
+        let duration = 0;
+        return {
+            get duration() { return duration; },
+            append(buffer, offset) {
+                const bins = Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer.getChannelData(index));
+                let bin = Math.floor(offset / step + 1e-7);
+                let end = Math.ceil(((bin + 1) * step - offset) * buffer.sampleRate);
+                let peak = Math.max(0, peaks[bin]);
+                for (let i = 0; i < buffer.length; i++) {
+                    if (i >= end) {
+                        peaks[bin++] = peak;
+                        end = Math.ceil(((bin + 1) * step - offset) * buffer.sampleRate);
+                        peak = Math.max(0, peaks[bin]);
+                    }
+                    for (const channel of bins) peak = Math.max(peak, Math.abs(channel[i]));
+                }
+                peaks[bin] = peak;
+                duration = offset + buffer.duration;
+            },
+            peakBetween(start, end) {
+                const first = Math.floor(start / step + 1e-7);
+                const last = Math.max(first, Math.ceil(end / step - 1e-7) - 1);
+                let peak = -1;
+                for (let i = first; i <= Math.min(last, peaks.length - 1); i++) peak = Math.max(peak, peaks[i]);
+                return peak;
+            }
+        };
+    }
+
     function stop() {
         session?.abort.abort();
         session = null;
@@ -109,7 +142,7 @@
         }
     }
 
-    async function playPCM(url, options, offset, onEnd, onStream) {
+    async function playPCM(url, options, offset, onEnd, onStream, onRendered) {
         stop();
         const active = { abort: new AbortController(), clock: () => offset };
         session = active;
@@ -126,6 +159,12 @@
             const reader = response.body.getReader();
             let remaining = new Uint8Array();
             let channels, rate;
+            const pcm = response.headers.get('X-SoundBot-PCM');
+            if (pcm) {
+                [rate, channels] = pcm.split('/').map(Number);
+                if (!Number.isInteger(rate) || rate < 8000 || rate > 384000 ||
+                    !Number.isInteger(channels) || channels < 1 || channels > 32) throw new Error('音频预览格式无效');
+            }
             let scheduled = context.currentTime;
             let origin;
             let expectedBytes;
@@ -163,6 +202,7 @@
                         }
                     }
                     remaining = remaining.slice(consumed);
+                    if (pcm) onRendered?.(buffer, offset + receivedBytes / (channels * 2 * rate));
                     receivedBytes += consumed;
                     const node = context.createBufferSource();
                     node.buffer = buffer;
@@ -177,7 +217,8 @@
                     node.start(scheduled);
                     scheduled += frames / rate;
                 }
-                if (!active.abort.signal.aborted && (!expectedBytes || expectedBytes !== receivedBytes)) {
+                if (!active.abort.signal.aborted && (!receivedBytes || remaining.length ||
+                    (!pcm && expectedBytes !== receivedBytes))) {
                     throw new Error('音频预览中断');
                 }
             } finally {
@@ -195,7 +236,7 @@
     }
 
     const scriptURL = document.currentScript.src;
-    window.SoundBotPlayback = { playSource, playPCM, setVolume, currentTime, levels, spectrum, stop,
+    window.SoundBotPlayback = { playSource, playPCM, setVolume, currentTime, levels, spectrum, stop, renderedPeaks,
         get generation() { return meterEpoch; },
         get momentary() { return session && !muted ? momentary : null; },
         get active() { return !!session; } };

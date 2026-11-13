@@ -4,6 +4,14 @@ Release history for SoundBot. / SoundBot 版本记录。
 
 ## [Unreleased] / 未发布
 
+## [1.0.7] - 2026-11-13
+
+### Fixed / 修复
+
+- Load a selected VST3 and open its editor in one worker on macOS and Windows. Show loading progress until the editor is ready. / macOS 与 Windows 使用同一个工作进程完成 VST3 加载和首次打开编辑器，并显示加载提示。
+- Place Windows plug-in editors beside the main window with a draggable title bar, minimize and close controls, and resizing where the native editor allows it. / Windows 插件编辑器在主窗口附近打开，可拖动标题栏、最小化和关闭，原生编辑器支持时可调整尺寸。
+- Preserve audible reverb and VST3 tails in audition and WAV delivery. The library and middleware workspace show the waveform from rendered playback. / 试听与 WAV 交付保留混响及 VST3 可听尾音，音效库和中间件工作台显示实际渲染的播放波形。
+
 ## [1.0.6] - 2026-11-13
 
 ### Changed / 变更
@@ -225,7 +233,8 @@ Release history for SoundBot. / SoundBot 版本记录。
 - The Windows release gate starts the frozen backend with a clean `PATH` and no system FFmpeg, then requires the complete format matrix, exact waveforms, CLAP, Chroma, hybrid search, `win-unpacked`, and NSIS installer integrity checks to pass before publishing. / Windows 发布门禁会在干净 `PATH`、无系统 FFmpeg 下启动冻结后端，并要求全格式矩阵、精确波形、CLAP、Chroma、混合搜索、`win-unpacked` 与 NSIS 安装包完整性检查全部通过后才允许发布。
 - CI builds Windows x64 and macOS arm64 only on native runners and blocks release creation if any functional smoke test, model check, metadata check, package check, or installer check fails. / CI 仅在原生 runner 构建 Windows x64 与 macOS arm64，并在任一功能冒烟、模型、元数据、应用包或安装包检查失败时阻止创建 Release。
 
-[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.6...HEAD
+[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.7...HEAD
+[1.0.7]: https://github.com/Huckrick/SoundBot/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/Huckrick/SoundBot/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/Huckrick/SoundBot/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/Huckrick/SoundBot/compare/v1.0.3...v1.0.4

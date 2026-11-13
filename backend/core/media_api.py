@@ -19,7 +19,7 @@ from config import AUDIO_FORMAT_CAPABILITIES
 from core import delivery, middleware, vst, wwise
 from core.audio_service import AudioServiceError, get_audio_service
 from core.database import get_db_manager
-from core.editing import Clip, Track, mix, read_region, wave_stream
+from core.editing import Clip, Track, mix, pcm_bytes, read_region, tail_budget, wave_stream
 from core.effects import EQBand, Effect, analyze, validate_effect
 
 router = APIRouter(prefix="/api/v1")
@@ -99,6 +99,7 @@ class MixRequest(BaseModel):
 class PreviewRequest(MixRequest):
     master_effects: list[EffectRequest] = Field(default_factory=list, max_length=12)
     request_id: str | None = Field(default=None, pattern=r"^[a-f0-9-]{36}$")
+    include_tail: bool = False
 
 
 class DAWRequest(BaseModel):
@@ -188,7 +189,7 @@ def _mix_request(request):
     if sum(len(track.clips) for track in tracks) > 128:
         raise ValueError("单次预览或写回最多支持 128 个剪辑")
     duration = max((clip.start + clip.duration for track in tracks for clip in track.clips), default=0)
-    if duration <= request.start:
+    if duration <= request.start and not getattr(request, 'include_tail', False):
         raise ValueError("选区没有可播放的音频")
     return tracks, duration
 
@@ -270,11 +271,14 @@ def preview(request: PreviewRequest):
         chains = [master, *(track.effects for track in tracks),
                   *(clip.effects for track in tracks for clip in track.clips)]
         live = any(effect.plugin_instance for effects in chains for effect in effects)
+        budget = tail_budget(tracks, master) if request.include_tail else 0
+        if not duration or request.start >= duration + budget:
+            raise ValueError("选区没有可播放的音频")
         frames = round(duration * request.rate) - round(request.start * request.rate)
-        if frames < 1 or frames * request.channels * 2 > 0xffffffff - 36:
+        if not budget and (frames < 1 or frames * request.channels * 2 > 0xffffffff - 36):
             raise ValueError("预览时长超出 WAV 限制")
         blocks = mix(tracks, request.rate, request.channels, duration, start=request.start,
-                     master_effects=master, on_plugin_error=report)
+                     master_effects=master, on_plugin_error=report, tails=bool(budget))
         if any(chains):
             first = next(blocks, None)
             if first is None:
@@ -290,7 +294,7 @@ def preview(request: PreviewRequest):
                     if not live:
                         yield from blocks
                         return
-                    while emitted < frames:
+                    while budget or emitted < frames:
                         delay = started + emitted / request.rate - 0.25 - time.monotonic()
                         if delay > 0:
                             time.sleep(delay)
@@ -305,6 +309,16 @@ def preview(request: PreviewRequest):
             source = prepared()
         else:
             source = blocks
+        if budget:
+            def pcm():
+                try:
+                    for block in source:
+                        yield pcm_bytes(block, 16)
+                finally:
+                    source.close()
+
+            return StreamingResponse(pcm(), media_type="application/octet-stream", headers={
+                "Cache-Control": "no-store", "X-SoundBot-PCM": f"{request.rate}/{request.channels}"})
         return _stream(source, request.rate, request.channels, frames)
     except (OSError, ValueError, AudioServiceError) as exc:
         raise HTTPException(422, str(exc)) from exc
@@ -344,6 +358,18 @@ def close_editor(instance: Annotated[str, PathParameter(pattern=r"^[a-f0-9]{32}$
     return {"closed": vst.close_editor(instance)}
 
 
+@router.get("/effects/editors/{instance}")
+def editor_status(instance: Annotated[str, PathParameter(pattern=r"^[a-f0-9]{32}$")]):
+    return vst.editor_status(instance)
+
+
+@router.post("/effects/editors/{instance}/focus")
+def focus_editor(instance: Annotated[str, PathParameter(pattern=r"^[a-f0-9]{32}$")],
+                 x_soundbot_ipc: str | None = Header(None)):
+    _trusted(x_soundbot_ipc)
+    return {"focused": vst.focus_editor(instance)}
+
+
 @router.post("/effects/editors/close")
 def close_editors(x_soundbot_ipc: str | None = Header(None)):
     _trusted(x_soundbot_ipc)
@@ -357,6 +383,16 @@ def edit_plugin(plugin_id: str, request: PluginEditorRequest, x_soundbot_ipc: st
     try:
         return vst.edit(plugin_id, request.state, request.values if request.state is None else None,
                         instance=request.instance, dark=request.dark,
+                        owner=request.owner.model_dump() if request.owner else None)
+    except (OSError, ValueError) as exc:
+        raise HTTPException(422, "无法打开 VST3 编辑窗口" if isinstance(exc, OSError) else str(exc)) from exc
+
+
+@router.post("/effects/plugins/{plugin_id}/load-editor")
+def load_editor(plugin_id: str, request: PluginEditorRequest, x_soundbot_ipc: str | None = Header(None)):
+    _trusted(x_soundbot_ipc)
+    try:
+        return vst.edit(plugin_id, instance=request.instance, dark=request.dark, candidate=True,
                         owner=request.owner.model_dump() if request.owner else None)
     except (OSError, ValueError) as exc:
         raise HTTPException(422, "无法打开 VST3 编辑窗口" if isinstance(exc, OSError) else str(exc)) from exc

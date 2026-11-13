@@ -34,6 +34,7 @@
     const expanded = new Map();
     const filteredExpansion = new Map();
     let previewGeneration = 0;
+    let renderedMix;
     const minClip = 0.01;
     const limit = (value, lo, hi) => Math.max(lo, Math.min(hi, value));
     const startAt = time => Math.max(0, snap ? Math.round(time / grid) * grid : time);
@@ -43,6 +44,7 @@
     });
     const trackName = track => track.name || t(track.label, { count: track.trackNumber });
     const duration = () => Math.max(0, ...tracks.flatMap(track => track.clips.map(clip => clip.start + clip.duration)));
+    const auditionEnd = () => Math.max(duration(), renderedMix?.duration || 0);
     const timelineLength = () => Math.max(8, Math.ceil(duration() + 1));
     const active = () => tracks.find(track => track.id === selectedTrack);
     const countClips = () => tracks.reduce((count, track) => count + track.clips.length, 0);
@@ -61,6 +63,8 @@
 
     function pause(reset = false) {
         previewGeneration++;
+        renderedMix = null;
+        $('dawRendered').classList.add('hidden');
         stop(reset);
     }
 
@@ -1060,7 +1064,12 @@
             const label = t('轨道效果器');
             fx.useRack(track?.effects, track ? `${label} · ${trackName(track)}` : label, ({ live } = {}) => {
                 if (!tracks.includes(track)) return;
-                if (!live && !state.dockEditing) ui.refreshAudition();
+                if (!live && !state.dockEditing) {
+                    renderedMix = null;
+                    $('dawRendered').classList.add('hidden');
+                    $('dawDuration').textContent = fmt(duration());
+                    ui.refreshAudition();
+                }
                 dirtyState(true);
             }, target?.sample_rate || 48000);
         }
@@ -1208,12 +1217,19 @@
 
     async function play() {
         if (!target || !duration() || busy) return say(t('请先选择音频源并添加剪辑'));
-        const start = state.position < duration() ? state.position : 0;
+        const nominalEnd = duration();
+        const start = state.position < Math.max(nominalEnd, renderedMix?.duration || 0) ? state.position : 0;
         const token = ++previewGeneration;
+        const rendered = (start > 0 && renderedMix) || playback.renderedPeaks(nominalEnd);
         return fx.preview({ ...mixRequest(true), start }, start, () => {
             state.position = 0;
             if (state.loop && token === previewGeneration && state.workspace === 'wwise') attempt(play);
             syncTransport();
+        }, (buffer, time) => {
+            if (token !== previewGeneration) return;
+            rendered.append(buffer, time);
+            renderedMix = rendered;
+            $('dawRendered').classList.remove('hidden');
         });
     }
 
@@ -1263,6 +1279,19 @@
     }
 
     function playhead(time) {
+        if (renderedMix) {
+            const total = Math.max(duration(), renderedMix.duration);
+            if (renderedMix.painted !== renderedMix.duration) {
+                renderedMix.data = Float32Array.from({ length: 1200 }, (_, i) =>
+                    Math.max(0, renderedMix.peakBetween(i * total / 1200, (i + 1) * total / 1200)));
+                renderedMix.painted = renderedMix.duration;
+            }
+            const css = getComputedStyle(document.documentElement);
+            waveform.renderMain($('dawRenderedWave'), { waveformData: renderedMix.data, duration: total,
+                progress: time / total, backgroundColor: css.getPropertyValue('--bg0'),
+                activeColor: css.getPropertyValue('--tx1'), inactiveColor: css.getPropertyValue('--tx2') });
+            $('dawDuration').textContent = fmt(total);
+        }
         const progress = limit(time / timelineLength(), 0, 1);
         document.querySelectorAll('.track-lane').forEach(lane => lane.style.setProperty('--play', String(progress)));
         const marker = $('dawRuler').querySelector('.ruler-playhead');
@@ -1271,6 +1300,17 @@
 
     function bind() {
         bindTree();
+        $('dawRenderedWave').onclick = event => {
+            if (!renderedMix) return;
+            const bounds = event.currentTarget.getBoundingClientRect();
+            const resume = playback.active;
+            previewGeneration++;
+            stop();
+            state.position = limit((event.clientX - bounds.left) / bounds.width, 0, 1) *
+                Math.max(duration(), renderedMix.duration);
+            syncTransport();
+            if (resume) attempt(play);
+        };
         const on = (id, fn) => { $(id).onclick = () => attempt(fn); };
         const viewport = $('dawRulerViewport');
         const box = $('dawTracks');
@@ -1433,7 +1473,7 @@
     }
 
     window.SoundBotTimeline = {
-        show: async () => { renderTree(); render(); await loadDock(); }, duration, renderTree, loadDock,
+        show: async () => { renderTree(); render(); await loadDock(); }, duration, auditionEnd, renderTree, loadDock,
         hasLibraryClips, discard, stageClip, stageWholeAsset, play, playhead,
         isBusy: () => busy,
         refreshLabels: () => {

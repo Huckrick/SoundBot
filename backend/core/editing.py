@@ -14,6 +14,25 @@ from core.audio_service import get_audio_service
 from core.effects import Effect, process as apply_effects
 
 BLOCK = 8192
+TAIL_LIMIT = 30
+TAIL_LEVEL = 0.0001  # -80 dBFS
+
+
+def _tail_budget(effects):
+    return min(TAIL_LIMIT, sum(12 if effect.kind == 'vst3' else
+                               8 if effect.kind == 'reverb' and effect.values['mix'] else 0
+                               for effect in effects))
+
+
+def _audible_tracks(tracks):
+    solo = any(track.solo and not track.mute for track in tracks)
+    return tuple(track for track in tracks if not track.mute and (track.solo or not solo))
+
+
+def tail_budget(tracks, master_effects=()):
+    upstream = max((_tail_budget(track.effects) + max((_tail_budget(clip.effects) for clip in track.clips), default=0)
+                    for track in _audible_tracks(tracks) if track.clips), default=0)
+    return min(TAIL_LIMIT, upstream + _tail_budget(master_effects))
 
 
 @dataclass(frozen=True)
@@ -146,7 +165,9 @@ def _clip_blocks(clip, channels, rate, start, stop, on_plugin_error):
         position = first
         gain = 10 ** (clip.gain / 20)
         length = round(clip.duration * rate)
-        for block in read_region(clip.path, clip.offset + first / rate, stop - first, rate, channels):
+        dry_frames = max(0, min(stop, length) - first)
+        source = read_region(clip.path, clip.offset + first / rate, dry_frames, rate, channels) if dry_frames else ()
+        for block in source:
             if not clip.fade_in and not clip.fade_out:
                 yield block if gain == 1 else block * gain
                 continue
@@ -159,10 +180,13 @@ def _clip_blocks(clip, channels, rate, start, stop, on_plugin_error):
                 envelope *= _fade(progress, clip.fade_out_curve)
             position += len(block)
             yield block * envelope[:, None]
+        for frame in range(first + dry_frames, stop, BLOCK):
+            yield np.zeros((min(BLOCK, stop - frame), channels), dtype=np.float32)
 
     if not clip.effects:
         return read(start)
-    warmup = max(0, start - rate) if on_plugin_error is not None else 0
+    preroll = rate * max(1, _tail_budget(clip.effects))
+    warmup = max(0, min(start, round(clip.duration * rate)) - preroll) if on_plugin_error is not None else 0
     processed = apply_effects(read(warmup), rate, channels, clip.effects, measure=lambda: read(0),
                               on_plugin_error=on_plugin_error)
     return _skip_frames(processed, start - warmup)
@@ -182,7 +206,7 @@ def _crossfades(regions, default_curve, overrides):
     return transitions
 
 
-def _track_blocks(track, rate, channels, origin, stop, pan_enabled, on_plugin_error):
+def _track_blocks(track, rate, channels, origin, stop, pan_enabled, on_plugin_error, tails):
     source_channels = track.channels or channels
     active = []
     regions = [(round(clip.start * rate), round(clip.start * rate) + round(clip.duration * rate))
@@ -191,16 +215,17 @@ def _track_blocks(track, rate, channels, origin, stop, pan_enabled, on_plugin_er
                   if track.auto_crossfade else [()] * len(regions))
     try:
         for clip, (left, right), fades in zip(track.clips, regions, crossfades):
-            if right <= origin or left >= stop:
+            last = min(stop, right + (rate * _tail_budget(clip.effects) if tails else 0))
+            if last <= origin or left >= stop:
                 continue
-            blocks = _clip_blocks(clip, source_channels, rate, max(0, origin-left), min(stop, right)-left, on_plugin_error)
-            active.append((left, right, _RegionReader(blocks, source_channels), fades, clip.pan))
+            blocks = _clip_blocks(clip, source_channels, rate, max(0, origin-left), last-left, on_plugin_error)
+            active.append((left, right, last, _RegionReader(blocks, source_channels), fades, clip.pan))
         gain = 10 ** (track.gain / 20)
         for position in range(origin, stop, BLOCK):
             end = min(position + BLOCK, stop)
             block = np.zeros((end-position, channels), dtype=np.float32)
-            for left, right, reader, fades, pan in active:
-                begin, finish = max(position, left), min(end, right)
+            for left, right, last, reader, fades, pan in active:
+                begin, finish = max(position, left), min(end, last)
                 if begin >= finish:
                     continue
                 samples = _map_channels(reader.take(finish-begin), channels)
@@ -223,33 +248,31 @@ def _track_blocks(track, rate, channels, origin, stop, pan_enabled, on_plugin_er
                 block[begin-position:finish-position] += samples
             yield block * gain
     finally:
-        for _, _, reader, _, _ in active:
+        for _, _, _, reader, _, _ in active:
             reader.blocks.close()
 
 
-def _render_track(track, rate, channels, origin, stop, pan_enabled, on_plugin_error):
+def _render_track(track, rate, channels, origin, stop, pan_enabled, on_plugin_error, tails):
     def read(first):
-        return _track_blocks(track, rate, channels, first, stop, pan_enabled, on_plugin_error)
+        return _track_blocks(track, rate, channels, first, stop, pan_enabled, on_plugin_error, tails)
 
     if not track.effects:
         return read(origin)
-    warmup = max(0, origin - rate) if on_plugin_error is not None else 0
+    preroll = rate * max(1, _tail_budget(track.effects))
+    warmup = max(0, origin - preroll) if on_plugin_error is not None else 0
     processed = apply_effects(read(warmup), rate, channels, track.effects, measure=lambda: read(0),
                               on_plugin_error=on_plugin_error)
     return _skip_frames(processed, origin - warmup)
 
 
-def _sum_tracks(tracks, rate, channels, duration, start, on_plugin_error):
+def _sum_tracks(tracks, rate, channels, duration, start, on_plugin_error, tails):
     origin, stop = round(start * rate), round(duration * rate)
-    solo = any(track.solo and not track.mute for track in tracks)
     readers = []
     try:
-        for track in tracks:
-            if track.mute or (solo and not track.solo):
-                continue
+        for track in _audible_tracks(tracks):
             pan_enabled = channels == 2 and any(clip.pan for clip in track.clips)
             count = 2 if pan_enabled else track.channels or channels
-            blocks = _render_track(track, rate, count, origin, stop, pan_enabled, on_plugin_error)
+            blocks = _render_track(track, rate, count, origin, stop, pan_enabled, on_plugin_error, tails)
             readers.append(_RegionReader(blocks, count))
         for position in range(origin, stop, BLOCK):
             frames = min(BLOCK, stop - position)
@@ -262,25 +285,49 @@ def _sum_tracks(tracks, rate, channels, duration, start, on_plugin_error):
             reader.blocks.close()
 
 
-def mix(tracks, rate, channels, duration, *, start=0, master_effects=(), on_plugin_error=None):
+def mix(tracks, rate, channels, duration, *, start=0, master_effects=(), on_plugin_error=None, tails=False):
     """Mix in float, process the master once, then limit the output format."""
+    budget = tail_budget(tracks, master_effects) if tails else 0
+
     def read(first):
-        return _sum_tracks(tracks, rate, channels, duration, first, on_plugin_error)
+        return _sum_tracks(tracks, rate, channels, duration + budget, first, on_plugin_error, bool(budget))
 
     if master_effects:
         origin = round(start * rate)
-        warmup = max(0, origin - rate) if on_plugin_error is not None else 0
+        warmup = max(0, origin - rate * (budget or 1)) if on_plugin_error is not None else 0
         processed = apply_effects(read(warmup / rate), rate, channels, master_effects,
                                   measure=lambda: read(0), on_plugin_error=on_plugin_error)
         blocks = _skip_frames(processed, origin - warmup)
     else:
         blocks = read(start)
     try:
-        for block in blocks:
+        output = _trim_tail(blocks, round(duration * rate) - round(start * rate), channels) if budget else blocks
+        for block in output:
             writable = np.nan_to_num(block, copy=not block.flags.writeable)
             yield np.clip(writable, -1, 1, out=writable)
     finally:
         blocks.close()
+
+
+def _trim_tail(blocks, nominal_frames, channels):
+    """Hold quiet tail frames until a later echo justifies emitting them."""
+    remaining = max(0, nominal_frames)
+    quiet = 0
+    for block in blocks:
+        if remaining:
+            count = min(remaining, len(block))
+            yield block[:count]
+            remaining -= count
+            block = block[count:]
+        audible = np.flatnonzero(np.any(np.abs(block) >= TAIL_LEVEL, axis=1))
+        if not len(audible):
+            quiet += len(block)
+            continue
+        for frame in range(0, quiet, BLOCK):
+            yield np.zeros((min(BLOCK, quiet-frame), channels), dtype=np.float32)
+        last = int(audible[-1]) + 1
+        yield block[:last]
+        quiet = len(block) - last
 
 
 def pcm_bytes(samples, bits):
@@ -322,9 +369,28 @@ def write_wave(path, tracks, rate, channels, duration, bits):
     frames = round(duration * rate)
     if frames < 1:
         raise ValueError("音频长度无效")
-    with path.open("wb") as output:
-        blocks = mix(tracks, rate, channels, duration)
-        output.writelines(wave_stream(blocks, rate, channels, frames, bits))
+    width = bits // 8
+    with path.open("wb") as output, wave.open(output, "wb") as writer:
+        writer.setparams((channels, width, rate, 0, "NONE", "not compressed"))
+        frames = 0
+        blocks = mix(tracks, rate, channels, duration, tails=True)
+        try:
+            for samples in blocks:
+                frames += len(samples)
+                size = frames * channels * width
+                if size + (size & 1) > 0xffffffff - 36:
+                    raise ValueError("音频长度无效或超出 WAV 大小限制")
+                writer.writeframesraw(pcm_bytes(samples, bits))
+        finally:
+            blocks.close()
+    # PCM RIFF chunks are word-aligned. Pad without counting an audio frame.
+    size = frames * channels * width
+    if size & 1:
+        with path.open("r+b") as output:
+            output.seek(4)
+            output.write(struct.pack("<I", size + 37))
+            output.seek(0, 2)
+            output.write(b"\0")
     with wave.open(str(path), "rb") as check:
         if (check.getnframes(), check.getframerate(), check.getnchannels(), check.getsampwidth()) != (
             frames, rate, channels, bits//8

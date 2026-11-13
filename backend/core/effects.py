@@ -207,6 +207,8 @@ def _reverb(blocks, rate, channels, values):
             count = data.shape[1]
             if count <= data.shape[0]:
                 data = np.pad(data, ((0, 0), (0, 3-count)))
-            reverberated = plugin.process(data, rate, reset=False)[:, :count].T
+            # Keep the DSP block size fixed across decoder and tail blocks.
+            # Changing it can reinitialize the reverb and erase its state.
+            reverberated = plugin.process(data, rate, buffer_size=512, reset=False)[:, :count].T
             output[:, pair] = block[:, pair] * (1-wet) + reverberated * wet
         yield output

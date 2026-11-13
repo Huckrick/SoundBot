@@ -36,6 +36,7 @@ _state_key = secrets.token_bytes(32)
 _EDITOR_SLOTS = threading.BoundedSemaphore(4)
 _editor_lock = threading.Lock()
 _editors = {}
+_editor_ready = {}
 _editor_states = OrderedDict()
 _editors_closing = False
 _catalog_lock = threading.Lock()
@@ -71,14 +72,24 @@ def _show_editor(plugin, connection, dark, owner):
     initial = previous = plugin.raw_state
     style = editor_chrome(str(plugin.name), dark, owner)
     next_sample = 0
+    ticks = 0
+    focus = None
+    ready = False
     class EditorEvents:
         # Pedalboard calls this from the native GUI thread.
         def is_set(self):
-            nonlocal next_sample, previous
+            nonlocal next_sample, previous, ticks, ready, focus
             if connection.poll():
-                return connection.recv_bytes(1) == b"X"
-            if style is not None:
-                style()
+                if connection.recv_bytes(1) == b"X":
+                    return True
+                if focus is not None:
+                    focus()
+            ticks += 1
+            if ticks > 1 and not ready:
+                focus = style() if style is not None else None
+                if style is None or focus is not None:
+                    connection.send_bytes(b"R")
+                    ready = True
             now = time.monotonic()
             if now >= next_sample:
                 next_sample = now + 0.3
@@ -89,7 +100,13 @@ def _show_editor(plugin, connection, dark, owner):
                         connection.send_bytes(b"U" + current)
             return False
 
-    plugin.show_editor(EditorEvents())
+    try:
+        plugin.show_editor(EditorEvents())
+    except RuntimeError as exc:
+        if str(exc) not in {"Plugin has no available editor UI.", "Failed to create plugin editor UI."}:
+            raise
+        connection.send_bytes(b"N")
+        return
     final = plugin.raw_state
     if len(final) > _MAX_STATE:
         connection.send_bytes(b"L")
@@ -115,12 +132,18 @@ def _worker(connection, path, rate, channels, values, state, editor, dark, owner
         module = str(binary) if os.name == "nt" else path
 
         def load():
-            names = (effect_name,) if effect_name else VST3Plugin.get_plugin_names_for_file(module)
-            for name in names:
-                plugin = VST3Plugin(module, plugin_name=name, initialization_timeout=8.0)
-                if plugin.is_effect:
-                    break
-            else:
+            try:
+                plugin = VST3Plugin(module, plugin_name=effect_name, initialization_timeout=8.0)
+            except ValueError as exc:
+                if effect_name is not None or "contains" not in str(exc) or "plugin_name" not in str(exc):
+                    raise
+                # A bundle can advertise several components. Scan names only
+                # when the constructor needs a class to disambiguate them.
+                for name in VST3Plugin.get_plugin_names_for_file(module):
+                    plugin = VST3Plugin(module, plugin_name=name, initialization_timeout=8.0)
+                    if plugin.is_effect:
+                        break
+            if not plugin.is_effect:
                 raise ValueError("仅支持音频效果插件")
             if state is not None:
                 plugin.raw_state = state
@@ -136,7 +159,7 @@ def _worker(connection, path, rate, channels, values, state, editor, dark, owner
         plugin = load()
         description = {
             "name": str(plugin.name)[:200],
-            "parameters": [] if rate or editor else [
+            "parameters": [] if rate or (editor and effect_name) else [
                 {"key": key, "name": str(param.name)[:120], "value": float(param.raw_value)}
                 for key, param in list(plugin.parameters.items())[:128] if np.isfinite(param.raw_value)
             ],
@@ -260,7 +283,7 @@ def _receive(connection, deadline, max_message=_MAX_MESSAGE):
         raise ValueError(payload[1:].decode())
     if payload[:1] == b"D":
         _logger.warning("VST3 worker failed during %s", payload[1:].decode(errors="replace")[:200])
-    if payload[:1] not in {b"A", b"J", b"S", b"U"}:
+    if payload[:1] not in {b"A", b"J", b"N", b"R", b"S", b"U"}:
         raise ValueError("VST3 插件无法加载或处理音频，请检查兼容性")
     return payload[:1], payload[1:]
 
@@ -303,6 +326,10 @@ def register(path):
     _plugin_binary(source)
     with _host(source) as (_, info):
         pass
+    return _save_plugin(source, info)
+
+
+def _save_plugin(source, info):
     with get_db_manager().get_cursor() as cursor:
         initialize(cursor)
         row = cursor.execute("""INSERT INTO vst_plugins(id,path,name,parameters) VALUES(?,?,?,?)
@@ -369,13 +396,17 @@ def discover():
 
 
 def load_discovered(plugin_id):
+    return register(_candidate(plugin_id))
+
+
+def _candidate(plugin_id):
     with _catalog_lock:
         source = _candidates.get(plugin_id)
     if source is None:
         raise ValueError("插件列表已变化，请重新扫描 VST3")
     if source.resolve(strict=True) != source:
         raise ValueError("插件路径已变化，请重新扫描 VST3")
-    return register(source)
+    return source
 
 
 def _registered_plugin(plugin_id):
@@ -415,14 +446,27 @@ def close_editors():
     global _editors_closing
     with _editor_lock:
         _editors_closing = True
-        for closed in _editors.values():
+        for closed, _ in _editors.values():
             closed.set()
 
 
 def close_editor(instance):
     with _editor_lock:
-        if closed := _editors.get(instance):
-            closed.set()
+        if editor := _editors.get(instance):
+            editor[0].set()
+            return True
+    return False
+
+
+def editor_status(instance):
+    with _editor_lock:
+        return {"ready": instance in _editor_ready, "plugin": _editor_ready.get(instance)}
+
+
+def focus_editor(instance):
+    with _editor_lock:
+        if editor := _editors.get(instance):
+            editor[1].set()
             return True
     return False
 
@@ -435,15 +479,16 @@ def _editor_state(plugin_id, instance, fallback):
         return current[1] if current and current[0] == plugin_id else fallback
 
 
-def edit(plugin_id, token=None, values=None, *, instance=None, dark=False, owner=None):
-    path, name = _registered_plugin(plugin_id)
-    state = _decode_state(plugin_id, token)
+def edit(plugin_id, token=None, values=None, *, instance=None, dark=False, owner=None, candidate=False):
+    path, name = (_candidate(plugin_id), None) if candidate else _registered_plugin(plugin_id)
+    state = None if candidate else _decode_state(plugin_id, token)
     closed = threading.Event()
+    focused = threading.Event()
     instance = instance or uuid4().hex
     with _editor_lock:
         if _editors_closing or instance in _editors:
             raise ValueError("无法打开 VST3 编辑窗口")
-        _editors[instance] = closed
+        _editors[instance] = closed, focused
         _editor_states.pop(instance, None)
 
     def update(raw):
@@ -458,13 +503,22 @@ def edit(plugin_id, token=None, values=None, *, instance=None, dark=False, owner
 
     try:
         with _host(path, values=values, state=state, editor=True, dark=dark, owner=owner,
-                   effect_name=name) as (connection, _):
+                   effect_name=name) as (connection, info):
+            registered = _save_plugin(path, info) if candidate else None
+            if registered:
+                plugin_id = registered["id"]
             close_deadline = None
+            open_deadline = time.monotonic() + 12
             while True:
                 if closed.is_set() and close_deadline is None:
                     connection.send_bytes(b"X")
                     close_deadline = time.monotonic() + 8
+                elif focused.is_set() and open_deadline is None and close_deadline is None:
+                    focused.clear()
+                    connection.send_bytes(b"F")
                 if close_deadline is not None and time.monotonic() >= close_deadline:
+                    raise ValueError("VST3 插件响应超时")
+                if open_deadline is not None and time.monotonic() >= open_deadline:
                     raise ValueError("VST3 插件响应超时")
                 try:
                     ready = connection.poll(0.1)
@@ -473,6 +527,13 @@ def edit(plugin_id, token=None, values=None, *, instance=None, dark=False, owner
                 if not ready:
                     continue
                 kind, updated = _receive(connection, 0, _MAX_STATE + 1)
+                if kind == b"N":
+                    return {"plugin": registered, "editor_unavailable": True}
+                if kind == b"R":
+                    with _editor_lock:
+                        _editor_ready[instance] = registered
+                    open_deadline = None
+                    continue
                 if kind == b"U" and updated:
                     update(updated)
                     continue
@@ -481,7 +542,8 @@ def edit(plugin_id, token=None, values=None, *, instance=None, dark=False, owner
                 if updated:
                     update(updated)
                 break
-        return {"changed": bool(updated), "state": _encode_state(plugin_id, updated) if updated else token}
+        return {"changed": bool(updated), "state": _encode_state(plugin_id, updated) if updated else token,
+                "plugin": registered}
     except (OSError, ValueError):
         with _editor_lock:
             _editor_states.pop(instance, None)
@@ -489,6 +551,7 @@ def edit(plugin_id, token=None, values=None, *, instance=None, dark=False, owner
     finally:
         with _editor_lock:
             _editors.pop(instance, None)
+            _editor_ready.pop(instance, None)
 
 
 def _process(blocks, rate, channels, plugin_id, values, token, instance=None):

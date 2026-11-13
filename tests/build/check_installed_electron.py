@@ -214,6 +214,9 @@ def _enumerate_native_windows(root_pid: int) -> list[dict]:
     user32.GetWindowTextW.restype = ctypes.c_int
     user32.GetWindow.argtypes = [wintypes.HWND, wintypes.UINT]
     user32.GetWindow.restype = wintypes.HWND
+    user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+    user32.GetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int]
+    user32.GetWindowLongPtrW.restype = ctypes.c_ssize_t
     windows: list[dict] = []
 
     def visit(window, _parameter):
@@ -229,6 +232,8 @@ def _enumerate_native_windows(root_pid: int) -> list[dict]:
         owner_pid = wintypes.DWORD()
         if owner:
             user32.GetWindowThreadProcessId(owner, ctypes.byref(owner_pid))
+        bounds = wintypes.RECT()
+        user32.GetWindowRect(window, ctypes.byref(bounds))
         windows.append(
             {
                 "handle": int(window),
@@ -236,6 +241,8 @@ def _enumerate_native_windows(root_pid: int) -> list[dict]:
                 "class": class_name.value,
                 "title": title.value,
                 "owner_pid": int(owner_pid.value),
+                "rect": (bounds.left, bounds.top, bounds.right, bounds.bottom),
+                "style": user32.GetWindowLongPtrW(window, -16),
             }
         )
         return True
@@ -644,19 +651,24 @@ def _exercise_vst(client: _DevToolsClient, root_pid: int, fixture: Path) -> dict
   const plugin = catalog.plugins.find(item => item.name.toLowerCase() === name.toLowerCase());
   if (!plugin) throw Error('installed VST3 fixture not found');
   const confirm = w.$('actionDialog');
-  const load = w.desktop.desktopMedia('load-plugin', plugin);
+  const instance = crypto.randomUUID().replaceAll('-', '');
+  window.vstSmoke = { job: { instance } };
+  w.desktop.desktopMedia('load-plugin-editor', { ...plugin, instance, dark: true }).then(
+    result => { window.vstSmoke.result = result; },
+    error => { window.vstSmoke.error = error.message; });
   for (let i = 0; !confirm.open && i < 100; i++) await new Promise(r => setTimeout(r, 50));
   if (!confirm.open) throw Error('VST3 trust prompt did not appear');
   w.$('actionConfirm').click();
-  const loaded = await load;
+  let loaded;
+  for (let i = 0; i < 140 && !loaded; i++) {
+    if (window.vstSmoke.error) throw Error(window.vstSmoke.error);
+    loaded = (await w.api.get('/api/v1/effects/editors/' + instance)).plugin;
+    if (!loaded) await new Promise(r => setTimeout(r, 200));
+  }
+  if (!loaded) throw Error('VST3 editor readiness was not reported');
   const gain = loaded.parameters.find(parameter => /gain/i.test(parameter.name));
   if (!gain) throw Error('VST3 gain parameter is unavailable');
-  const instance = crypto.randomUUID().replaceAll('-', '');
-  const job = { id: loaded.id, instance, values: { [gain.key]: 0.2 }, dark: true };
-  window.vstSmoke = { job };
-  w.desktop.desktopMedia('edit-plugin', job).then(
-    result => { window.vstSmoke.result = result; },
-    error => { window.vstSmoke.error = error.message; });
+  window.vstSmoke.job = { id: loaded.id, instance, values: { [gain.key]: 0.2 } };
   return { name: loaded.name };
 })()
 """.replace("VST_FIXTURE", candidate))
@@ -669,6 +681,13 @@ def _exercise_vst(client: _DevToolsClient, root_pid: int, fixture: Path) -> dict
             editor = next((window for window in visible if window["title"] == f"{opened['name']} · SoundBot"), None)
             if editor:
                 assert editor["owner_pid"] == root_pid, editor
+                assert editor["style"] & 0x00CA0000 == 0x00CA0000, editor  # caption, system menu, minimize
+                host = next((window for window in visible if window["pid"] == root_pid and
+                             window["class"].startswith("Chrome_WidgetWin") and window["title"] == "SoundBot"), None)
+                if host:
+                    x, y, right, bottom = editor["rect"]
+                    left, top, host_right, host_bottom = host["rect"]
+                    assert x < host_right and right > left and y < host_bottom and bottom > top, (host, editor)
                 return editor
             status = client.evaluate("({error: window.vstSmoke.error || null})")
             if status["error"]:
@@ -678,6 +697,22 @@ def _exercise_vst(client: _DevToolsClient, root_pid: int, fixture: Path) -> dict
 
     editor = wait_for_editor()
     try:
+        import ctypes
+        from ctypes import wintypes
+
+        user32 = ctypes.WinDLL("user32")
+        user32.IsIconic.argtypes = [wintypes.HWND]
+        user32.ShowWindowAsync.argtypes = [wintypes.HWND, ctypes.c_int]
+        user32.ShowWindowAsync(editor["handle"], 6)  # SW_MINIMIZE
+        deadline = time.monotonic() + 4
+        while not user32.IsIconic(editor["handle"]) and time.monotonic() < deadline:
+            time.sleep(0.1)
+        assert user32.IsIconic(editor["handle"]), editor
+        client.evaluate("window.electronAPI.desktopMedia('focus-plugin-editor', { instance: window.vstSmoke.job.instance })")
+        deadline = time.monotonic() + 4
+        while user32.IsIconic(editor["handle"]) and time.monotonic() < deadline:
+            time.sleep(0.1)
+        assert not user32.IsIconic(editor["handle"]), editor
         result = client.evaluate(r"""
 (async () => {
   const w = window.SoundBotWorkspace;
@@ -689,15 +724,16 @@ def _exercise_vst(client: _DevToolsClient, root_pid: int, fixture: Path) -> dict
     const request_id = crypto.randomUUID();
     const response = await w.api.fetch('/api/v1/preview', { method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ ...session, master_effects: effects, request_id }) });
+      body: JSON.stringify({ ...session, include_tail: true, master_effects: effects, request_id }) });
     if (!response.ok) throw Error('VST3 preview: ' + await response.text());
     const data = await response.arrayBuffer();
     const { plugins } = await w.api.get('/api/v1/preview/' + request_id + '/warnings');
     if (Object.keys(plugins).length) throw Error('VST3 was bypassed: ' + JSON.stringify(plugins));
-    if (data.byteLength !== 44 + 35280 * 2) throw Error('VST3 changed WAV duration');
+    const header = response.headers.get('X-SoundBot-PCM') ? 0 : 44;
+    if (data.byteLength !== header + 35280 * 2) throw Error('Gain plug-in added a silent tail');
     const view = new DataView(data);
     let peak = 0;
-    for (let i = 44; i < view.byteLength; i += 2) peak = Math.max(peak, Math.abs(view.getInt16(i, true)));
+    for (let i = header; i < view.byteLength; i += 2) peak = Math.max(peak, Math.abs(view.getInt16(i, true)));
     return peak;
   };
   const dry = await pcm([]);

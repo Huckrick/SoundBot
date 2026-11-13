@@ -420,6 +420,42 @@ class CoreDeliveryTests(unittest.TestCase):
         blended = preview("reverb-impulse", [reverb])
         self.assertAlmostEqual(blended[0], 9000, delta=2)
 
+    def test_rendered_tail_matches_delivery_and_can_be_previewed_from_inside_tail(self):
+        source = self.root / "dry-click.wav"
+        with wave.open(str(source), "wb") as handle:
+            handle.setparams((1, 2, 48000, 0, "NONE", "not compressed"))
+            handle.writeframes(bytes(2 * 47999) + struct.pack("<h", 24000))
+        self.import_folder(self.root)
+        asset = self.items(q="dry-click")["files"][0]
+        clip = {"file_id": asset["id"], "duration": 1}
+        reverb = {"kind": "reverb", "values": {"mix": 75, "size": 80, "damping": 45, "width": 100}}
+        session = {"project_id": "default", "rate": 48000, "channels": 1, "include_tail": True}
+        media = self.root / "daw"
+        media.mkdir()
+        exported = self.client.post("/api/v1/delivery", headers=self.headers, json={
+            "project_id": "default", "directory": str(media), "bits": 16,
+            "clip": {**clip, "effects": [reverb]},
+        }).raise_for_status().json()
+        with wave.open(exported["path"], "rb") as wav:
+            self.assertGreater(wav.getnframes(), 48000)
+            actual = wav.readframes(wav.getnframes())
+        for placement in ("clip", "track", "master"):
+            with self.subTest(placement=placement):
+                job = {**session, "tracks": [{"clips": [clip]}]}
+                if placement == "clip":
+                    job["tracks"][0]["clips"] = [{**clip, "effects": [reverb]}]
+                elif placement == "track":
+                    job["tracks"][0]["effects"] = [reverb]
+                else:
+                    job["master_effects"] = [reverb]
+                response = self.client.post("/api/v1/preview", json=job).raise_for_status()
+                self.assertEqual(response.headers["X-SoundBot-PCM"], "48000/1")
+                self.assertEqual(response.content, actual)
+                seek = self.client.post("/api/v1/preview", json={**job, "start": 1.02}).raise_for_status()
+                expected = np.frombuffer(actual, dtype="<i2")[round(48000 * 1.02):]
+                # Quiet blocks may be segmented differently after a seek.
+                np.testing.assert_allclose(np.frombuffer(seek.content, dtype="<i2"), expected, atol=3)
+
     def test_source_metadata_and_embedded_artwork_for_production_wave(self):
         from PIL import Image
 
