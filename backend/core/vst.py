@@ -7,6 +7,7 @@ import hashlib
 import hmac
 import importlib.util
 import json
+import logging
 import multiprocessing
 import os
 import secrets
@@ -25,6 +26,7 @@ import numpy as np
 from core.database import get_db_manager
 
 
+_logger = logging.getLogger("soundbot")
 _HOST_SLOTS = threading.BoundedSemaphore(8)
 _WORKER_START_LOCK = threading.Lock()
 _MAX_MESSAGE = 512 * 1024
@@ -101,20 +103,21 @@ def _show_editor(plugin, connection, dark, owner):
 
 def _worker(connection, path, rate, channels, values, state, editor, dark, owner, effect_name):
     dll_directory = None
+    phase = "host initialization"
     try:
         from pedalboard import VST3Plugin
 
         binary = _plugin_binary(path)
         # Keep dependent Windows DLLs discoverable for the lifetime of the worker.
         dll_directory = os.add_dll_directory(str(binary.parent)) if os.name == "nt" else None
+        # Pedalboard's Windows scanner expects the module file. Retain the
+        # original bundle path in the registry and use the module only to load.
+        module = str(binary) if os.name == "nt" else path
 
         def load():
-            # The bundle is the plug-in identity. Its binary path is used only
-            # to locate architecture-specific DLLs beside the plug-in.
-            # Resolve the class on registration, then reopen that same class.
-            names = (effect_name,) if effect_name else VST3Plugin.get_plugin_names_for_file(path)
+            names = (effect_name,) if effect_name else VST3Plugin.get_plugin_names_for_file(module)
             for name in names:
-                plugin = VST3Plugin(path, plugin_name=name, initialization_timeout=8.0)
+                plugin = VST3Plugin(module, plugin_name=name, initialization_timeout=8.0)
                 if plugin.is_effect:
                     break
             else:
@@ -129,6 +132,7 @@ def _worker(connection, path, rate, channels, values, state, editor, dark, owner
                     parameters[key].raw_value = value
             return plugin
 
+        phase = "effect loading"
         plugin = load()
         description = {
             "name": str(plugin.name)[:200],
@@ -139,10 +143,12 @@ def _worker(connection, path, rate, channels, values, state, editor, dark, owner
         }
         connection.send_bytes(b"J" + json.dumps(description, allow_nan=False).encode())
         if editor:
+            phase = "editor"
             _show_editor(plugin, connection, dark, owner)
             return
         if not rate:
             return
+        phase = "audio processing"
         stereo_adapter = False
         first_block = True
         while data := connection.recv_bytes(_MAX_STATE + 1):
@@ -181,7 +187,10 @@ def _worker(connection, path, rate, channels, values, state, editor, dark, owner
             message = str(exc)
             expected = {"仅支持音频效果插件", "插件参数已变化，请重新添加插件",
                         "无法将 VST3 窗口关联到 SoundBot"}
-            connection.send_bytes(b"E" + (message.encode() if message in expected else b""))
+            if message in expected:
+                connection.send_bytes(b"E" + message.encode())
+            else:
+                connection.send_bytes(b"D" + f"{phase}: {type(exc).__name__}".encode())
         except OSError:
             pass
     finally:
@@ -249,6 +258,8 @@ def _receive(connection, deadline, max_message=_MAX_MESSAGE):
         raise ValueError("插件状态超出保存上限")
     if payload[:1] == b"E" and payload[1:]:
         raise ValueError(payload[1:].decode())
+    if payload[:1] == b"D":
+        _logger.warning("VST3 worker failed during %s", payload[1:].decode(errors="replace")[:200])
     if payload[:1] not in {b"A", b"J", b"S", b"U"}:
         raise ValueError("VST3 插件无法加载或处理音频，请检查兼容性")
     return payload[:1], payload[1:]
