@@ -10,7 +10,7 @@ The interface supports Simplified Chinese, Traditional Chinese, Japanese, Englis
 
 ## What’s new in v1.0.6
 
-The updated SoundBot icon appears in the app, installers, and native drag preview. [Release history](CHANGELOG.md)
+The updated SoundBot icon appears in the app, installers, and native drag preview. On Windows, VST3 editors open as SoundBot-owned tool windows, and the plug-in workers run without console windows. Space controls playback in the workspace and types a space in text fields. [Release history](CHANGELOG.md)
 
 ## Support and feedback
 

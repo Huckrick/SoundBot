@@ -1617,9 +1617,13 @@ function setupIpcHandlers() {
         const contents = event.sender;
         contents.setBackgroundThrottling(false);
         try {
+          const owner = process.platform === 'win32'
+            ? { handle: mainWindow.getNativeWindowHandle().readBigUInt64LE().toString(), pid: process.pid }
+            : undefined;
           return await requestBackendJson(apiBaseUrl + `/effects/plugins/${data.id}/edit`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ state: data.state, values: data.values, instance: data.instance, dark: data.dark === true })
+            body: JSON.stringify({ state: data.state, values: data.values, instance: data.instance,
+              dark: data.dark === true, owner })
           });
         } finally {
           pluginEditorSessions.delete(data.instance);

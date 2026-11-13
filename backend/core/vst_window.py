@@ -3,16 +3,16 @@
 import sys
 
 
-def editor_chrome(name, dark):
+def editor_chrome(name, dark, owner=None):
     title = f"{name} · SoundBot"
     if sys.platform == "win32":
-        return _once(lambda: _windows_chrome(title, dark))
+        return _once(lambda: _windows_chrome(title, dark, owner), require_owner=owner is not None)
     if sys.platform == "darwin":
         return _once(lambda: _mac_chrome(title, dark))
     return None
 
 
-def _once(apply):
+def _once(apply, *, require_owner=False):
     from time import monotonic
 
     applied = False
@@ -27,13 +27,15 @@ def _once(apply):
         try:
             applied = apply()
         except (OSError, AttributeError, ValueError):
+            if require_owner:
+                raise ValueError("无法将 VST3 窗口关联到 SoundBot") from None
             # Window chrome is optional. Keep the native editor functional.
             applied = True
 
     return tick
 
 
-def _windows_chrome(title, dark):
+def _windows_chrome(title, dark, owner):
     import ctypes as ct
     from ctypes import wintypes as wt
 
@@ -47,7 +49,12 @@ def _windows_chrome(title, dark):
     user.GetWindowLongPtrW.restype = ct.c_ssize_t
     user.SetWindowLongPtrW.argtypes = [wt.HWND, ct.c_int, ct.c_ssize_t]
     user.SetWindowLongPtrW.restype = ct.c_ssize_t
+    user.GetWindow.argtypes = [wt.HWND, wt.UINT]
+    user.GetWindow.restype = wt.HWND
+    user.GetWindowThreadProcessId.argtypes = [wt.HWND, ct.POINTER(wt.DWORD)]
+    user.GetWindowThreadProcessId.restype = wt.DWORD
     user.SetWindowPos.argtypes = [wt.HWND, wt.HWND, ct.c_int, ct.c_int, ct.c_int, ct.c_int, wt.UINT]
+    kernel.GetCurrentThreadId.restype = wt.DWORD
     window = None
 
     @proc
@@ -63,16 +70,33 @@ def _windows_chrome(title, dark):
     user.EnumThreadWindows(kernel.GetCurrentThreadId(), find, 0)
     if window is None:
         return False
+    if owner:
+        owner_process = wt.DWORD()
+        handle = int(owner["handle"])
+        user.GetWindowThreadProcessId(handle, ct.byref(owner_process))
+        if owner_process.value != owner["pid"]:
+            raise OSError("SoundBot owner window has closed")
+        # Keep the native top-level window and its DPI context. Win32 ownership
+        # groups it with SoundBot and hides it when the main window minimizes.
+        user.SetWindowLongPtrW(window, -8, handle)  # GWLP_HWNDPARENT
+        if user.GetWindow(window, 4) != handle:  # GW_OWNER
+            raise ct.WinError(ct.get_last_error())
+        ex_style_index = -20
+        ex_style = user.GetWindowLongPtrW(window, ex_style_index)
+        user.SetWindowLongPtrW(window, ex_style_index, (ex_style & ~0x40000) | 0x80)  # tool window
     user.SetWindowTextW(window, title)
     style_index = -16  # GWL_STYLE
     style = user.GetWindowLongPtrW(window, style_index)
     thick_frame, maximize_box, system_menu = 0x40000, 0x10000, 0x80000
     if style & thick_frame:
         user.SetWindowLongPtrW(window, style_index, style | maximize_box | system_menu)
-        frame_changed = 0x20 | 0x01 | 0x02 | 0x04 | 0x10
-        user.SetWindowPos(window, None, 0, 0, 0, 0, frame_changed)
+    frame_changed = 0x20 | 0x01 | 0x02 | 0x04 | 0x10
+    user.SetWindowPos(window, None, 0, 0, 0, 0, frame_changed)
 
-    dwm = ct.WinDLL("dwmapi")
+    try:
+        dwm = ct.WinDLL("dwmapi")
+    except OSError:
+        return True
     dwm.DwmSetWindowAttribute.argtypes = [wt.HWND, wt.DWORD, ct.c_void_p, wt.DWORD]
     for attribute, value in (
         (20, int(dark)),  # DWMWA_USE_IMMERSIVE_DARK_MODE

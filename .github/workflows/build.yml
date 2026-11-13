@@ -665,6 +665,21 @@ jobs:
             exit 1
           }
 
+      - name: Build the VST3 gain fixture
+        shell: pwsh
+        run: |
+          $sdk = Join-Path $env:RUNNER_TEMP 'vst3-sdk'
+          git clone --depth 1 --branch v3.8.0_build_66 --recurse-submodules --shallow-submodules https://github.com/steinbergmedia/vst3sdk.git $sdk
+          if ($LASTEXITCODE -ne 0 -or (git -C $sdk rev-parse HEAD) -ne '9fad9770f2ae8542ab1a548a68c1ad1ac690abe0') { throw 'VST3 fixture SDK revision mismatch' }
+          $build = Join-Path $env:RUNNER_TEMP 'vst3-sdk-build'
+          cmake -S $sdk -B $build -G 'Visual Studio 17 2022' -A x64 -DSMTG_CREATE_PLUGIN_LINK=OFF -DSMTG_RUN_VST_VALIDATOR=OFF -DSMTG_CREATE_MODULE_INFO=OFF
+          if ($LASTEXITCODE -ne 0) { throw 'VST3 fixture configure failed' }
+          cmake --build $build --config Release --target again --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw 'VST3 fixture build failed' }
+          $fixture = Get-ChildItem $build -Directory -Recurse -Filter 'again.vst3' | Select-Object -First 1
+          if (-not $fixture) { throw 'VST3 gain fixture is missing' }
+          "SOUNDBOT_TEST_VST3=$($fixture.FullName)" >> $env:GITHUB_ENV
+
       - name: Install NSIS and smoke-test installed Electron
         shell: powershell
         run: |
@@ -698,6 +713,7 @@ jobs:
           & $pythonExe tests/build/check_installed_electron.py `
             --executable $installedExe `
             --fixture-root "$env:RUNNER_TEMP\soundbot-installed-electron-smoke % # + (中文)" `
+            --vst-fixture $env:SOUNDBOT_TEST_VST3 `
             --timeout 600
           $smokeExit = $LASTEXITCODE
           $env:PATH = $originalPath

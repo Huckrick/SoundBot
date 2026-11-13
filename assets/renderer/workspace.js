@@ -2036,11 +2036,17 @@
         on('aiSend', askAssistant);
         $('aiInput').onkeydown = event => { if (event.key === 'Enter' && !event.isComposing) attempt(askAssistant); };
         document.addEventListener('keydown', event => {
-            if (event.code === 'Space' && !event.target.closest('button,input,textarea,select,dialog,.overlay')) {
-                event.preventDefault();
-                togglePlay();
-            }
-        });
+            if (event.code !== 'Space' || event.isComposing) return;
+            const target = event.target;
+            const textInput = target instanceof HTMLInputElement &&
+                ['text', 'search', 'email', 'tel', 'url', 'password', 'number'].includes(target.type);
+            if (textInput || target instanceof HTMLTextAreaElement || target.isContentEditable) return;
+            // Focused buttons, tabs and switches otherwise consume Space on keyup.
+            event.preventDefault();
+            event.stopPropagation();
+            if (!event.repeat && !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey &&
+                !document.querySelector('dialog[open], .overlay.show')) togglePlay();
+        }, { capture: true });
         const themes = window.matchMedia('(prefers-color-scheme: light)');
         const applyTheme = theme => {
             localStorage.setItem('soundbot-theme', theme);

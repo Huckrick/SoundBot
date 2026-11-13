@@ -193,8 +193,8 @@ def _windows_process_tree(root_pid: int) -> set[int]:
     return process_ids
 
 
-def _enumerate_native_dialogs(root_pid: int) -> list[dict]:
-    """List visible #32770 dialogs owned by the installed Electron tree."""
+def _enumerate_native_windows(root_pid: int) -> list[dict]:
+    """List visible windows in the installed Electron process tree."""
     import ctypes
     from ctypes import wintypes
 
@@ -212,7 +212,9 @@ def _enumerate_native_dialogs(root_pid: int) -> list[dict]:
     user32.GetClassNameW.restype = ctypes.c_int
     user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
     user32.GetWindowTextW.restype = ctypes.c_int
-    dialogs: list[dict] = []
+    user32.GetWindow.argtypes = [wintypes.HWND, wintypes.UINT]
+    user32.GetWindow.restype = wintypes.HWND
+    windows: list[dict] = []
 
     def visit(window, _parameter):
         process_id = wintypes.DWORD()
@@ -221,16 +223,19 @@ def _enumerate_native_dialogs(root_pid: int) -> list[dict]:
             return True
         class_name = ctypes.create_unicode_buffer(256)
         user32.GetClassNameW(window, class_name, len(class_name))
-        if class_name.value != "#32770":
-            return True
         title = ctypes.create_unicode_buffer(512)
         user32.GetWindowTextW(window, title, len(title))
-        dialogs.append(
+        owner = user32.GetWindow(window, 4)  # GW_OWNER
+        owner_pid = wintypes.DWORD()
+        if owner:
+            user32.GetWindowThreadProcessId(owner, ctypes.byref(owner_pid))
+        windows.append(
             {
                 "handle": int(window),
                 "pid": int(process_id.value),
                 "class": class_name.value,
                 "title": title.value,
+                "owner_pid": int(owner_pid.value),
             }
         )
         return True
@@ -242,7 +247,11 @@ def _enumerate_native_dialogs(root_pid: int) -> list[dict]:
         error = ctypes.get_last_error()
         if error:
             raise ctypes.WinError(error)
-    return dialogs
+    return windows
+
+
+def _enumerate_native_dialogs(root_pid: int) -> list[dict]:
+    return [window for window in _enumerate_native_windows(root_pid) if window["class"] == "#32770"]
 
 
 def _wait_for_new_native_dialog(
@@ -560,6 +569,17 @@ def _renderer_smoke_expression(
     return ms;
   }};
   const auditionMs = {{ native: await audition(expectedNames[0]), streamed: await audition(wmaRecord.filename) }};
+  const searchBox = document.getElementById('searchInput');
+  const space = (target, repeat = false) => target.dispatchEvent(new KeyboardEvent('keydown', {{
+    key: ' ', code: 'Space', bubbles: true, cancelable: true, repeat
+  }}));
+  if (!space(searchBox) || workspace.playback.active) throw new Error('Space is reserved for text in search');
+  const focusedTab = document.getElementById('tabDetail');
+  focusedTab.focus();
+  if (space(focusedTab) || !workspace.playback.active || space(focusedTab, true) || !workspace.playback.active) {{
+    throw new Error('Space must play once without activating a focused control');
+  }}
+  if (space(focusedTab) || workspace.playback.active) throw new Error('Space did not pause playback');
   const wwiseTab = document.querySelector('[data-ws="wwise"]');
   wwiseTab.click();
   await until(() => wwiseTab.getAttribute('aria-selected') === 'true', 'middleware workspace');
@@ -611,6 +631,95 @@ def _renderer_smoke_expression(
   }};
 }})()
 """
+
+
+def _exercise_vst(client: _DevToolsClient, root_pid: int, fixture: Path) -> dict:
+    candidate = json.dumps(fixture.stem)
+    opened = client.evaluate(r"""
+(async () => {
+  const w = window.SoundBotWorkspace;
+  await w.switchWorkspace('library');
+  const name = VST_FIXTURE;
+  const catalog = await w.api.get('/api/v1/effects/plugins');
+  const plugin = catalog.plugins.find(item => item.name.toLowerCase() === name.toLowerCase());
+  if (!plugin) throw Error('installed VST3 fixture not found');
+  const confirm = w.$('actionDialog');
+  const load = w.desktop.desktopMedia('load-plugin', plugin);
+  for (let i = 0; !confirm.open && i < 100; i++) await new Promise(r => setTimeout(r, 50));
+  if (!confirm.open) throw Error('VST3 trust prompt did not appear');
+  w.$('actionConfirm').click();
+  const loaded = await load;
+  const gain = loaded.parameters.find(parameter => /gain/i.test(parameter.name));
+  if (!gain) throw Error('VST3 gain parameter is unavailable');
+  const instance = crypto.randomUUID().replaceAll('-', '');
+  const job = { id: loaded.id, instance, values: { [gain.key]: 0.2 }, dark: true };
+  window.vstSmoke = { job };
+  w.desktop.desktopMedia('edit-plugin', job).then(
+    result => { window.vstSmoke.result = result; },
+    error => { window.vstSmoke.error = error.message; });
+  return { name: loaded.name };
+})()
+""".replace("VST_FIXTURE", candidate))
+
+    def wait_for_editor() -> dict:
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline:
+            visible = _enumerate_native_windows(root_pid)
+            assert not any(window["class"] == "ConsoleWindowClass" for window in visible), visible
+            editor = next((window for window in visible if window["title"] == f"{opened['name']} · SoundBot"), None)
+            if editor:
+                assert editor["owner_pid"] == root_pid, editor
+                return editor
+            status = client.evaluate("({error: window.vstSmoke.error || null})")
+            if status["error"]:
+                raise RuntimeError(status["error"])
+            time.sleep(0.15)
+        raise RuntimeError("SoundBot-owned VST3 window did not appear")
+
+    editor = wait_for_editor()
+    try:
+        result = client.evaluate(r"""
+(async () => {
+  const w = window.SoundBotWorkspace;
+  const {job} = window.vstSmoke;
+  const file = w.state.items.find(item => item.duration >= 0.9);
+  const session = { project_id: w.state.library.id, rate: 44100, channels: 1,
+    tracks: [{ clips: [{ file_id: file.id, duration: 0.8 }] }] };
+  const pcm = async (effects) => {
+    const request_id = crypto.randomUUID();
+    const response = await w.api.fetch('/api/v1/preview', { method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ ...session, master_effects: effects, request_id }) });
+    if (!response.ok) throw Error('VST3 preview: ' + await response.text());
+    const data = await response.arrayBuffer();
+    const { plugins } = await w.api.get('/api/v1/preview/' + request_id + '/warnings');
+    if (Object.keys(plugins).length) throw Error('VST3 was bypassed: ' + JSON.stringify(plugins));
+    if (data.byteLength !== 44 + 35280 * 2) throw Error('VST3 changed WAV duration');
+    const view = new DataView(data);
+    let peak = 0;
+    for (let i = 44; i < view.byteLength; i += 2) peak = Math.max(peak, Math.abs(view.getInt16(i, true)));
+    return peak;
+  };
+  const dry = await pcm([]);
+  const wet = await pcm([{ kind: 'vst3', plugin_id: job.id, plugin_instance: job.instance, values: job.values }]);
+  if (!(wet > 0 && wet < dry * 0.85)) throw Error(`Expected processed gain, got dry=${dry} wet=${wet}`);
+  if (window.vstSmoke.error || window.vstSmoke.result) throw Error('Editor closed while auditioning');
+  return { dry, wet };
+})()
+""")
+        assert any(window["handle"] == editor["handle"] for window in _enumerate_native_windows(root_pid))
+        return result
+    finally:
+        client.evaluate(r"""
+(async () => {
+  await window.electronAPI.desktopMedia('close-plugin-editor', { instance: window.vstSmoke.job.instance });
+  for (let i = 0; i < 100 && !window.vstSmoke.result && !window.vstSmoke.error; i++) {
+    await new Promise(r => setTimeout(r, 50));
+  }
+  if (!window.vstSmoke.result) throw Error(window.vstSmoke.error || 'VST3 editor did not close');
+  return { closed: true };
+})()
+""")
 
 
 def _tail(path: Path, line_count: int = 100) -> str:
@@ -688,6 +797,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--executable", required=True, type=Path)
     parser.add_argument("--fixture-root", required=True, type=Path)
     parser.add_argument("--debug-port", type=int, default=0)
+    parser.add_argument("--vst-fixture", type=Path)
     parser.add_argument("--timeout", type=int, default=480)
     return parser.parse_args()
 
@@ -751,6 +861,12 @@ def main() -> int:
             "PYTHONIOENCODING": "utf-8",
         }
     )
+    if args.vst_fixture:
+        if not windows:
+            raise ValueError("The VST3 window ownership check requires Windows")
+        fixture = args.vst_fixture.resolve(strict=True)
+        fixture_dir = local_appdata / "Programs/Common/VST3" / fixture.name
+        shutil.copytree(fixture, fixture_dir)
 
     process: subprocess.Popen | None = None
     client: _DevToolsClient | None = None
@@ -793,6 +909,8 @@ def main() -> int:
                 )
             )
             result["nativeDialogs"] = native_dialogs
+            if args.vst_fixture:
+                result["vst3"] = _exercise_vst(client, process.pid, args.vst_fixture)
             try:
                 client.evaluate(
                     "(async () => { await window.electronAPI.windowControl.close(); "

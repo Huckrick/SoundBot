@@ -692,4 +692,5 @@
     ["VST3 插件响应超时", "The VST3 plug-in timed out.", "VST3 外掛程式回應逾時。", "VST3 プラグインの応答がタイムアウトしました。", "O plug-in VST3 demorou demais para responder.", "El complemento VST3 tardó demasiado en responder."],
     ["VST3 插件进程异常退出", "The VST3 plug-in process exited unexpectedly.", "VST3 外掛程式意外結束。", "VST3 プラグインのプロセスが異常終了しました。", "O processo do plug-in VST3 foi encerrado inesperadamente.", "El proceso del complemento VST3 se cerró inesperadamente."],
     ["VST3 插件无法加载或处理音频，请检查兼容性", "The VST3 plug-in could not load or process audio. Check compatibility.", "VST3 外掛程式無法載入或處理音訊，請檢查相容性。", "VST3 プラグインを読み込めないか、音声を処理できません。互換性を確認してください。", "O plug-in VST3 não carregou ou não processou o áudio. Verifique a compatibilidade.", "El complemento VST3 no pudo cargar o procesar el audio. Comprueba su compatibilidad."],
+    ["无法将 VST3 窗口关联到 SoundBot", "Could not attach the VST3 editor to SoundBot.", "無法將 VST3 視窗關聯到 SoundBot。", "VST3 エディターを SoundBot に関連付けられませんでした。", "Não foi possível vincular o editor VST3 ao SoundBot.", "No se pudo vincular el editor VST3 a SoundBot."],
 ]);

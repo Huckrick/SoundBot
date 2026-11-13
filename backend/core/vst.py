@@ -10,6 +10,7 @@ import json
 import multiprocessing
 import os
 import secrets
+import subprocess
 import sys
 import threading
 import time
@@ -25,6 +26,7 @@ from core.database import get_db_manager
 
 
 _HOST_SLOTS = threading.BoundedSemaphore(8)
+_WORKER_START_LOCK = threading.Lock()
 _MAX_MESSAGE = 512 * 1024
 _MAX_STATE = 1024 * 1024
 MAX_STATE_TOKEN = ((_MAX_STATE + 2) // 3) * 4 + 65
@@ -61,15 +63,12 @@ def _plugin_binary(path):
     return candidate
 
 
-def _show_editor(plugin, connection, dark):
+def _show_editor(plugin, connection, dark, owner):
     from core.vst_window import editor_chrome
 
     initial = previous = plugin.raw_state
-    style = editor_chrome(str(plugin.name), dark)
+    style = editor_chrome(str(plugin.name), dark, owner)
     next_sample = 0
-    if 0 < len(initial) <= _MAX_STATE:
-        connection.send_bytes(b"U" + initial)
-
     class EditorEvents:
         # Pedalboard calls this from the native GUI thread.
         def is_set(self):
@@ -100,28 +99,25 @@ def _show_editor(plugin, connection, dark):
         connection.send_bytes(b"S")
 
 
-def _worker(connection, path, rate, channels, values, state, editor, dark):
-    # Native plugin code runs in this worker. Keep application credentials out
-    # of the environment before any external code is loaded.
-    for key in tuple(os.environ):
-        if key.startswith("SOUNDBOT_") or any(
-            word in key.upper() for word in ("KEY", "TOKEN", "SECRET", "PASSWORD", "PROXY", "COOKIE", "AUTHORIZATION")
-        ):
-            os.environ.pop(key, None)
+def _worker(connection, path, rate, channels, values, state, editor, dark, owner, effect_name):
     dll_directory = None
     try:
-        with open(os.devnull, "wb") as sink:
-            os.dup2(sink.fileno(), 1)
-            os.dup2(sink.fileno(), 2)
-        from pedalboard import load_plugin
+        from pedalboard import VST3Plugin
 
         binary = _plugin_binary(path)
         # Keep dependent Windows DLLs discoverable for the lifetime of the worker.
         dll_directory = os.add_dll_directory(str(binary.parent)) if os.name == "nt" else None
 
         def load():
-            plugin = load_plugin(str(binary), initialization_timeout=8.0)
-            if not plugin.is_effect:
+            # The bundle is the plug-in identity. Its binary path is used only
+            # to locate architecture-specific DLLs beside the plug-in.
+            # Resolve the class on registration, then reopen that same class.
+            names = (effect_name,) if effect_name else VST3Plugin.get_plugin_names_for_file(path)
+            for name in names:
+                plugin = VST3Plugin(path, plugin_name=name, initialization_timeout=8.0)
+                if plugin.is_effect:
+                    break
+            else:
                 raise ValueError("仅支持音频效果插件")
             if state is not None:
                 plugin.raw_state = state
@@ -136,14 +132,14 @@ def _worker(connection, path, rate, channels, values, state, editor, dark):
         plugin = load()
         description = {
             "name": str(plugin.name)[:200],
-            "parameters": [
+            "parameters": [] if rate or editor else [
                 {"key": key, "name": str(param.name)[:120], "value": float(param.raw_value)}
                 for key, param in list(plugin.parameters.items())[:128] if np.isfinite(param.raw_value)
             ],
         }
         connection.send_bytes(b"J" + json.dumps(description, allow_nan=False).encode())
         if editor:
-            _show_editor(plugin, connection, dark)
+            _show_editor(plugin, connection, dark, owner)
             return
         if not rate:
             return
@@ -183,7 +179,8 @@ def _worker(connection, path, rate, channels, values, state, editor, dark):
     except Exception as exc:
         try:
             message = str(exc)
-            expected = {"仅支持音频效果插件", "插件参数已变化，请重新添加插件"}
+            expected = {"仅支持音频效果插件", "插件参数已变化，请重新添加插件",
+                        "无法将 VST3 窗口关联到 SoundBot"}
             connection.send_bytes(b"E" + (message.encode() if message in expected else b""))
         except OSError:
             pass
@@ -193,10 +190,58 @@ def _worker(connection, path, rate, channels, values, state, editor, dark):
             dll_directory.close()
 
 
+def worker_entry(args):
+    if len(args) != 1 or not args[0].isascii() or not args[0].isdecimal():
+        return 2
+    from multiprocessing import connection
+
+    handle = int(args[0])
+    if os.name == "nt":
+        os.set_handle_inheritable(handle, False)
+        endpoint = connection.PipeConnection(handle)
+    else:
+        endpoint = connection.Connection(handle)
+    with endpoint:
+        request = json.loads(endpoint.recv_bytes(_MAX_MESSAGE))
+        state = endpoint.recv_bytes(_MAX_STATE + 1)
+        if state[:1] != b"S":
+            return 2
+        _worker(endpoint, state=state[1:] or None, **request)
+    return 0
+
+
+def _start_worker(endpoint):
+    handle = endpoint.fileno()
+    command = [sys.executable]
+    if not getattr(sys, "frozen", False):
+        command.append(str(Path(__file__).resolve().parents[1] / "main.py"))
+    command.extend(("--vst-worker", str(handle)))
+    # Remove credentials before any worker code runs. Preserve the Windows
+    # runtime paths and PyInstaller's shared-runtime environment.
+    env = {key: value for key, value in os.environ.items()
+           if not key.upper().startswith("SOUNDBOT_")
+           and not any(word in key.upper() for word in
+                       ("KEY", "TOKEN", "SECRET", "PASSWORD", "PROXY", "COOKIE", "AUTHORIZATION"))}
+    options = dict(env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                   stderr=subprocess.DEVNULL)
+    if os.name != "nt":
+        return subprocess.Popen(command, pass_fds=(handle,), **options)
+    startup = subprocess.STARTUPINFO(lpAttributeList={"handle_list": [handle]})
+    # Windows requires handles in the explicit list to be inheritable during
+    # CreateProcess. Serialize worker starts and restore that bit immediately.
+    with _WORKER_START_LOCK:
+        os.set_handle_inheritable(handle, True)
+        try:
+            return subprocess.Popen(command, startupinfo=startup, close_fds=True,
+                                    creationflags=subprocess.CREATE_NO_WINDOW, **options)
+        finally:
+            os.set_handle_inheritable(handle, False)
+
+
 def _receive(connection, deadline, max_message=_MAX_MESSAGE):
-    if not connection.poll(deadline):
-        raise ValueError("VST3 插件响应超时")
     try:
+        if not connection.poll(deadline):
+            raise ValueError("VST3 插件响应超时")
         payload = connection.recv_bytes(max_message)
     except (OSError, EOFError) as exc:
         raise ValueError("VST3 插件进程异常退出") from exc
@@ -210,31 +255,35 @@ def _receive(connection, deadline, max_message=_MAX_MESSAGE):
 
 
 @contextmanager
-def _host(path, rate=0, channels=0, values=None, *, state=None, editor=False, dark=False):
+def _host(path, rate=0, channels=0, values=None, *, state=None, editor=False, dark=False, owner=None,
+          effect_name=None):
     if not available():
         raise ValueError("VST3 宿主组件不可用")
     slots = _EDITOR_SLOTS if editor else _HOST_SLOTS
     if not slots.acquire(blocking=False):
         raise ValueError("请先关闭一个 VST3 编辑窗口" if editor else "VST3 渲染已占满，请减少同时启用的插件")
-    context = multiprocessing.get_context("spawn")
-    parent, child = context.Pipe()
-    worker = context.Process(target=_worker, args=(child, str(path), rate, channels, values or {}, state, editor, dark), daemon=True)
     try:
-        worker.start()
-        child.close()
-        kind, raw = _receive(parent, 16.0)
-        if kind != b"J":
-            raise ValueError("VST3 插件未完成初始化")
-        yield parent, json.loads(raw)
+        parent, child = multiprocessing.Pipe()
+        with parent, child:
+            worker = _start_worker(child)
+            try:
+                child.close()
+                parent.send_bytes(json.dumps(dict(path=str(path), rate=rate, channels=channels,
+                                                  values=values or {}, editor=editor, dark=dark, owner=owner,
+                                                  effect_name=effect_name)).encode())
+                parent.send_bytes(b"S" + (state or b""))
+                kind, raw = _receive(parent, 16.0)
+                if kind != b"J":
+                    raise ValueError("VST3 插件未完成初始化")
+                yield parent, json.loads(raw)
+            finally:
+                parent.close()
+                try:
+                    worker.wait(timeout=0.25)
+                except subprocess.TimeoutExpired:
+                    worker.kill()
+                    worker.wait(timeout=2)
     finally:
-        child.close()
-        parent.close()
-        if worker.pid is not None:
-            worker.join(timeout=0.25)
-            if worker.is_alive():
-                worker.kill()
-                worker.join(timeout=1)
-            worker.close()
         slots.release()
 
 
@@ -318,13 +367,13 @@ def load_discovered(plugin_id):
     return register(source)
 
 
-def _registered_path(plugin_id):
+def _registered_plugin(plugin_id):
     with get_db_manager().get_cursor() as cursor:
         initialize(cursor)
-        item = cursor.execute("SELECT path FROM vst_plugins WHERE id=?", (plugin_id,)).fetchone()
+        item = cursor.execute("SELECT path, name FROM vst_plugins WHERE id=?", (plugin_id,)).fetchone()
     if not item:
         raise ValueError("所用 VST3 插件已移除")
-    return item["path"]
+    return item["path"], item["name"]
 
 
 def _sign_state(plugin_id, state):
@@ -375,8 +424,8 @@ def _editor_state(plugin_id, instance, fallback):
         return current[1] if current and current[0] == plugin_id else fallback
 
 
-def edit(plugin_id, token=None, values=None, *, instance=None, dark=False):
-    path = _registered_path(plugin_id)
+def edit(plugin_id, token=None, values=None, *, instance=None, dark=False, owner=None):
+    path, name = _registered_plugin(plugin_id)
     state = _decode_state(plugin_id, token)
     closed = threading.Event()
     instance = instance or uuid4().hex
@@ -397,7 +446,8 @@ def edit(plugin_id, token=None, values=None, *, instance=None, dark=False):
                 _editor_states.popitem(last=False)
 
     try:
-        with _host(path, values=values, state=state, editor=True, dark=dark) as (connection, _):
+        with _host(path, values=values, state=state, editor=True, dark=dark, owner=owner,
+                   effect_name=name) as (connection, _):
             close_deadline = None
             while True:
                 if closed.is_set() and close_deadline is None:
@@ -405,7 +455,11 @@ def edit(plugin_id, token=None, values=None, *, instance=None, dark=False):
                     close_deadline = time.monotonic() + 8
                 if close_deadline is not None and time.monotonic() >= close_deadline:
                     raise ValueError("VST3 插件响应超时")
-                if not connection.poll(0.1):
+                try:
+                    ready = connection.poll(0.1)
+                except (OSError, EOFError) as exc:
+                    raise ValueError("VST3 插件进程异常退出") from exc
+                if not ready:
                     continue
                 kind, updated = _receive(connection, 0, _MAX_STATE + 1)
                 if kind == b"U" and updated:
@@ -433,7 +487,8 @@ def _process(blocks, rate, channels, plugin_id, values, token, instance=None):
     state = _editor_state(plugin_id, instance, baseline)
     if state is not baseline:
         values = None
-    with _host(_registered_path(plugin_id), rate, channels, values, state=state) as (connection, _):
+    path, name = _registered_plugin(plugin_id)
+    with _host(path, rate, channels, values, state=state, effect_name=name) as (connection, _):
         def render(block):
             nonlocal state
             latest = _editor_state(plugin_id, instance, baseline)

@@ -10,6 +10,11 @@ Release history for SoundBot. / SoundBot 版本记录。
 
 - Updated the SoundBot mark across the application, installers, README, and native drag indicator. / 更新 SoundBot 标识，同步应用、安装包、README 与原生拖拽图标。
 
+### Fixed / 修复
+
+- Start isolated VST3 workers without a Windows console. Keep native editor windows attached to SoundBot and render audio while the editor is open. / Windows 的 VST3 进程在后台启动。原生插件小窗随 SoundBot 主窗口管理，打开时可继续试听。
+- Reserve Space for playback and text entry. / 空格键用于播放和暂停，文本输入区照常输入空格。
+
 ## [1.0.5] - 2026-11-13
 
 ### Changed / 变更

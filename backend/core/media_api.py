@@ -274,7 +274,7 @@ def preview(request: PreviewRequest):
         if frames < 1 or frames * request.channels * 2 > 0xffffffff - 36:
             raise ValueError("预览时长超出 WAV 限制")
         blocks = mix(tracks, request.rate, request.channels, duration, start=request.start,
-                     master_effects=master, on_plugin_error=report if request.request_id else None)
+                     master_effects=master, on_plugin_error=report)
         if any(chains):
             first = next(blocks, None)
             if first is None:
@@ -324,11 +324,17 @@ def load_plugin(plugin_id: str, x_soundbot_ipc: str | None = Header(None)):
         raise HTTPException(422, "无法加载本地 VST3" if isinstance(exc, OSError) else str(exc)) from exc
 
 
+class PluginWindowOwner(BaseModel):
+    handle: str = Field(pattern=r"^[1-9][0-9]{0,18}$")
+    pid: int = Field(gt=0, le=0xffffffff)
+
+
 class PluginEditorRequest(BaseModel):
     state: str | None = Field(default=None, max_length=vst.MAX_STATE_TOKEN)
     values: dict[str, Annotated[float, Field(ge=0, le=1, allow_inf_nan=False)]] = Field(default_factory=dict, max_length=128)
     instance: str | None = Field(default=None, pattern=r"^[a-f0-9]{32}$")
     dark: bool = False
+    owner: PluginWindowOwner | None = None
 
 
 @router.post("/effects/editors/{instance}/close")
@@ -350,7 +356,8 @@ def edit_plugin(plugin_id: str, request: PluginEditorRequest, x_soundbot_ipc: st
     _trusted(x_soundbot_ipc)
     try:
         return vst.edit(plugin_id, request.state, request.values if request.state is None else None,
-                        instance=request.instance, dark=request.dark)
+                        instance=request.instance, dark=request.dark,
+                        owner=request.owner.model_dump() if request.owner else None)
     except (OSError, ValueError) as exc:
         raise HTTPException(422, "无法打开 VST3 编辑窗口" if isinstance(exc, OSError) else str(exc)) from exc
 

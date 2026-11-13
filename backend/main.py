@@ -17,6 +17,14 @@
 
 """FastAPI 后端服务，用于音效管理器的 AI 语义搜索功能。"""
 
+if __name__ == "__main__":
+    import sys
+
+    if sys.argv[1:2] == ["--vst-worker"]:
+        from core.vst import worker_entry
+
+        raise SystemExit(worker_entry(sys.argv[2:]))
+
 import os
 import re
 import time
@@ -1619,11 +1627,7 @@ async def get_ai_status():
 # ==================== 主入口 ====================
 
 if __name__ == "__main__":
-    # PyInstaller 打包后的 Windows 多进程支持
-    import sys
     import socket
-    import multiprocessing
-    multiprocessing.freeze_support()
 
     # 自动寻找可用端口（避免端口冲突）
     _port = config.PORT

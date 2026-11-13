@@ -222,17 +222,22 @@ class CoreDeliveryTests(unittest.TestCase):
         connection.recv_bytes.return_value = b"Snew state"
 
         @contextmanager
-        def host(path, *, values, state, editor, dark):
+        def host(path, *, values, state, editor, dark, owner, effect_name):
             self.assertEqual(path, "fixture.vst3")
             self.assertIsNone(values)
             self.assertEqual(state, b"old state")
             self.assertTrue(editor)
+            self.assertEqual(owner, {"handle": "123456", "pid": 123})
+            self.assertEqual(effect_name, "Fixture")
             yield connection, {}
 
         route = f"/api/v1/effects/plugins/{plugin_id}/edit"
         self.assertEqual(self.client.post(route, json={"state": state}).status_code, 403)
-        with patch.object(vst, "_registered_path", return_value="fixture.vst3"), patch.object(vst, "_host", host):
-            result = self.client.post(route, headers=self.headers, json={"state": state}).raise_for_status().json()
+        with patch.object(vst, "_registered_plugin", return_value=("fixture.vst3", "Fixture")), \
+                patch.object(vst, "_host", host):
+            result = self.client.post(route, headers=self.headers, json={
+                "state": state, "owner": {"handle": "123456", "pid": 123}
+            }).raise_for_status().json()
         self.assertTrue(result["changed"])
         self.assertEqual(vst._decode_state(plugin_id, result["state"]), b"new state")
 
