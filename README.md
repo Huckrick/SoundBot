@@ -18,7 +18,7 @@ SoundBot 把音效查找、剪辑和交付放在同一个桌面应用里。素�
 
 ### 下载和安装
 
-当前源码版本为 **v1.0.2（稳定版）**。安装包的发布状态以 GitHub Releases 为准。旧版保留在发行记录中，供查阅和回退。 [发行页](https://github.com/Huckrick/SoundBot/releases) · [更新日志](CHANGELOG.md)
+当前源码版本为 **v1.0.3（稳定版）**。安装包的发布状态以 GitHub Releases 为准。旧版保留在发行记录中，供查阅和回退。 [发行页](https://github.com/Huckrick/SoundBot/releases) · [更新日志](CHANGELOG.md)
 
 | 平台 | 发行文件 | 安装方式 |
 | --- | --- | --- |
@@ -33,7 +33,11 @@ SoundBot 把音效查找、剪辑和交付放在同一个桌面应用里。素�
 2. 选择素材，试听并在底部波形框选。第一次拖到 DAW 时，选择工程媒体目录。成品就绪后从选区上沿拖出，交付的 WAV 留在该目录。
 3. 在中间件工作台编辑多轨。Wwise 通过本机 WAAPI 连接，可写回符合条件的 PCM WAV 并留存备份。FMOD Studio 和 CRI Atom Craft 接收渲染到工程素材目录的新 WAV，随后在宿主中导入或注册。 [宿主操作指南](docs/middleware.md)
 
-整条素材可从列表拖到「中间件工作台」标签或时间线，列表行上的拖拽手柄用于交付到 DAW。时间线上拖动标尺可定位播放头，拖动音频块两侧下半部可裁剪。同轨相邻剪辑部分重叠时，默认生成交叉淡化。
+在底部波形上滚动鼠标滚轮，以光标位置为中心缩放。按住 Shift 滚动可横移。从列表的缩略波形拖动整条素材到「中间件工作台」标签或时间线。拖到 DAW 时按住 Alt（Mac 上是 Option）。初次交付时选择工程媒体目录，文件准备好后再拖一次。
+
+Wwise 工程浏览器按层级显示可用的对象类型与颜色。拖动标尺可定位播放头，拖动剪辑两侧下半部可裁剪。选择剪辑后，可在时间线下方编辑增益、淡入淡出和立体声声像曲线。同轨相邻剪辑部分重叠时会自动交叉淡化，曲线可在工具栏切换。
+
+打开 VST 面板时，SoundBot 自动查找标准安装目录中的 VST3。安装新插件后，可在 **设置 → VST3** 重新扫描。
 
 ### 文件权限和隐私
 
@@ -41,7 +45,7 @@ SoundBot 把音效查找、剪辑和交付放在同一个桌面应用里。素�
 | --- | --- |
 | 导入或试听 | 读取你选的文件及目录，索引和缓存放在本机应用数据目录。关键词检索、试听和剪辑可离线使用。 |
 | 交付音频 | 写入选定的 DAW 媒体目录或中间件素材目录。Wwise 写回前会核对目标源文件并备份。 |
-| 加载 VST3 | 确认后，选定的插件以当前用户身份运行本机代码。请选择可信来源。 |
+| 扫描和加载 VST3 | 扫描只读取标准安装目录和已登记的插件位置。选定插件并确认加载后，插件以当前用户身份运行本机代码。请选择可信来源。 |
 | 使用可选助手 | 保存或使用服务 API 密钥时，系统可能要求访问钥匙串或凭据存储。SoundBot 的输入框只接收服务 API 密钥。调用远端服务时，助手将你的消息和对话上下文发往所配置的服务。 |
 
 在 macOS 访问受保护的文件夹时，系统可能按目录弹出授权提示。若不能读取素材，可以在文件选择器改选可访问的目录。SoundBot 的日常使用无需全磁盘访问或管理员密码。升级前可备份应用数据目录。 [数据位置与验收说明](docs/release-review.md)
@@ -68,7 +72,7 @@ SoundBot supports **Simplified Chinese, Traditional Chinese, Japanese, English, 
 
 ### Download and install
 
-The current source version is **v1.0.2 (stable)**. GitHub Releases shows which installers have been published. Older releases remain in the archive for reference and rollback. [Releases](https://github.com/Huckrick/SoundBot/releases) · [Changelog](CHANGELOG.md)
+The current source version is **v1.0.3 (stable)**. GitHub Releases shows which installers have been published. Older releases remain in the archive for reference and rollback. [Releases](https://github.com/Huckrick/SoundBot/releases) · [Changelog](CHANGELOG.md)
 
 | Platform | Release file | Installation |
 | --- | --- | --- |
@@ -83,7 +87,11 @@ Download the installer and `SHA256SUMS.txt` from the same release. Run `shasum -
 2. Select a sound and mark a range in the bottom waveform. For the first DAW delivery, choose the project's media folder. Once the file is ready, drag from the top of the selection. The rendered WAV stays in the selected folder.
 3. Edit tracks in the middleware workspace. Wwise connects over local WAAPI and can write back eligible PCM WAV sources with a recovery backup. FMOD Studio and CRI Atom Craft receive a new WAV in their asset folder. Import or register it in the host. [Middleware guide](docs/middleware.md)
 
-Drag a full sound from the list onto the middleware workspace tab or timeline. Use the drag handle in the row to deliver it to a DAW. Drag along the timeline ruler to seek, and drag the lower part of either clip edge to trim. Partial overlaps between adjacent clips on the same track crossfade by default.
+Scroll over the waveform editor to zoom around the pointer. Hold Shift while scrolling to pan. Drag a thumbnail waveform to send the whole sound to the middleware tab or timeline. Hold Alt (Option on Mac) to drag it to a DAW. On the first delivery, choose the project's media folder and drag again once the WAV is ready.
+
+The Wwise project browser shows the hierarchy with available object types and colors. Drag the timeline ruler to seek and the lower part of either clip edge to trim. Select a clip to edit its gain, fades, and stereo pan curve below the timeline. Partial overlaps between adjacent clips on the same track crossfade automatically. Choose the crossfade curve in the timeline toolbar.
+
+SoundBot searches the standard VST3 folders when you open the VST panel. After installing a plug-in, you can rescan in **Settings → VST3**.
 
 ### Permissions and privacy
 
@@ -91,7 +99,7 @@ Drag a full sound from the list onto the middleware workspace tab or timeline. U
 | --- | --- |
 | Import or audition | Reads the files and folders you select and stores the index and cache locally. Keyword search, audition, and editing work offline. |
 | Deliver audio | Writes to the selected DAW or middleware asset directory. Wwise writeback checks the target source and keeps a backup. |
-| Load a VST3 plug-in | The selected plug-in runs native code under your account after you confirm. Use plug-ins from sources you trust. |
+| Discover and load VST3 | Discovery reads the standard installation folders and previously registered plug-in locations. A selected plug-in runs native code under your account after you confirm. Use plug-ins from sources you trust. |
 | Use the optional assistant | Your OS may ask for access to its credential store when you save or use a service API key. Enter only the service API key into SoundBot. When you use a remote assistant, SoundBot sends the message and conversation context to the configured service. |
 
 macOS may ask for access to a protected folder you select. If access is denied, select a folder that you can read. Routine SoundBot use requires neither full disk access nor an administrator password. Back up the app data directory before upgrading. [Data locations and release review](docs/release-review.md)

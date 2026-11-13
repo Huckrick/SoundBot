@@ -97,6 +97,26 @@ class _WAAPI:
                 pass  # Older authoring versions may not expose the property.
         return await self.objects("$ from type Sound", fields)
 
+    async def explorer_objects(self, sources):
+        roots = {source["path"].split("\\")[1] for source in sources if source["path"].startswith("\\")}
+        if not roots:
+            roots = {"Actor-Mixer Hierarchy", "Containers"}
+        fields = ["id", "type", "path"]
+        result = []
+        for root in sorted(roots):
+            # The hierarchy name changed in Wwise 2025.1. The authoring tool
+            # returns an empty result (or a query error) for an absent root.
+            if '"' in root:
+                continue
+            query = f'$ from object "\\{root}" select this, descendants'
+            for colors in (["@@Color", "@Color"], ["@@Color"], ["@Color"], []):
+                try:
+                    result.extend(await self.objects(query, fields + colors))
+                    break
+                except ValueError:
+                    continue
+        return result
+
 
 @asynccontextmanager
 async def _connection(url):
@@ -126,19 +146,37 @@ async def connect(url):
             project = await client.project()
             rows = await client.sources()
             sounds = {item["id"]: item for item in await client.sounds(colors=True) if item.get("@IsVoice") is False}
+            sources = []
+            nodes = {}
+            for item in rows:
+                sound = sounds.get(_parent(item))
+                if not sound or not item.get("originalWavFilePath"):
+                    continue
+                color = _color(sound)
+                sources.append({"id": item["id"], "name": item["name"], "path": item["path"],
+                                "type": "AudioFileSource", "color": color})
+                if sound.get("path"):
+                    nodes[sound["path"]] = {"id": sound["id"], "type": "Sound", "color": color}
+            visible_types = {"PhysicalFolder", "WorkUnit", "Folder", "ActorMixer", "RandomSequenceContainer",
+                             "SwitchContainer", "BlendContainer", "Container"}
+            for item in await client.explorer_objects(sources):
+                path, kind = item.get("path"), item.get("type")
+                if not path or (kind not in visible_types and path not in nodes and path.count("\\") != 1):
+                    continue
+                previous = nodes.get(path, {})
+                nodes[path] = {"id": item.get("id"), "type": kind, "color": _color(item) or previous.get("color")}
         _url = target_url
         _connected_project = project["path"], project["id"]
         _selected = None
-        sources = []
-        for item in rows:
-            sound = sounds.get(_parent(item))
-            if not sound or not item.get("originalWavFilePath"):
-                continue
-            index = sound.get("@@Color")
-            color = _COLORS[index] if type(index) is int and 0 <= index < len(_COLORS) else None
-            sources.append({"id": item["id"], "name": item["name"], "path": item["path"],
-                            "color": color, "color_path": sound.get("path")})
-        return {"project": project, "sources": sources}
+        return {"project": project, "sources": sources, "objects": nodes}
+
+
+def _color(item):
+    for key in ("@@Color", "@Color"):
+        index = item.get(key)
+        if type(index) is int and 0 < index < len(_COLORS):
+            return _COLORS[index]
+    return None
 
 
 async def disconnect():

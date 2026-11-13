@@ -1561,29 +1561,23 @@ function setupIpcHandlers() {
       disconnect: () => ['/middleware/disconnect', {}],
       select: () => [`/middleware/sources/${encodeURIComponent(data.id)}/select`, {}],
       writeback: () => ['/middleware/deliver', data],
-      restore: () => [`/wwise/backups/${encodeURIComponent(data.id)}/restore`, {}],
-      'remove-plugin': () => [`/effects/plugins/${encodeURIComponent(data.id)}/remove`, {}]
+      restore: () => [`/wwise/backups/${encodeURIComponent(data.id)}/restore`, {}]
     };
     try {
       if (event.sender !== mainWindow?.webContents) throw new Error('窗口不可用');
-      if (action === 'add-plugin') {
-        const options = { title: t('选择本地 VST3 插件'), properties: [data.directory ? 'openDirectory' : 'openFile'] };
-        if (!data.directory) options.filters = [{ name: 'VST3', extensions: ['vst3'] }];
-        const choice = await showOwnedOpenDialog(event, options);
-        if (choice.canceled || !choice.filePaths[0]) return null;
+      if (action === 'load-plugin') {
+        if (typeof data.id !== 'string' || !/^[a-f0-9]{64}$/.test(data.id)) throw new Error('未知媒体操作');
+        const name = String(data.name || 'VST3').replace(/[\p{C}]/gu, '').slice(0, 200);
         const approval = await dialog.showMessageBox(mainWindow, {
           type: 'warning',
-          message: t('加载 VST3 插件「{name}」？', { name: path.basename(choice.filePaths[0]) }),
+          message: t('加载 VST3 插件「{name}」？', { name }),
           detail: t('插件将在本机执行代码。请只加载你信任的来源提供的插件。'),
           buttons: [t('取消'), t('加载插件')],
           defaultId: 0,
           cancelId: 0
         });
         if (approval.response !== 1) return null;
-        return await requestBackendJson(apiBaseUrl + '/effects/plugins', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: choice.filePaths[0] })
-        });
+        return await requestBackendJson(apiBaseUrl + `/effects/plugins/${data.id}/load`, { method: 'POST' });
       }
       if (action === 'connect') {
         const host = data.host;

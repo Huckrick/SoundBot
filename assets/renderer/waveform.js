@@ -3,6 +3,7 @@
 
     const namespace = global.SoundBotRenderer = global.SoundBotRenderer || {};
     const layerCache = new WeakMap();
+    const miniCache = new WeakMap();
 
     function isValidData(value) {
         return Array.isArray(value) && value.length > 0 && value.every(Number.isFinite);
@@ -339,9 +340,17 @@
     function drawMini(canvas, options = {}) {
         const size = surface(canvas, 112, 32);
         const { ctx, width, height } = size;
-        ctx.clearRect(0, 0, width, height);
         const waveformData = options.waveformData;
-        if (!isValidData(waveformData)) {
+        const paint = options.isCurrent ? (options.activeColor || '#e5e5e5') : (options.inactiveColor || '#a3a3a3');
+        const previous = miniCache.get(canvas);
+        if (!size.resized && previous && previous.waveformData === waveformData && previous.paint === paint &&
+            previous.current === Boolean(options.isCurrent) && previous.loading === options.loading &&
+            previous.error === options.error) return previous.valid;
+        const valid = isValidData(waveformData);
+        miniCache.set(canvas, { waveformData, paint, current: Boolean(options.isCurrent),
+            loading: options.loading, error: options.error, valid });
+        ctx.clearRect(0, 0, width, height);
+        if (!valid) {
             if (options.loading || options.error) {
                 ctx.globalAlpha = 0.5;
                 ctx.fillStyle = options.error ? '#ef4444' : (options.inactiveColor || '#a3a3a3');
@@ -355,7 +364,7 @@
         }
         drawWaveShape(
             ctx, width, height, waveformData,
-            options.isCurrent ? (options.activeColor || '#e5e5e5') : (options.inactiveColor || '#a3a3a3'),
+            paint,
             options.isCurrent ? 1 : 0.85,
             1,
             0

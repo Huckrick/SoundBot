@@ -4,6 +4,15 @@ Release history for SoundBot. / SoundBot 版本记录。
 
 ## [Unreleased] / 未发布
 
+## [1.0.3] - 2026-11-13
+
+### Changed / 变更
+
+- Zoom the library waveform with the mouse wheel and drag a thumbnail to deliver the whole sound. Keep rendered thumbnails in a bounded cache as the list scrolls. / 波形支持滚轮缩放，从列表缩略波形拖出整条素材。列表滚动时复用有限数量的已渲染缩略图。
+- Show Wwise object colors and type icons along the source hierarchy. Keep the browser's branch state and add indentation guides. / 在 Wwise 音频源层级中显示对象颜色和类型图标，保留展开状态并加入层级辅助线。
+- Add five fade and crossfade shapes, editable stereo clip pan automation, and a dedicated clip editing bar below the timeline. / 新增五种淡化和交叉淡化曲线、可编辑的立体声剪辑声像曲线，以及时间线下方的剪辑编辑栏。
+- Discover installed VST3 plug-ins in the standard folders. SoundBot asks for confirmation when loading a selected plug-in. / 自动发现标准安装目录中的 VST3 插件，选定后确认加载。
+
 - Embedded the original MiSans, MiSans TC, and MiSans Latin variable fonts for all six interface languages. Expanded Settings → About with authorship, font licensing, component references, and community thanks. The installer includes the full credits and Xiaomi’s font agreement. / 六种界面语言均使用内嵌的原版 MiSans、MiSans TC 或 MiSans Latin 可变字体。设置 → 关于补全作者、字体许可、组件引用和社区致谢，安装包随附完整致谢及小米字体协议原文。
 
 ## [1.0.2] - 2026-11-12
@@ -178,7 +187,8 @@ Release history for SoundBot. / SoundBot 版本记录。
 - The Windows release gate starts the frozen backend with a clean `PATH` and no system FFmpeg, then requires the complete format matrix, exact waveforms, CLAP, Chroma, hybrid search, `win-unpacked`, and NSIS installer integrity checks to pass before publishing. / Windows 发布门禁会在干净 `PATH`、无系统 FFmpeg 下启动冻结后端，并要求全格式矩阵、精确波形、CLAP、Chroma、混合搜索、`win-unpacked` 与 NSIS 安装包完整性检查全部通过后才允许发布。
 - CI builds Windows x64 and macOS arm64 only on native runners and blocks release creation if any functional smoke test, model check, metadata check, package check, or installer check fails. / CI 仅在原生 runner 构建 Windows x64 与 macOS arm64，并在任一功能冒烟、模型、元数据、应用包或安装包检查失败时阻止创建 Release。
 
-[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/Huckrick/SoundBot/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/Huckrick/SoundBot/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/Huckrick/SoundBot/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Huckrick/SoundBot/compare/v0.2.1-beta.3...v1.0.0

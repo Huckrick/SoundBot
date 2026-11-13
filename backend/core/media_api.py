@@ -10,7 +10,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from config import AUDIO_FORMAT_CAPABILITIES
 from core import delivery, middleware, vst, wwise
@@ -39,6 +39,11 @@ class EffectRequest(BaseModel):
     bands: list[EQBandRequest] = Field(default_factory=list, max_length=8)
 
 
+Curve = Literal["linear", "equal_power", "ease_in", "ease_out", "smooth"]
+PanPosition = Annotated[float, Field(ge=0, le=1, allow_inf_nan=False)]
+PanValue = Annotated[float, Field(ge=-1, le=1, allow_inf_nan=False)]
+
+
 class ClipRequest(BaseModel):
     file_id: str | None = None
     wwise_token: str | None = Field(default=None, max_length=64)
@@ -49,7 +54,18 @@ class ClipRequest(BaseModel):
     gain: Gain = 0
     fade_in: Time = 0
     fade_out: Time = 0
+    fade_in_curve: Curve = "linear"
+    fade_out_curve: Curve = "linear"
+    pan: list[tuple[PanPosition, PanValue]] = Field(default_factory=list, max_length=32)
     effects: list[EffectRequest] = Field(default_factory=list, max_length=12)
+
+
+    @field_validator("pan")
+    @classmethod
+    def validate_pan_order(cls, points):
+        if any(left[0] >= right[0] for left, right in zip(points, points[1:])):
+            raise ValueError("声像点的位置必须按顺序排列且不能重复")
+        return points
 
 
 class TrackRequest(BaseModel):
@@ -60,6 +76,7 @@ class TrackRequest(BaseModel):
     channels: Literal[1, 2] | None = None
     effects: list[EffectRequest] = Field(default_factory=list, max_length=12)
     auto_crossfade: bool = False
+    crossfade_curve: Curve = "linear"
 
 
 class MixRequest(BaseModel):
@@ -93,10 +110,6 @@ class MiddlewareConnection(BaseModel):
     url: str = Field(default="ws://127.0.0.1:8080/waapi", max_length=256)
     project_path: str = Field(default="", max_length=32768)
     source_directory: str = Field(default="", max_length=32768)
-
-
-class PluginRequest(BaseModel):
-    path: str = Field(max_length=32768)
 
 
 class CleanupRequest(BaseModel):
@@ -136,7 +149,8 @@ def _clip(project_id, request, *, allow_host=True):
     if available <= 0 or request.duration > available + 0.005:
         raise ValueError("裁剪区间超出音频范围")
     clip = Clip(source, request.start, min(request.duration, available), request.offset,
-                request.gain, request.fade_in, request.fade_out, _effects(request.effects))
+                request.gain, request.fade_in, request.fade_out, _effects(request.effects),
+                request.fade_in_curve, request.fade_out_curve, tuple(request.pan))
     return clip, rate, channels
 
 
@@ -154,7 +168,7 @@ def _mix_request(request):
     for track in request.tracks:
         clips = tuple(_clip(request.project_id, clip)[0] for clip in track.clips)
         tracks.append(Track(clips, track.gain, track.mute, track.solo, track.channels,
-                            _effects(track.effects), track.auto_crossfade))
+                            _effects(track.effects), track.auto_crossfade, track.crossfade_curve))
     if sum(len(track.clips) for track in tracks) > 128:
         raise ValueError("单次预览或写回最多支持 128 个剪辑")
     duration = max((clip.start + clip.duration for track in tracks for clip in track.clips), default=0)
@@ -240,26 +254,17 @@ def preview(request: MixRequest):
 
 
 @router.get("/effects/plugins")
-def list_plugins():
-    return {"available": vst.available(), "plugins": vst.list_plugins()}
+def discover_plugins():
+    return vst.discover()
 
 
-@router.post("/effects/plugins")
-def add_plugin(request: PluginRequest, x_soundbot_ipc: str | None = Header(None)):
+@router.post("/effects/plugins/{plugin_id}/load")
+def load_plugin(plugin_id: str, x_soundbot_ipc: str | None = Header(None)):
     _trusted(x_soundbot_ipc)
-    if not Path(request.path).is_absolute():
-        raise HTTPException(422, "请选择本地 VST3 文件")
     try:
-        return vst.register(request.path)
+        return vst.load_discovered(plugin_id)
     except (OSError, ValueError) as exc:
         raise HTTPException(422, "无法加载本地 VST3" if isinstance(exc, OSError) else str(exc)) from exc
-
-
-@router.post("/effects/plugins/{plugin_id}/remove")
-def remove_plugin(plugin_id: str, x_soundbot_ipc: str | None = Header(None)):
-    _trusted(x_soundbot_ipc)
-    vst.unregister(plugin_id)
-    return {"removed": True}
 
 
 @router.post("/delivery")

@@ -21,8 +21,9 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 
 import main
-from core import catalog, delivery, editing, wwise
+from core import catalog, delivery, editing, vst, wwise
 from core.database import DatabaseManager, get_db_manager, reset_db_manager
+from core.media_api import ClipRequest
 
 
 def audio_file(path: Path, frequency: int = 220) -> Path:
@@ -143,6 +144,59 @@ class CoreDeliveryTests(unittest.TestCase):
         self.assertAlmostEqual(float(whole[6000]), 0.4, places=3)
         self.assertAlmostEqual(float(unblended[6000]), 0.8, places=5)
         np.testing.assert_allclose(sought, whole[6000:])
+
+    def test_timeline_curves_and_pan_match_when_seeking(self):
+        import numpy as np
+
+        def read_region(path, offset, frames, rate, channels):
+            yield np.full((frames, channels), 0.2 if path.name == "a.wav" else 0.4, dtype=np.float32)
+
+        rate = 8000
+        fade = editing.Clip(Path("a.wav"), 0, 2, fade_in=1, fade_out=1,
+                            fade_in_curve="ease_in", fade_out_curve="ease_out",
+                            pan=((0, -1), (0.5, 0), (1, 1)))
+        with patch.object(editing, "read_region", read_region):
+            track = editing.Track((fade,), channels=1)
+            whole = np.concatenate(list(editing.mix([track], rate, 2, 2)))
+            sought = np.concatenate(list(editing.mix([track], rate, 2, 2, start=1.05)))
+            mono = np.concatenate(list(editing.mix([track], rate, 1, 2)))
+            clips = (editing.Clip(Path("a.wav"), 0, 1), editing.Clip(Path("b.wav"), 0.5, 1))
+            overlap = {}
+            for shape in ("linear", "equal_power", "ease_in", "ease_out", "smooth"):
+                pair = editing.Track(clips, auto_crossfade=True, crossfade_curve=shape)
+                overlap[shape] = np.concatenate(list(editing.mix([pair], rate, 1, 1.5)))[:, 0]
+        np.testing.assert_allclose(sought, whole[8400:])
+        self.assertAlmostEqual(float(mono[4000, 0]), 0.05, places=5)
+        self.assertAlmostEqual(float(mono[12000, 0]), 0.15, places=4)
+        self.assertGreater(whole[4000, 0], whole[4000, 1])
+        self.assertGreater(whole[12000, 1], whole[12000, 0])
+        self.assertGreater(overlap["equal_power"][6000], overlap["linear"][6000])
+        self.assertLess(overlap["ease_in"][6000], overlap["ease_out"][6000])
+        self.assertLess(overlap["smooth"][5000], overlap["linear"][5000])
+        with self.assertRaises(ValueError):
+            ClipRequest(duration=1, pan=[(0.5, 0), (0.5, 1)])
+
+    def test_installed_vst_discovery_never_loads_code(self):
+        base = self.root / "standard"
+        bundle = base / "Vendor" / "Room.vst3"
+        binary = bundle / "Contents" / "x86_64-win" / "Room.vst3"
+        binary.parent.mkdir(parents=True)
+        binary.touch()
+        (bundle / "Contents" / "MacOS").mkdir()
+        candidate = "Not a plug-in.txt"
+        (base / candidate).touch()
+        with patch.object(vst, "_plugin_roots", return_value=(base, base)), \
+                patch.object(vst, "available", return_value=True), patch.object(vst, "register") as register:
+            catalog = self.client.get("/api/v1/effects/plugins").raise_for_status().json()
+            (plugin,) = catalog["plugins"]
+            self.assertEqual(plugin["name"], "Room")
+            url = f"/api/v1/effects/plugins/{plugin['id']}/load"
+            self.assertEqual(self.client.post(url).status_code, 403)
+            register.assert_not_called()
+            register.return_value = {"id": "registered", "name": "Room", "parameters": []}
+            self.assertEqual(self.client.post(url, headers=self.headers).raise_for_status().json()["id"], "registered")
+            register.assert_called_once_with(bundle.resolve())
+            self.assertEqual(self.client.post("/api/v1/effects/plugins/invalid/load", headers=self.headers).status_code, 422)
 
     def test_import_metadata_fts_rescan_and_exclusion(self):
         folder = self.root / "input"
@@ -410,7 +464,7 @@ class CoreDeliveryTests(unittest.TestCase):
         originals.mkdir()
         original = audio_file(originals / "impact.wav")
         original_digest = delivery.sha256(original)
-        source = {"id": "source", "name": "impact", "path": "\\Actor-Mixer\\Sound\\impact",
+        source = {"id": "source", "name": "impact", "path": "\\Actor-Mixer\\Unit\\Folder\\Sound\\impact",
                   "parent": {"id": "sound"}, "originalWavFilePath": str(original)}
 
         class Authoring:
@@ -421,8 +475,14 @@ class CoreDeliveryTests(unittest.TestCase):
                 return [source]
 
             async def sounds(self, *, colors=False):
-                row = {"id": "sound", "path": "\\Actor-Mixer\\Sound", "@IsVoice": False}
+                row = {"id": "sound", "path": "\\Actor-Mixer\\Unit\\Folder\\Sound", "@IsVoice": False}
                 return [{**row, "@@Color": 3} if colors else row]
+
+            async def explorer_objects(self, sources):
+                return [
+                    {"id": "unit", "path": "\\Actor-Mixer\\Unit", "type": "WorkUnit", "@Color": 2},
+                    {"id": "folder", "path": "\\Actor-Mixer\\Unit\\Folder", "type": "Folder", "@@Color": 4},
+                ]
 
         from contextlib import asynccontextmanager
 
@@ -433,6 +493,9 @@ class CoreDeliveryTests(unittest.TestCase):
         with patch.object(wwise, "_connection", local_authoring):
             connected = self.client.post("/api/v1/middleware/connect", headers=self.headers, json={"host": "wwise"}).raise_for_status().json()
             self.assertEqual(connected["sources"][0]["color"], "#086868")
+            self.assertEqual(connected["objects"]["\\Actor-Mixer\\Unit"],
+                             {"id": "unit", "type": "WorkUnit", "color": "#1a55cb"})
+            self.assertEqual(connected["objects"]["\\Actor-Mixer\\Unit\\Folder"]["type"], "Folder")
             selected = self.client.post("/api/v1/middleware/sources/source/select", headers=self.headers, json={})
             selected.raise_for_status()
             token = selected.json()["token"]

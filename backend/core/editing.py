@@ -26,6 +26,9 @@ class Clip:
     fade_in: float = 0
     fade_out: float = 0
     effects: tuple[Effect, ...] = ()
+    fade_in_curve: str = "linear"
+    fade_out_curve: str = "linear"
+    pan: tuple[tuple[float, float], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -37,6 +40,7 @@ class Track:
     channels: int | None = None
     effects: tuple[Effect, ...] = ()
     auto_crossfade: bool = False
+    crossfade_curve: str = "linear"
 
 
 def read_region(path, offset, frames, rate, channels):
@@ -124,6 +128,18 @@ def _skip_frames(blocks, frames):
         blocks.close()
 
 
+def _fade(progress, curve):
+    if curve == "equal_power":
+        return np.sin(progress * (math.pi / 2))
+    if curve == "ease_in":
+        return progress ** 2
+    if curve == "ease_out":
+        return progress * (2 - progress)
+    if curve == "smooth":
+        return progress ** 2 * (3 - 2 * progress)
+    return progress
+
+
 def _clip_blocks(clip, channels, rate, start, stop):
     def read(first):
         position = first
@@ -136,9 +152,10 @@ def _clip_blocks(clip, channels, rate, start, stop):
             frames = np.arange(position, position + len(block))
             envelope = np.full(len(block), gain, dtype=np.float32)
             if clip.fade_in:
-                envelope *= np.clip(frames / max(1, round(clip.fade_in * rate)), 0, 1)
+                envelope *= _fade(np.clip(frames / max(1, round(clip.fade_in * rate)), 0, 1), clip.fade_in_curve)
             if clip.fade_out:
-                envelope *= np.clip((length - 1 - frames) / max(1, round(clip.fade_out * rate)), 0, 1)
+                progress = np.clip((length - 1 - frames) / max(1, round(clip.fade_out * rate)), 0, 1)
+                envelope *= _fade(progress, clip.fade_out_curve)
             position += len(block)
             yield block * envelope[:, None]
 
@@ -158,7 +175,8 @@ def _crossfades(regions):
     return transitions
 
 
-def _track_blocks(track, rate, channels, origin, stop):
+def _track_blocks(track, rate, channels, origin, stop, pan_enabled):
+    source_channels = track.channels or channels
     active = []
     regions = [(round(clip.start * rate), round(clip.start * rate) + round(clip.duration * rate))
                for clip in track.clips]
@@ -167,34 +185,44 @@ def _track_blocks(track, rate, channels, origin, stop):
         for clip, (left, right), fades in zip(track.clips, regions, crossfades):
             if right <= origin or left >= stop:
                 continue
-            blocks = _clip_blocks(clip, channels, rate, max(0, origin-left), min(stop, right)-left)
-            active.append((left, right, _RegionReader(blocks, channels), fades))
+            blocks = _clip_blocks(clip, source_channels, rate, max(0, origin-left), min(stop, right)-left)
+            active.append((left, right, _RegionReader(blocks, source_channels), fades, clip.pan))
         gain = 10 ** (track.gain / 20)
         for position in range(origin, stop, BLOCK):
             end = min(position + BLOCK, stop)
             block = np.zeros((end-position, channels), dtype=np.float32)
-            for left, right, reader, fades in active:
+            for left, right, reader, fades, pan in active:
                 begin, finish = max(position, left), min(end, right)
                 if begin >= finish:
                     continue
-                samples = reader.take(finish-begin)
+                samples = _map_channels(reader.take(finish-begin), channels)
                 for fade_start, fade_end, fade_in in fades:
                     if finish <= fade_start or begin >= fade_end:
                         continue
                     first = max(begin, fade_start)
                     last = min(finish, fade_end)
                     blend = (np.arange(first, last) - fade_start) / max(1, fade_end - fade_start - 1)
-                    samples[first-begin:last-begin] *= (blend if fade_in else 1 - blend)[:, None]
+                    curve = track.crossfade_curve
+                    shaped = _fade(blend, curve)
+                    envelope = shaped if fade_in else (
+                        _fade(1 - blend, curve) if curve == "equal_power" else 1 - shaped
+                    )
+                    samples[first-begin:last-begin] *= envelope[:, None]
+                if pan_enabled and pan:
+                    positions, values = zip(*pan)
+                    progress = (np.arange(begin, finish) - left) / max(1, right - left - 1)
+                    balance = np.interp(progress, positions, values)
+                    samples = samples * np.sqrt(1 - np.maximum(np.column_stack((balance, -balance)), 0))
                 block[begin-position:finish-position] += samples
             yield block * gain
     finally:
-        for _, _, reader, _ in active:
+        for _, _, reader, _, _ in active:
             reader.blocks.close()
 
 
-def _render_track(track, rate, channels, origin, stop):
+def _render_track(track, rate, channels, origin, stop, pan_enabled):
     def read(first):
-        return _track_blocks(track, rate, channels, first, stop)
+        return _track_blocks(track, rate, channels, first, stop, pan_enabled)
 
     if not track.effects:
         return read(origin)
@@ -210,8 +238,10 @@ def mix(tracks, rate, channels, duration, *, start=0):
         for track in tracks:
             if track.mute or (solo and not track.solo):
                 continue
-            count = track.channels or channels
-            readers.append(_RegionReader(_render_track(track, rate, count, origin, stop), count))
+            pan_enabled = channels == 2 and any(clip.pan for clip in track.clips)
+            count = 2 if pan_enabled else track.channels or channels
+            blocks = _render_track(track, rate, count, origin, stop, pan_enabled)
+            readers.append(_RegionReader(blocks, count))
         for position in range(origin, stop, BLOCK):
             frames = min(BLOCK, stop - position)
             block = np.zeros((frames, channels), dtype=np.float32)

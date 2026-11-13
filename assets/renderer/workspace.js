@@ -21,6 +21,8 @@
     let peakRequest = null;
     let previewRevision = 0;
     let renderFrame = null;
+    let rowWindow;
+    let rowNodes = new Map();
     let effectsPreviewTimer;
     let libraryRevision = 0;
     let directoryRevision = 0;
@@ -607,17 +609,34 @@
         $('zoomIn').onclick = () => { state.zoom = Math.min(state.zoom * 1.5, 16); updateZoom(); };
         $('zoomOut').onclick = () => { state.zoom = Math.max(state.zoom / 1.5, 1); updateZoom(); };
         $('zoomReset').onclick = () => { state.zoom = 1; updateZoom(); };
-        canvas.addEventListener('wheel', event => {
-            if (state.zoom <= 1) return;
+        let wheelFrame = null;
+        canvas.closest('.wave-plot').parentElement.addEventListener('wheel', event => {
+            const rect = canvas.getBoundingClientRect();
+            if (!state.selected?.duration || !rect.width || (!event.deltaY && !event.deltaX)) return;
             event.preventDefault();
-            state.pan = Math.max(0, Math.min(state.zoom - 1, state.pan + (event.deltaX || event.deltaY) / canvas.clientWidth));
-            positionRangeHandles();
-            syncTransport();
+            const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? rect.width : 1;
+            if (event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+                state.pan += (event.deltaX || event.deltaY) * scale / rect.width;
+            } else {
+                const pointer = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+                const anchor = (state.pan + pointer) / state.zoom;
+                const delta = Math.max(-320, Math.min(320, event.deltaY * scale));
+                state.zoom = Math.max(1, Math.min(16, state.zoom * Math.exp(-delta * 0.003)));
+                state.pan = anchor * state.zoom - pointer;
+            }
+            state.pan = Math.max(0, Math.min(state.zoom - 1, state.pan));
+            if (wheelFrame === null) wheelFrame = requestAnimationFrame(() => {
+                wheelFrame = null;
+                refreshZoom();
+            });
         }, { passive: false });
         function updateZoom() {
             const duration = state.selected?.duration || 1;
             const center = state.range ? (state.range[0] + state.range[1]) / 2 : state.position;
             state.pan = Math.max(0, Math.min(state.zoom - 1, center / duration * state.zoom - 0.5));
+            refreshZoom();
+        }
+        function refreshZoom() {
             $('zoomLevel').textContent = `${Math.round(state.zoom * 100)}%`;
             positionRangeHandles();
             syncTransport();
@@ -732,41 +751,42 @@
         $('btnBulk').textContent = count ? t('批量操作 ({count})', { count }) : t('批量操作');
     }
 
-    function renderRows() {
+    function renderRows(scrolling = false) {
         if (libraryDrag) { refreshRowsAfterDrag = true; return; }
         refreshRowsAfterDrag = false;
         $('rowCount').textContent = t('结果：{count}', { count: state.total });
-        renderBulkActions();
+        if (!scrolling) renderBulkActions();
         const box = $('rows');
         const first = Math.max(0, Math.floor(box.scrollTop / ROW) - 5);
         const count = Math.max(16, Math.ceil(box.clientHeight / ROW) + 10);
         const last = Math.min(first + count, state.displayRows.length);
+        if (scrolling && rowWindow?.first === first && rowWindow?.last === last) {
+            scheduleMiniPeaks();
+            return;
+        }
+        rowWindow = { first, last };
+        const nextRows = scrolling ? rowNodes : new Map();
         const parts = [];
         if (first) { const space = el('div'); space.style.height = `${first * ROW}px`; parts.push(space); }
         for (const item of state.displayRows.slice(first, last)) {
+            const existing = scrolling && rowNodes.get(item);
+            if (existing) {
+                nextRows.delete(item);
+                nextRows.set(item, existing);
+                parts.push(existing);
+                continue;
+            }
             if (item.folder) {
                 const label = item.folder.split('/').filter(Boolean).at(-1) || item.folder;
                 const heading = button(label, () => setFilter({ folder: item.folder }), 'folder-hdr');
                 heading.title = item.folder;
+                nextRows.set(item, heading);
                 parts.push(heading);
                 continue;
             }
             const row = el('div', null, `row ${state.selected?.id === item.id ? 'sel' : ''}`);
             row.dataset.fileId = item.id;
             const playable = item.duration > 0 && !item.missing;
-            row.draggable = playable;
-            row.ondragstart = event => {
-                if (!playable) return event.preventDefault();
-                libraryDrag = item;
-                $('mainWorkspace').classList.add('library-dragging');
-                event.dataTransfer.setData(clipDragType, item.id);
-                event.dataTransfer.effectAllowed = 'copy';
-            };
-            row.ondragend = () => {
-                libraryDrag = null;
-                $('mainWorkspace').classList.remove('library-dragging');
-                if (refreshRowsAfterDrag) renderRows();
-            };
             const name = el('div', null, 'name');
             const check = el('input');
             check.type = 'checkbox';
@@ -778,26 +798,49 @@
                 renderBulkActions();
             };
             const thumb = miniCanvas(item);
-            name.append(check, assetCover(item), thumb, el('span', item.title || item.filename, 'file-title'));
+            let waveHandle = thumb;
             if (playable) {
-                const handle = el('button', '↗', 'row-daw-drag');
+                const handle = waveHandle = el('button', null, 'wave-drag');
                 handle.type = 'button';
-                handle.title = t('拖动整条音效到 DAW');
+                handle.title = t('拖动波形到工作台；按住 Alt 拖到 DAW');
                 handle.setAttribute('aria-label', handle.title);
                 handle.draggable = true;
-                handle.onclick = event => { event.stopPropagation(); if (!listDragId(item)) attempt(() => prepareListDrag(item)); };
-                handle.onpointerdown = event => {
-                    if (event.button === 0 && state.dawDirectory && !listDragId(item)) attempt(() => prepareListDrag(item));
-                };
-                handle.ondragstart = event => {
+                handle.append(thumb);
+                handle.onclick = event => {
+                    if (event.detail !== 0) return;
                     event.stopPropagation();
-                    event.preventDefault();
-                    const id = listDragId(item);
-                    if (id) desktop.startDrag(id);
-                    else attempt(() => prepareListDrag(item));
+                    attempt(() => prepareListDrag(item));
                 };
-                name.append(handle);
+                let dawIntent = false;
+                handle.onpointerdown = event => {
+                    dawIntent = event.altKey && event.button === 0;
+                    if (dawIntent && state.dawDirectory && !listDragId(item)) {
+                        attempt(() => prepareListDrag(item));
+                    }
+                };
+                handle.onpointerup = handle.onpointercancel = () => { dawIntent = false; };
+                handle.ondragstart = event => {
+                    const toDAW = dawIntent || event.altKey;
+                    dawIntent = false;
+                    if (toDAW) {
+                        event.preventDefault();
+                        const id = listDragId(item);
+                        if (id) desktop.startDrag(id);
+                        else attempt(() => prepareListDrag(item));
+                        return;
+                    }
+                    libraryDrag = item;
+                    $('mainWorkspace').classList.add('library-dragging');
+                    event.dataTransfer.setData(clipDragType, item.id);
+                    event.dataTransfer.effectAllowed = 'copy';
+                };
+                handle.ondragend = () => {
+                    libraryDrag = null;
+                    $('mainWorkspace').classList.remove('library-dragging');
+                    if (refreshRowsAfterDrag) renderRows();
+                };
             }
+            name.append(check, assetCover(item), waveHandle, el('span', item.title || item.filename, 'file-title'));
             row.append(name, el('span', fmt(item.duration), 'meta'),
                 el('span', item.sample_rate ? `${item.sample_rate / 1000}k` : '—', 'meta'),
                 el('span', item.channels || '—', 'meta'),
@@ -808,6 +851,7 @@
                 if (state.selected?.id !== item.id) attempt(() => select(item, true));
                 else if (!playback.active) attempt(playLibrary);
             };
+            nextRows.set(item, row);
             parts.push(row);
         }
         if (state.displayRows.length > last) {
@@ -818,8 +862,16 @@
             ? el('div', state.search ? t('没有匹配的素材') : t('将音频或文件夹拖到这里'), 'empty')
             : button(t('新建音效库…'), () => $('btnNewLib').click(), 'empty empty-library'));
         const offset = box.scrollTop;
-        box.replaceChildren(...parts);
-        box.scrollTop = offset;
+        const keep = new Set(parts);
+        for (const child of [...box.children]) if (!keep.has(child)) child.remove();
+        let current = box.firstElementChild;
+        for (const part of parts) {
+            if (part === current) current = current.nextElementSibling;
+            else box.insertBefore(part, current);
+        }
+        while (nextRows.size > Math.max(128, count)) nextRows.delete(nextRows.keys().next().value);
+        rowNodes = nextRows;
+        if (box.scrollTop !== offset) box.scrollTop = offset;
         scheduleMiniPeaks();
     }
 
@@ -932,13 +984,14 @@
             if (!library) return;
             const waves = new Map();
             const covers = new Map();
+            const waveColor = color('--tx2');
             for (const node of visiblePreviews()) {
                 const item = previewItems.get(node);
                 if (!item || item.missing) continue;
                 const key = previewKey(item);
                 if (node.tagName === 'CANVAS') {
                     const peaks = peakCache.get(key);
-                    if (peaks) waveform.drawMini(node, { waveformData: peaks, inactiveColor: color('--tx2') });
+                    if (peaks) waveform.drawMini(node, { waveformData: peaks, inactiveColor: waveColor });
                     else if (Date.now() - (failedPeaks.get(key) || 0) > 20000) waves.set(key, item);
                 } else if (artCache.has(key)) showArtwork(node, artCache.get(key));
                 else if (Date.now() - (failedArtwork.get(key) || 0) > 20000) covers.set(key, item);
@@ -972,7 +1025,7 @@
         if (renderFrame !== null) return;
         renderFrame = requestAnimationFrame(() => {
             renderFrame = null;
-            renderRows();
+            renderRows(true);
             const box = $('rows');
             if (box.scrollHeight - box.scrollTop - box.clientHeight < ROW * 4) attempt(() => loadItems());
         });
@@ -1431,7 +1484,10 @@
             $(tab.getAttribute('aria-controls')).classList.toggle('hidden', !active);
         }
         if (tabId === 'tabGroups') attempt(renderAssetGroups);
-        if (tabId === 'tabVst') requestAnimationFrame(() => fx()?.refreshLayout());
+        if (tabId === 'tabVst') {
+            requestAnimationFrame(() => fx()?.refreshLayout());
+            if (fx()) attempt(() => fx().discover());
+        }
         if (tabId === 'tabDetail') loadAssetDetails();
     }
 

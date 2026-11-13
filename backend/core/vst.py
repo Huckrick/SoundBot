@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import multiprocessing
 import os
+import sys
 import threading
 from contextlib import contextmanager
+from itertools import chain
 from pathlib import Path
 from uuid import uuid4
 
@@ -18,6 +21,8 @@ from core.database import get_db_manager
 
 _HOST_SLOTS = threading.BoundedSemaphore(8)
 _MAX_MESSAGE = 512 * 1024
+_catalog_lock = threading.Lock()
+_candidates: dict[str, Path] = {}
 
 
 def available():
@@ -144,17 +149,71 @@ def register(path):
     return {"id": row["id"], **info}
 
 
-def list_plugins():
-    with get_db_manager().get_cursor() as cursor:
-        initialize(cursor)
-        return [{"id": row["id"], "name": row["name"], "parameters": json.loads(row["parameters"])}
-                for row in cursor.execute("SELECT id,name,parameters FROM vst_plugins ORDER BY name COLLATE NOCASE")]
+def _plugin_roots():
+    if sys.platform == "darwin":
+        return (Path.home() / "Library/Audio/Plug-Ins/VST3", Path("/Library/Audio/Plug-Ins/VST3"))
+    if sys.platform == "win32":
+        user = os.environ.get("LOCALAPPDATA")
+        common = os.environ.get("CommonProgramW6432") or os.environ.get("CommonProgramFiles")
+        return tuple(path for path in (
+            Path(user) / "Programs/Common/VST3" if user else None,
+            Path(common) / "VST3" if common else None,
+        ) if path is not None)
+    return (Path.home() / ".vst3", Path("/usr/local/lib/vst3"), Path("/usr/lib/vst3"))
 
 
-def unregister(plugin_id):
-    with get_db_manager().get_cursor() as cursor:
-        initialize(cursor)
-        cursor.execute("DELETE FROM vst_plugins WHERE id=?", (plugin_id,))
+def _installed_packages():
+    for root in _plugin_roots():
+        for directory, folders, files in os.walk(root):
+            # A bundle is a single plug-in. Its internal binary must not show as a second entry.
+            packages = [name for name in folders if name.lower().endswith(".vst3")]
+            folders[:] = [name for name in folders if not name.lower().endswith(".vst3")]
+            yield from (Path(directory) / name for name in packages)
+            yield from (Path(directory) / name for name in files if name.lower().endswith(".vst3"))
+
+
+def discover():
+    """List installed candidates without loading any native code."""
+    if not available():
+        return {"available": False, "plugins": []}
+    with _catalog_lock:
+        with get_db_manager().get_cursor() as cursor:
+            initialize(cursor)
+            known = {Path(row["path"]): row["name"]
+                     for row in cursor.execute("SELECT path,name FROM vst_plugins")}
+        paths = {}
+        names = {}
+        for path in chain(_installed_packages(), known):
+            try:
+                source = path.resolve(strict=True)
+                if sys.platform == "darwin" and not (
+                    source.is_dir() and (source / "Contents/MacOS").is_dir()
+                ):
+                    continue
+                _plugin_binary(source)
+                if not (source.is_file() or source.is_dir()):
+                    continue
+            except (OSError, RuntimeError, ValueError):
+                continue
+            candidate_id = hashlib.sha256(os.fsencode(os.path.normcase(source))).hexdigest()
+            paths[candidate_id] = source
+            names[candidate_id] = known.get(source) or path.stem
+        _candidates.clear()
+        _candidates.update(paths)
+        return {"available": True, "plugins": [
+            {"id": plugin_id, "name": name}
+            for plugin_id, name in sorted(names.items(), key=lambda item: (item[1].casefold(), item[0]))
+        ]}
+
+
+def load_discovered(plugin_id):
+    with _catalog_lock:
+        source = _candidates.get(plugin_id)
+    if source is None:
+        raise ValueError("插件列表已变化，请重新扫描 VST3")
+    if source.resolve(strict=True) != source:
+        raise ValueError("插件路径已变化，请重新扫描 VST3")
+    return register(source)
 
 
 def process(blocks, rate, channels, plugin_id, values):

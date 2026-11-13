@@ -276,39 +276,86 @@
         render();
     }
 
-    async function settings() {
-        const { available, plugins } = await api.get('/api/v1/effects/plugins');
-        $('btnPluginFile').disabled = !available;
-        $('btnPluginBundle').disabled = !available;
-        $('settingsPlugins').replaceChildren(...plugins.map(plugin => {
-            const row = el('div');
-            row.append(el('span', plugin.name), button(t('移除'), async () => {
-                if (!await ui.confirm(t('从 SoundBot 移除插件「{name}」？', { name: plugin.name }))) return;
-                await desktop.desktopMedia('remove-plugin', { id: plugin.id });
-                await settings();
-            }, 'ghost-btn'));
-            return row;
-        }));
-        if (!available) $('settingsPlugins').append(el('p', t('VST3 宿主组件不可用')));
+    let pluginCatalog;
+
+    function discover(refresh = false) {
+        if (refresh || !pluginCatalog) {
+            const request = api.get('/api/v1/effects/plugins');
+            pluginCatalog = request;
+            request.catch(() => {
+                if (pluginCatalog === request) pluginCatalog = undefined;
+            });
+        }
+        return pluginCatalog;
+    }
+
+    function emptyCatalog(available) {
+        return el('p', t(available ? '标准安装目录中未找到 VST3 插件。' : 'VST3 宿主组件不可用。'));
+    }
+
+    async function settings(refresh = false) {
+        const results = $('settingsPlugins');
+        const scan = $('btnScanPlugins');
+        scan.disabled = true;
+        results.replaceChildren(el('p', t('正在扫描 VST3…')));
+        try {
+            const { available, plugins } = await discover(refresh);
+            results.replaceChildren(...(plugins.length ? plugins.map(plugin => el('div', plugin.name)) : [emptyCatalog(available)]));
+        } catch (error) {
+            results.replaceChildren();
+            throw error;
+        } finally {
+            scan.disabled = false;
+        }
     }
 
     async function pick() {
         const context = current;
         if (!context?.chain || context.chain.length >= 12) return say(t('单条效果链最多 12 个效果器'));
-        const { available, plugins } = await api.get('/api/v1/effects/plugins');
-        if (current !== context) return;
+        const dialog = $('pluginDialog');
         const choices = $('pluginChoices');
-        choices.replaceChildren(...plugins.map(plugin => button(plugin.name, () => {
-            if (current !== context) return;
-            const values = Object.fromEntries(plugin.parameters.map(param => [param.key, param.value]));
-            context.chain.push({ kind: 'vst3', plugin_id: plugin.id, name: plugin.name,
-                values, parameters: plugin.parameters, on: true });
-            $('pluginDialog').close();
-            context.changed();
-            render();
-        }, 'ghost-btn')));
-        if (!plugins.length) choices.append(el('p', available ? t('请先在设置中添加本地插件。') : t('VST3 宿主组件不可用。')));
-        $('pluginDialog').showModal();
+        const query = $('pluginFilter');
+        if (dialog.open) return;
+        query.value = '';
+        query.disabled = true;
+        query.oninput = null;
+        choices.replaceChildren(el('p', t('正在扫描 VST3…')));
+        dialog.showModal();
+        let catalog;
+        try {
+            catalog = await discover();
+        } catch (error) {
+            if (dialog.open) dialog.close();
+            throw error;
+        }
+        if (!dialog.open || current?.chain !== context.chain) return;
+        const { available, plugins } = catalog;
+        const show = () => {
+            const needle = query.value.trim().toLowerCase();
+            const matches = plugins.filter(plugin => plugin.name.toLowerCase().includes(needle));
+            choices.replaceChildren(...matches.map(plugin => button(plugin.name, () => attempt(async () => {
+                choices.inert = true;
+                query.disabled = true;
+                try {
+                    const loaded = await desktop.desktopMedia('load-plugin', plugin);
+                    if (!loaded || !dialog.open || current?.chain !== context.chain) return;
+                    const values = Object.fromEntries(loaded.parameters.map(param => [param.key, param.value]));
+                    context.chain.push({ kind: 'vst3', plugin_id: loaded.id, name: loaded.name,
+                        values, parameters: loaded.parameters, on: true });
+                    dialog.close();
+                    context.changed();
+                    render();
+                } finally {
+                    choices.inert = false;
+                    query.disabled = false;
+                }
+            }), 'ghost-btn')));
+            if (!matches.length) choices.append(plugins.length
+                ? el('p', t('没有匹配的插件。')) : emptyCatalog(available));
+        };
+        query.disabled = !plugins.length;
+        query.oninput = show;
+        show();
     }
 
     function resetLoudness() {
@@ -382,16 +429,12 @@
         $('btnAddEffect').onclick = () => attempt(pick);
         $('btnClosePlugins').onclick = () => $('pluginDialog').close();
         $('fileLoudness').ontoggle = () => { if ($('fileLoudness').open) void measure(); };
-        for (const [id, directory] of [['btnPluginFile', false], ['btnPluginBundle', true]]) {
-            $(id).onclick = () => attempt(async () => {
-                if (await desktop.desktopMedia('add-plugin', { directory })) await settings();
-            });
-        }
+        $('btnScanPlugins').onclick = () => attempt(() => settings(true));
         new MutationObserver(() => redraw.forEach(paint => paint()))
             .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     });
 
-    window.SoundBotEffects = { create, enabled, useRack, resetLoudness, settings, meters,
+    window.SoundBotEffects = { create, enabled, useRack, resetLoudness, settings, discover, meters,
         refreshLayout: () => {
             redraw.forEach(paint => paint());
             void measure();
