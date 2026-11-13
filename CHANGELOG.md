@@ -16,6 +16,7 @@ Release history for SoundBot. / SoundBot 版本记录。
 
 - Adapt mono audio for stereo-only VST3 effects and continue audition with a warning when a plug-in cannot process audio. Delivery stops on a plug-in failure. / 为仅支持立体声的 VST3 适配单声道素材。插件处理失败时提示并继续试听，交付遇到该错误则停止。
 - Pass native editor state updates to audition while playback continues. / 播放时同步 VST3 原生编辑器的状态更新。
+- Allow native source playback from SoundBot's local audio service. / 允许播放器从 SoundBot 本地音频服务直接试听源文件。
 
 ## [1.0.4] - 2026-11-13
 

@@ -547,7 +547,8 @@ def _renderer_smoke_expression(
     row.click();
     await until(() => workspace.playback.currentTime() > 0.01, `playing ${{filename}}`);
     const ms = Math.round(performance.now() - start);
-    if (workspace.state.effects.find(effect => effect.kind === 'eq')?.on !== false) {{
+    const equalizer = document.querySelector('#rack .fx-card .eq-plot')?.closest('.fx-card');
+    if (equalizer?.querySelector('[role="switch"]')?.getAttribute('aria-checked') !== 'false') {{
       throw new Error('equalizer must start bypassed');
     }}
     await until(() => workspace.playback.levels().some(level => level > 0.01) &&
