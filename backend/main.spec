@@ -159,14 +159,8 @@ hiddenimports += [
 
 # ==================== 额外手动补充 ====================
 hiddenimports += [
-    # multiprocessing (Windows freeze_support 需要)
-    'multiprocessing',
-    'multiprocessing.context',
-    'multiprocessing.pool',
-    'multiprocessing.process',
-    'multiprocessing.spawn',
-    'multiprocessing.synchronize',
-    'multiprocessing.reduction',
+    # The isolated VST worker uses the platform's duplex pipe implementation.
+    'multiprocessing.connection',
 
     # asyncio（uvicorn 事件循环）
     'asyncio',

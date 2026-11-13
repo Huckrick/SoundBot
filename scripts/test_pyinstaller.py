@@ -187,24 +187,21 @@ def check_file_structure():
     
     return all_ok
 
-def check_multiprocessing_fix():
-    """检查 multiprocessing.freeze_support() 是否已添加"""
+def check_vst_worker_entry():
+    """Verify the plug-in subprocess reaches its own entry point before starting the server."""
     print("\n" + "=" * 60)
-    print("检查 multiprocessing.freeze_support()...")
+    print("检查 VST3 子进程入口...")
     print("=" * 60)
-    
     backend_dir = Path(__file__).parent.parent / "backend"
-    main_py = backend_dir / 'main.py'
-    
-    content = main_py.read_text()
-    
-    if 'multiprocessing.freeze_support()' in content:
-        print("✅ main.py 已包含 multiprocessing.freeze_support()")
-        return True
-    else:
-        print("❌ main.py 缺少 multiprocessing.freeze_support()")
-        print("   这可能导致 Windows 下打包后的多进程问题")
+    try:
+        result = subprocess.run([sys.executable, str(backend_dir / "main.py"), "--vst-worker"],
+                                capture_output=True, timeout=10)
+    except subprocess.TimeoutExpired:
+        print("❌ VST3 子进程入口未及时返回")
         return False
+    valid = result.returncode == 2 and b"BOUND_PORT=" not in result.stdout
+    print("✅ VST3 子进程独立启动" if valid else "❌ VST3 子进程入口无效")
+    return valid
 
 def test_build():
     """测试构建过程"""
@@ -320,7 +317,7 @@ def main():
     results.append(("依赖导入", check_imports()))
     results.append(("PyAV / FFmpeg", check_pyav_runtime()))
     results.append(("文件结构", check_file_structure()))
-    results.append(("multiprocessing 修复", check_multiprocessing_fix()))
+    results.append(("VST3 子进程入口", check_vst_worker_entry()))
     
     if args.build:
         results.append(("PyInstaller 构建", test_build()))
