@@ -2,9 +2,9 @@
 
 <h1 align="center">SoundBot</h1>
 
-<p align="center">面向游戏音频的开源音效库管理器。在本地查找和剪辑音效，并交付到中间件工程。<br>An open-source sound library manager for game audio. Search and edit your local sounds, then deliver them to middleware projects.</p>
+<p align="center"><a href="README.ja.md">日本語</a> · <a href="#简体中文">简体中文</a> · <a href="#english">English</a> · <a href="https://github.com/Huckrick/SoundBot/releases">Releases</a></p>
 
-<p align="center"><a href="#简体中文">简体中文</a> · <a href="#english">English</a> · <a href="https://github.com/Huckrick/SoundBot/releases">发行版本 / Releases</a></p>
+<p align="center">ゲームオーディオ向けのオープンソース効果音ライブラリ管理ツール。素材の検索、波形編集、ミドルウェアへの反映を一つのアプリで。<br>面向游戏音频的开源音效库管理器。在本地查找和剪辑音效，并交付到中间件工程。<br>An open-source sound library manager for game audio. Search and edit your local sounds, then deliver them to middleware projects.</p>
 
 ## 简体中文
 
