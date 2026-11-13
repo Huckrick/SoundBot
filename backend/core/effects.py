@@ -41,9 +41,12 @@ class Effect:
     plugin_id: str | None = None
     bands: tuple[EQBand, ...] = ()
     plugin_state: str | None = None
+    plugin_instance: str | None = None
 
 
 def validate_effect(effect: Effect) -> Effect:
+    if effect.plugin_instance is not None and effect.kind != "vst3":
+        raise ValueError("VST3 参数无效")
     if effect.plugin_state is not None and (effect.kind != "vst3" or effect.values):
         raise ValueError("VST3 参数无效")
     if effect.bands:
@@ -135,7 +138,7 @@ def analyze(blocks, rate, channels):
     return {"integrated": value("I"), "range": value("LRA"), "true_peak": value("Peak")}
 
 
-def process(blocks, rate, channels, effects, *, measure):
+def process(blocks, rate, channels, effects, *, measure, on_plugin_error=None):
     """Apply effects in their declared order, using bounded audio blocks."""
     from core import vst
 
@@ -158,7 +161,8 @@ def process(blocks, rate, channels, effects, *, measure):
                 ("acompressor", f"threshold={threshold}:ratio={values['ratio']}:attack=12:release=180"),
             ])
         elif effect.kind == "vst3":
-            blocks = vst.process(blocks, rate, channels, effect.plugin_id, values, effect.plugin_state)
+            blocks = vst.process(blocks, rate, channels, effect.plugin_id, values, effect.plugin_state,
+                                 instance=effect.plugin_instance, on_error=on_plugin_error)
         elif effect.kind == "reverb" and values["mix"]:
             blocks = _reverb(blocks, rate, channels, values)
     yield from blocks

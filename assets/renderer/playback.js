@@ -109,7 +109,7 @@
         }
     }
 
-    async function playPCM(url, options, offset, onEnd) {
+    async function playPCM(url, options, offset, onEnd, onStream) {
         stop();
         const active = { abort: new AbortController(), clock: () => offset };
         session = active;
@@ -119,8 +119,10 @@
             const response = await fetch(url, { ...options, signal: active.abort.signal });
             if (!response.ok) {
                 const error = await response.json().catch(() => ({}));
-                throw new Error(error.detail || error.error?.message || '无法读取音频预览');
+                const detail = typeof error.detail === 'string' ? error.detail : error.detail?.message;
+                throw new Error(detail || error.error?.message || error.message || '无法读取音频预览');
             }
+            onStream?.();
             const reader = response.body.getReader();
             let remaining = new Uint8Array();
             let channels, rate;

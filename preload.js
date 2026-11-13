@@ -90,10 +90,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
   },
 
-  // 对话框
-  dialogs: {
-    showMessageBox: (options) => ipcRenderer.invoke('dialog-message', options)
-  },
+  onAppConfirmation: (callback) => ipcRenderer.on('app-confirmation', (_event, options) => callback(options)),
+  respondToConfirmation: (id, accepted) => ipcRenderer.send('app-confirmation-result', id, accepted),
 
   // 原生拖拽导出（用于拖拽文件到 DAW）
   startDrag: (deliveryId) => ipcRenderer.send('start-drag', deliveryId),

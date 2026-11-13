@@ -6,6 +6,7 @@
     const fx = () => window.SoundBotEffects;
     const libraryName = project => project?.id === 'default' && project.name === '默认工程' ? t('默认音效库') : project?.name || '';
     const clipSessions = new Map();
+    let libraryEffects;
     const desktop = window.electronAPI;
     const playback = window.SoundBotPlayback;
     const $ = id => document.getElementById(id);
@@ -136,7 +137,8 @@
         if (!item || item.missing) return say(t('请选择可用的音频素材'));
         const range = state.range;
         const edits = currentClip();
-        const processed = range || edits?.gain || edits?.fade_in || edits?.fade_out || edits?.effects.length;
+        const masterEffects = isLibrary() ? fx().enabled(libraryEffects, true) : [];
+        const processed = range || edits?.gain || edits?.fade_in || edits?.fade_out || masterEffects.length;
         const offset = processed ? Math.max(range?.[0] || 0, state.position) : state.position;
         const end = range?.[1] ?? item.duration;
         const start = offset >= end ? (range?.[0] || 0) : offset;
@@ -148,10 +150,10 @@
         };
         if (processed && edits) {
             const startRelative = start - edits.offset;
-            return playback.playPCM(api.url('/api/v1/preview'), {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ project_id: state.library.id, tracks: [{ clips: [edits] }],
-                    rate: item.sample_rate || 48000, channels: item.channels || 2, start: startRelative })
+            return fx().preview({
+                project_id: state.library.id, tracks: [{ clips: [edits] }], master_effects: masterEffects,
+                rate: item.sample_rate || 48000, channels: masterEffects.some(effect => effect.kind === 'vst3') ? 2 : item.channels || 2,
+                start: startRelative
             }, start, onEnd);
         }
         if (!audio.requiresPlaybackSource({ filePath: item.path, format: item.format })) {
@@ -180,8 +182,7 @@
         return { file_id: item.id, offset, duration, start: 0,
             gain: Math.min(24, Math.max(-96, Number($('clipGain').value) || 0)),
             fade_in: Math.min(duration, Math.max(0, Number($('fadeIn').value) || 0)),
-            fade_out: Math.min(duration, Math.max(0, Number($('fadeOut').value) || 0)),
-            effects: fx()?.enabled(state.effects) || [] };
+            fade_out: Math.min(duration, Math.max(0, Number($('fadeOut').value) || 0)) };
     }
 
     function positionRangeHandles() {
@@ -232,16 +233,14 @@
         if (!currentClip()) return;
         const controls = Object.fromEntries(['fadeIn', 'fadeOut', 'clipGain'].map(id => [id, $(id).value]));
         const name = $('clipName').value.trim();
-        if (!state.range && !name && !Object.values(controls).some(Number) &&
-            JSON.stringify(state.effects) === JSON.stringify(fx()?.create())) {
+        if (!state.range && !name && !Object.values(controls).some(Number)) {
             clipSessions.delete(state.selected.id);
             return;
         }
         clipSessions.set(state.selected.id, {
             name,
             range: state.range && [...state.range],
-            controls,
-            effects: state.effects
+            controls
         });
     }
 
@@ -259,7 +258,6 @@
         stop(true);
         state.selected = item;
         const saved = item && clipSessions.get(item.id);
-        state.effects = item && (saved?.effects || fx()?.create());
         fx()?.resetLoudness();
         if (isLibrary()) showLibraryEffects();
         state.range = saved?.range && saved.range[1] <= item.duration ? [...saved.range] : null;
@@ -499,7 +497,6 @@
         state.dockEditing = false;
         state.selected = null;
         state.waveform = state.range = null;
-        state.effects = null;
         state.position = timelinePosition;
         syncBottomStage();
         syncTransport();
@@ -1422,12 +1419,24 @@
         }));
     }
 
-    async function confirm(message) {
-        const result = await desktop.dialogs.showMessageBox({
-            type: 'warning', message, buttons: [t('取消'), t('继续操作')], defaultId: 0, cancelId: 0
-        });
-        return result.response === 1;
+    let resolveAction;
+    function actionDialog({ message, detail, cancel = t('取消'), confirm: label = t('继续操作') }, priority = false) {
+        const dialog = $('actionDialog');
+        if (resolveAction) {
+            if (!priority) return Promise.resolve(false);
+            resolveAction(false);
+        }
+        $('actionMessage').textContent = message;
+        $('actionDetail').textContent = detail || '';
+        $('actionDetail').hidden = !detail;
+        $('actionCancel').textContent = cancel;
+        $('actionConfirm').textContent = label;
+        dialog.returnValue = 'cancel';
+        if (!dialog.open) dialog.showModal();
+        $('actionCancel').focus();
+        return new Promise(resolve => { resolveAction = resolve; });
     }
+    const confirm = message => actionDialog({ message });
 
     async function mutate(action, value, ids = [...state.selectedIds]) {
         if (!ids.length) return;
@@ -1479,21 +1488,27 @@
 
     async function prepareDrag() {
         if (state.preparing || preparingListDelivery) return;
-        const clip = currentClip();
-        if (!clip || !state.range) return;
+        if (!isLibrary() || !currentClip() || !state.range) return;
         const projectId = state.library.id;
         const specs = () => ({ rate: Number($('dawRate').value) || null,
             channels: Number($('dawChannels').value) || null, bits: Number($('dawBits').value),
             name: $('clipName').value.trim() || null });
-        const requestedSpecs = specs();
-        const signature = JSON.stringify([projectId, clip, requestedSpecs]);
-        const stillSelected = () => isLibrary() && state.range &&
-            signature === JSON.stringify([state.library.id, currentClip(), specs()]);
         state.preparing = true;
         updateDragHandle();
         try {
+            const selection = JSON.stringify(currentClip());
             const directory = state.dawDirectory || await chooseDaw();
-            if (!directory || !stillSelected()) return;
+            if (!directory || !isLibrary() || projectId !== state.library?.id || !state.range ||
+                selection !== JSON.stringify(currentClip())) return;
+            await fx().finishEditing([libraryEffects]);
+            if (!isLibrary() || projectId !== state.library?.id || !state.range ||
+                selection !== JSON.stringify(currentClip())) return;
+            const exportClip = () => ({ ...currentClip(), effects: fx().enabled(libraryEffects) });
+            const clip = exportClip();
+            const requestedSpecs = specs();
+            const signature = JSON.stringify([clip, requestedSpecs]);
+            const stillSelected = () => isLibrary() && state.range && projectId === state.library?.id &&
+                signature === JSON.stringify([exportClip(), specs()]);
             const result = await desktop.desktopMedia('prepare', { project_id: projectId, clip, ...requestedSpecs });
             if (directory !== state.dawDirectory || !stillSelected()) return;
             state.delivery = result.id;
@@ -1541,7 +1556,7 @@
         }
         peakRequest?.abort();
         playback.stop();
-        state.selected = state.range = state.waveform = state.effects = null;
+        state.selected = state.range = state.waveform = null;
         state.workspace = which;
         $('mainWorkspace').classList.toggle('wwise', !isLibrary());
         $('bottomStage').classList.toggle('wwise', !isLibrary());
@@ -1573,9 +1588,11 @@
     }
 
     function showLibraryEffects() {
-        fx()?.useRack(state.effects, t('选区效果器'), () => {
-            refreshAudition();
+        if (!isLibrary()) return;
+        libraryEffects ||= fx()?.create();
+        fx()?.useRack(libraryEffects, t('音效库试听主输出'), ({ live } = {}) => {
             invalidateDelivery();
+            if (!live && isLibrary()) refreshAudition();
         }, state.selected?.sample_rate || 48000);
     }
 
@@ -1930,6 +1947,15 @@
         on('btnBackDock', closeDockEditor);
         on('btnCreateGroup', createGroup);
         desktop.onDeliveryError(message => { listDelivery = null; invalidateDelivery(); say(describeError(message)); });
+        $('actionDialog').onclose = event => {
+            const resolve = resolveAction;
+            resolveAction = null;
+            resolve?.(event.currentTarget.returnValue === 'ok');
+        };
+        desktop.onAppConfirmation(async options => {
+            const accepted = await actionDialog(options, true);
+            desktop.respondToConfirmation(options.id, accepted);
+        });
         on('btnUseWwise', async () => {
             const editing = editorClip();
             if (!editing || timeline()?.isBusy()) return;

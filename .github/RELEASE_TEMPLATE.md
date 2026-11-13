@@ -1,13 +1,13 @@
 # SoundBot
 
-**Version / 版本:** 1.0.4<br>
+**Version / 版本:** 1.0.5<br>
 **Status / 状态:** Stable / 稳定版<br>
 
 ## 功能 / Features
 
 - 来源目录、增量导入、暂停续跑与本地关键词检索。 / Source folders, incremental imports, resumable jobs, and local keyword search.
-- 源文件试听、按需波形、选区效果器与 DAW 工程媒体交付。 / Source playback, on-demand waveforms, clip effects, and DAW media delivery.
-- Wwise 多轨编辑、效果链、源 WAV 写回与备份恢复。 / Wwise multitrack editing, effects, source WAV writeback, and recovery.
+- 源文件试听、按需波形、音效库试听主效果链与 DAW 选区交付。 / Source playback, on-demand waveforms, a library master effects chain, and DAW selection delivery.
+- 中间件多轨编辑和独立轨道效果链，以及 Wwise 源 WAV 写回与备份恢复。 / Middleware multitrack editing with independent track effects, plus Wwise source WAV writeback and recovery.
 
 ## 安装与迁移 / Install and migrate
 

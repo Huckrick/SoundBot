@@ -16,6 +16,7 @@ import wave
 from pathlib import Path
 from unittest.mock import patch
 
+import numpy as np
 from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
@@ -23,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 import main
 from core import catalog, delivery, editing, vst, wwise
 from core.database import DatabaseManager, get_db_manager, reset_db_manager
+from core.effects import EQBand, Effect
 from core.media_api import ClipRequest
 
 
@@ -220,7 +222,7 @@ class CoreDeliveryTests(unittest.TestCase):
         connection.recv_bytes.return_value = b"Snew state"
 
         @contextmanager
-        def host(path, *, values, state, editor):
+        def host(path, *, values, state, editor, dark):
             self.assertEqual(path, "fixture.vst3")
             self.assertIsNone(values)
             self.assertEqual(state, b"old state")
@@ -233,6 +235,47 @@ class CoreDeliveryTests(unittest.TestCase):
             result = self.client.post(route, headers=self.headers, json={"state": state}).raise_for_status().json()
         self.assertTrue(result["changed"])
         self.assertEqual(vst._decode_state(plugin_id, result["state"]), b"new state")
+
+    def test_preview_bypasses_failed_vst_without_losing_pending_audio(self):
+        dry = [np.full((12, 1), amplitude, np.float32) for amplitude in (0.1, 0.2, 0.3)]
+        warnings = []
+
+        def failed(blocks, *_args):
+            yield next(blocks)[:5] * 2
+            next(blocks)
+            raise ValueError("invalid plug-in samples")
+
+        with patch.object(vst, "_process", failed):
+            rendered = list(vst.process(iter(dry), 48000, 1, "plugin", {},
+                                        on_error=lambda *message: warnings.append(message)))
+            with self.assertRaisesRegex(ValueError, "invalid plug-in samples"):
+                list(vst.process(iter(dry), 48000, 1, "plugin", {}))
+        expected = np.concatenate(dry)
+        expected[:5] *= 2
+        np.testing.assert_array_equal(np.concatenate(rendered), expected)
+        self.assertEqual(warnings, [("plugin", "invalid plug-in samples")])
+
+    def test_library_master_effects_and_track_effects_use_different_buses(self):
+        first = audio_file(self.root / "sine.wav")
+        clips = (editing.Clip(first, 0, 1),)
+        effect = Effect("eq", {}, bands=(EQBand("low_cut", 800, 0, 0.707, True),))
+        plain = editing.Track(clips)
+        filtered = editing.Track(clips, effects=(effect,))
+
+        def render(tracks, **options):
+            return np.concatenate(list(editing.mix(tracks, 48000, 1, 1, **options)))
+
+        dry = render([plain])
+        wet = render([filtered])
+        np.testing.assert_allclose(render([plain, filtered]), dry + wet, atol=1e-6)
+        np.testing.assert_allclose(render([plain, plain], master_effects=(effect,)), wet * 2, atol=1e-6)
+
+        def readonly_output(blocks, *_args, **_kwargs):
+            for block in blocks:
+                yield np.frombuffer(block.tobytes(), dtype=np.float32).reshape(block.shape)
+
+        with patch.object(vst, "process", readonly_output):
+            np.testing.assert_array_equal(render([plain], master_effects=(Effect("vst3", {}, "id"),)), dry)
 
     def test_import_metadata_fts_rescan_and_exclusion(self):
         folder = self.root / "input"

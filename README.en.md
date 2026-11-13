@@ -2,15 +2,15 @@
 
 An open-source sound library manager for game audio. Search and edit your local sounds, then deliver them to middleware projects.
 
-The current source version is **v1.0.4 (stable)**. Published installers and their checksums are listed together in each release. [GitHub Releases](https://github.com/Huckrick/SoundBot/releases)
+The current source version is **v1.0.5 (stable)**. Published installers and their checksums are listed together in each release. [GitHub Releases](https://github.com/Huckrick/SoundBot/releases)
 
 SoundBot is a local sound library, waveform editor, and middleware workspace for macOS Apple Silicon and Windows x64. The main README covers installation, workflow, permissions, and troubleshooting in English. [English user guide](README.md#english) · [简体中文](README.md#简体中文) · [Changelog](CHANGELOG.md)
 
 The interface supports Simplified Chinese, Traditional Chinese, Japanese, English, Brazilian Portuguese, and Spanish. Change the language in **Settings → General → Language**. [Interface language details](README.md#interface-languages)
 
-## What’s new in v1.0.4
+## What’s new in v1.0.5
 
-Browse the full Wwise tree and edit fades, crossfades, and stereo pan on the timeline. VST3 effects open in their own editor windows and can be reordered or removed in the effects rack. The library reuses lightweight waveform previews across scrolling and refreshed results.
+The library keeps one audition effects chain across sounds and renders it into selection exports. The middleware workspace keeps a separate chain on each track and resets the chains after successful delivery. Native VST3 editors remain available during playback, and an audition can continue with a failed plug-in bypassed. SoundBot shows its confirmations inside the app.
 
 ## Support and feedback
 

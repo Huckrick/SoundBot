@@ -4,6 +4,19 @@ Release history for SoundBot. / SoundBot 版本记录。
 
 ## [Unreleased] / 未发布
 
+## [1.0.5] - 2026-11-13
+
+### Changed / 变更
+
+- Use one library audition effects chain across assets and render it into selection exports. / 音效库跨素材共用试听效果链，并将效果渲染到选区导出文件。
+- Keep independent middleware track effects and reset them after successful delivery. / 中间件各轨独立保存效果设置，交付成功后复位。
+- Show SoundBot confirmations inside the app and apply the app theme to native VST3 window chrome. / SoundBot 确认提示使用应用内弹窗，VST3 原生窗口外框随应用主题显示。
+
+### Fixed / 修复
+
+- Adapt mono audio for stereo-only VST3 effects and continue audition with a warning when a plug-in cannot process audio. Delivery stops on a plug-in failure. / 为仅支持立体声的 VST3 适配单声道素材。插件处理失败时提示并继续试听，交付遇到该错误则停止。
+- Pass native editor state updates to audition while playback continues. / 播放时同步 VST3 原生编辑器的状态更新。
+
 ## [1.0.4] - 2026-11-13
 
 ### Changed / 变更
@@ -200,7 +213,8 @@ Release history for SoundBot. / SoundBot 版本记录。
 - The Windows release gate starts the frozen backend with a clean `PATH` and no system FFmpeg, then requires the complete format matrix, exact waveforms, CLAP, Chroma, hybrid search, `win-unpacked`, and NSIS installer integrity checks to pass before publishing. / Windows 发布门禁会在干净 `PATH`、无系统 FFmpeg 下启动冻结后端，并要求全格式矩阵、精确波形、CLAP、Chroma、混合搜索、`win-unpacked` 与 NSIS 安装包完整性检查全部通过后才允许发布。
 - CI builds Windows x64 and macOS arm64 only on native runners and blocks release creation if any functional smoke test, model check, metadata check, package check, or installer check fails. / CI 仅在原生 runner 构建 Windows x64 与 macOS arm64，并在任一功能冒烟、模型、元数据、应用包或安装包检查失败时阻止创建 Release。
 
-[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.4...HEAD
+[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.5...HEAD
+[1.0.5]: https://github.com/Huckrick/SoundBot/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/Huckrick/SoundBot/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/Huckrick/SoundBot/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/Huckrick/SoundBot/compare/v1.0.1...v1.0.2

@@ -2,7 +2,7 @@
 (() => {
     const ui = window.SoundBotWorkspace;
     const { $, state, api, desktop, el, button, say, attempt } = ui;
-    const { t, setText } = window.SoundBotI18n;
+    const { t, setText, describeError } = window.SoundBotI18n;
     const equalizer = window.SoundBotEqualizer;
     const playback = window.SoundBotPlayback;
     const builtins = {
@@ -28,17 +28,20 @@
         if (builtins[effect.kind]) Object.assign(effect, defaults(effect.kind));
         else if (!editingPlugins.has(effect)) {
             delete effect.plugin_state;
+            effect.instance = crypto.randomUUID().replaceAll('-', '');
             effect.on = true;
         }
     }
     const activeBand = band => band.enabled && (band.gain !== 0 || band.shape.endsWith('_cut'));
-    const enabled = chain => (chain || []).filter(item => item.on && (!item.bands || item.bands.some(activeBand)))
-        .map(({ kind, values, plugin_id, plugin_state, bands }) => ({
+    const enabled = (chain, live = false) => (chain || []).filter(item => item.on && (!item.bands || item.bands.some(activeBand)))
+        .map(({ kind, values, plugin_id, plugin_state, instance, bands }) => ({
             kind, values: { ...values }, ...(plugin_id && { plugin_id }),
             ...(plugin_state && { plugin_state }),
+            ...(live && instance && { plugin_instance: instance }),
             ...(bands && { bands: bands.filter(activeBand).map(band => ({ ...band })) })
         }));
-    const editingPlugins = new WeakSet();
+    const editingPlugins = new WeakMap();
+    const pluginNames = new Map();
     let draggedPlugin;
     let current;
     let analysis;
@@ -172,19 +175,65 @@
 
     async function editPlugin(effect, context) {
         if (editingPlugins.has(effect)) return;
-        editingPlugins.add(effect);
-        if (current?.chain === context.chain) render();
-        try {
+        const instance = effect.instance;
+        const edit = (async () => {
             const result = await desktop.desktopMedia('edit-plugin', {
-                id: effect.plugin_id, state: effect.plugin_state, values: effect.values
+                id: effect.plugin_id, state: effect.plugin_state, values: effect.values, instance,
+                dark: document.documentElement.dataset.theme !== 'light'
             });
             if (!result?.changed || !context.chain.includes(effect)) return;
             effect.plugin_state = result.state;
             effect.values = {};
-            context.changed();
+            context.changed({ live: true });
+        })();
+        editingPlugins.set(effect, edit);
+        try {
+            context.changed({ live: true });
+            if (current?.chain === context.chain) render();
+            await edit;
         } finally {
             editingPlugins.delete(effect);
             if (current?.chain === context.chain) render();
+        }
+    }
+
+    async function finishEditing(chains) {
+        const edits = chains.flat().filter(effect => effect?.on && editingPlugins.has(effect));
+        await Promise.all(edits.map(async effect => {
+            const edit = editingPlugins.get(effect);
+            await desktop.desktopMedia('close-plugin-editor', { instance: effect.instance });
+            await edit;
+        }));
+    }
+
+    async function preview(request, offset, onEnd) {
+        const plugins = [request.master_effects || [], ...request.tracks.flatMap(track =>
+            [track.effects || [], ...track.clips.map(clip => clip.effects || [])])].flat()
+            .filter(effect => effect.plugin_id);
+        const requestId = plugins.length ? crypto.randomUUID() : undefined;
+        const warningsPath = `/api/v1/preview/${requestId}/warnings`;
+        let interval;
+        const report = async () => {
+            try {
+                const { plugins: warnings } = await api.get(warningsPath);
+                const messages = Object.entries(warnings).map(([id, reason]) =>
+                    t('试听已旁通 {name}：{reason}', { name: pluginNames.get(id) || 'VST3', reason: describeError(reason) }));
+                if (messages.length) say(messages.join('\n'));
+            } catch {
+                // The warning request is independent of the audio stream.
+            }
+        };
+        try {
+            await playback.playPCM(api.url('/api/v1/preview'), {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...request, request_id: requestId })
+            }, offset, onEnd, requestId ? () => {
+                void report();
+                interval = setInterval(report, 1500);
+            } : undefined);
+        } finally {
+            clearInterval(interval);
+            if (requestId) void report();
         }
     }
 
@@ -241,10 +290,13 @@
         up.disabled = index < 1 || chain[index - 1]?.kind === 'normalize';
         const down = iconButton('↓', t('下移'), () => movePlugin(context, effect, index + 1));
         down.disabled = index >= chain.length - 1;
-        const remove = iconButton('×', t('移除插件'), () => {
+        const remove = iconButton('×', t('移除插件'), async () => {
             chain.splice(chain.indexOf(effect), 1);
             changed();
             render();
+            if (editingPlugins.has(effect)) {
+                await desktop.desktopMedia('close-plugin-editor', { instance: effect.instance });
+            }
         }, 'vst-remove');
         row.append(handle, name, toggle, up, down, remove);
         return row;
@@ -427,7 +479,9 @@
                 try {
                     const loaded = await desktop.desktopMedia('load-plugin', plugin);
                     if (!loaded || !dialog.open || current?.chain !== context.chain) return;
-                    const effect = { kind: 'vst3', plugin_id: loaded.id, name: loaded.name, values: {}, on: true };
+                    const effect = { kind: 'vst3', plugin_id: loaded.id, name: loaded.name, values: {}, on: true,
+                        instance: crypto.randomUUID().replaceAll('-', '') };
+                    pluginNames.set(loaded.id, loaded.name);
                     context.chain.push(effect);
                     dialog.close();
                     current.changed();
@@ -522,7 +576,7 @@
             .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     });
 
-    window.SoundBotEffects = { create, enabled, useRack, resetLoudness, settings, discover, meters,
+    window.SoundBotEffects = { create, enabled, useRack, resetLoudness, settings, discover, meters, preview, finishEditing,
         refreshLayout: () => {
             redraw.forEach(paint => paint());
             void measure();

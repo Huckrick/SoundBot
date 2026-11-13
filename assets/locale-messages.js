@@ -687,4 +687,9 @@
     ["在波形上添加或拖动声像点", "Add or drag pan points on the waveform", "在波形上新增或拖動聲像點", "波形上でパンポイントを追加またはドラッグ", "Adicione ou arraste pontos de panorama na forma de onda", "Añade o arrastra puntos de panorama en la forma de onda"],
     ["跟随默认曲线", "Use default curve", "跟隨預設曲線", "既定のカーブを使用", "Usar curva padrão", "Usar curva predeterminada"],
     ["关闭此处交叉淡化", "Disable this crossfade", "關閉此處交叉淡化", "このクロスフェードを無効にする", "Desativar este crossfade", "Desactivar este fundido cruzado"],
+    ["音效库试听主输出", "Library audition master", "音效庫試聽主輸出", "ライブラリ試聴マスター", "Saída principal da prévia da biblioteca", "Salida principal de la escucha de biblioteca"],
+    ["试听已旁通 {name}：{reason}", "Preview bypassed {name}: {reason}", "試聽已旁通 {name}：{reason}", "試聴では {name} をバイパスしました：{reason}", "Prévia com {name} em bypass: {reason}", "La escucha omitió {name}: {reason}"],
+    ["VST3 插件响应超时", "The VST3 plug-in timed out.", "VST3 外掛程式回應逾時。", "VST3 プラグインの応答がタイムアウトしました。", "O plug-in VST3 demorou demais para responder.", "El complemento VST3 tardó demasiado en responder."],
+    ["VST3 插件进程异常退出", "The VST3 plug-in process exited unexpectedly.", "VST3 外掛程式意外結束。", "VST3 プラグインのプロセスが異常終了しました。", "O processo do plug-in VST3 foi encerrado inesperadamente.", "El proceso del complemento VST3 se cerró inesperadamente."],
+    ["VST3 插件无法加载或处理音频，请检查兼容性", "The VST3 plug-in could not load or process audio. Check compatibility.", "VST3 外掛程式無法載入或處理音訊，請檢查相容性。", "VST3 プラグインを読み込めないか、音声を処理できません。互換性を確認してください。", "O plug-in VST3 não carregou ou não processou o áudio. Verifique a compatibilidade.", "El complemento VST3 no pudo cargar o procesar el audio. Comprueba su compatibilidad."],
 ]);

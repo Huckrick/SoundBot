@@ -95,6 +95,8 @@ let rendererBridgeReady = false;
 let rendererPreloadFailure = null;
 const activeBackendRequests = new Map();
 let quitInProgress = false;
+let pendingConfirmation;
+const pluginEditorSessions = new Set();
 let pendingSplashState = {
   status: '正在启动服务…',
   progress: '初始化中',
@@ -1138,20 +1140,25 @@ function createWindow() {
   mainWindow.loadFile(indexPath, { query: savedInterfaceLocale ? { locale: savedInterfaceLocale } : {} });
 
   mainWindow.on('close', (event) => {
-    if (!mainWindow.hasUnsavedMiddlewareEdits) return;
-    const answer = dialog.showMessageBoxSync(mainWindow, {
-      type: 'warning',
-      buttons: [t('继续编辑'), t('丢弃编辑并退出')],
-      defaultId: 0,
-      cancelId: 0,
-      message: t('中间件工作台中有未交付的编辑。')
+    const window = mainWindow;
+    if (!window.hasUnsavedMiddlewareEdits) return;
+    event.preventDefault();
+    if (pendingConfirmation?.purpose === 'quit') return;
+    confirmInApp(window, 'quit', {
+      message: t('中间件工作台中有未交付的编辑。'),
+      cancel: t('继续编辑'),
+      confirm: t('丢弃编辑并退出')
+    }).then(accepted => {
+      if (!accepted || window.isDestroyed()) return;
+      window.hasUnsavedMiddlewareEdits = false;
+      window.close();
     });
-    if (answer === 0) event.preventDefault();
-    else mainWindow.hasUnsavedMiddlewareEdits = false;
   });
 
+  mainWindow.webContents.on('render-process-gone', () => pendingConfirmation?.resolve(false));
   // 窗口关闭处理
   mainWindow.on('closed', () => {
+    pendingConfirmation?.resolve(false);
     mainWindow = null;
   });
 
@@ -1229,6 +1236,28 @@ async function showOwnedOpenDialog(event, options = {}) {
 
 // ==================== IPC 处理 ====================
 
+function confirmInApp(window, purpose, options) {
+  if (!window || window.isDestroyed() || window.webContents.isLoadingMainFrame()) return Promise.resolve(false);
+  if (pendingConfirmation) {
+    if (purpose !== 'quit') return Promise.resolve(false);
+    pendingConfirmation.resolve(false);
+  }
+  return new Promise(resolve => {
+    const id = randomUUID();
+    pendingConfirmation = {
+      id, purpose, resolve(accepted) {
+        pendingConfirmation = undefined;
+        resolve(accepted);
+      }
+    };
+    try {
+      window.webContents.send('app-confirmation', { id, ...options });
+    } catch {
+      pendingConfirmation.resolve(false);
+    }
+  });
+}
+
 function setupIpcHandlers() {
   ipcMain.handle('audio-capabilities', () => ({
     version: audioCapabilityManifest.version || 1,
@@ -1259,9 +1288,9 @@ function setupIpcHandlers() {
     }
   });
 
-  // 文件对话框
-  ipcMain.handle('dialog-message', async (event, options) => {
-    return await dialog.showMessageBox(mainWindow, options);
+  ipcMain.on('app-confirmation-result', (event, id, accepted) => {
+    if (event.sender !== mainWindow?.webContents || pendingConfirmation?.id !== id) return;
+    pendingConfirmation.resolve(accepted === true);
   });
 
   // 后端 API 代理
@@ -1569,29 +1598,46 @@ function setupIpcHandlers() {
       if (action === 'load-plugin') {
         if (typeof data.id !== 'string' || !/^[a-f0-9]{64}$/.test(data.id)) throw new Error('未知媒体操作');
         const name = String(data.name || 'VST3').replace(/[\p{C}]/gu, '').slice(0, 200);
-        const approval = await dialog.showMessageBox(mainWindow, {
-          type: 'warning',
+        const approved = await confirmInApp(mainWindow, 'plugin', {
           message: t('加载 VST3 插件「{name}」？', { name }),
           detail: t('插件将在本机执行代码。请只加载你信任的来源提供的插件。'),
-          buttons: [t('取消'), t('加载插件')],
-          defaultId: 0,
-          cancelId: 0
+          cancel: t('取消'),
+          confirm: t('加载插件')
         });
-        if (approval.response !== 1) return null;
+        if (!approved) return null;
         return await requestBackendJson(apiBaseUrl + `/effects/plugins/${data.id}/load`, { method: 'POST' });
       }
       if (action === 'edit-plugin') {
-        if (typeof data.id !== 'string' || !/^[a-f0-9]{32}$/.test(data.id)) throw new Error('未知媒体操作');
+        if (typeof data.id !== 'string' || !/^[a-f0-9]{32}$/.test(data.id) ||
+            typeof data.instance !== 'string' || !/^[a-f0-9]{32}$/.test(data.instance)) throw new Error('未知媒体操作');
         if (quitInProgress) return null;
+        if (pluginEditorSessions.has(data.instance)) return null;
+        pluginEditorSessions.add(data.instance);
         openPluginEditors++;
+        const contents = event.sender;
+        contents.setBackgroundThrottling(false);
         try {
           return await requestBackendJson(apiBaseUrl + `/effects/plugins/${data.id}/edit`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ state: data.state, values: data.values })
+            body: JSON.stringify({ state: data.state, values: data.values, instance: data.instance, dark: data.dark === true })
           });
         } finally {
+          pluginEditorSessions.delete(data.instance);
           openPluginEditors--;
+          if (!openPluginEditors && !contents.isDestroyed()) contents.setBackgroundThrottling(true);
         }
+      }
+      if (action === 'close-plugin-editor') {
+        if (typeof data.instance !== 'string' || !/^[a-f0-9]{32}$/.test(data.instance)) throw new Error('未知媒体操作');
+        const url = apiBaseUrl + `/effects/editors/${data.instance}/close`;
+        const deadline = Date.now() + 2500;
+        while (pluginEditorSessions.has(data.instance)) {
+          const result = await requestBackendJson(url, { method: 'POST', signal: AbortSignal.timeout(2500) });
+          if (result.closed) return result;
+          if (Date.now() >= deadline) throw new Error('VST3 插件响应超时');
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        return null;
       }
       if (action === 'connect') {
         const host = data.host;
@@ -1662,8 +1708,8 @@ function setupIpcHandlers() {
     }
   });
 
-  ipcMain.on('editing-dirty', (_event, dirty) => {
-    if (mainWindow) mainWindow.hasUnsavedMiddlewareEdits = dirty === true;
+  ipcMain.on('editing-dirty', (event, dirty) => {
+    if (event.sender === mainWindow?.webContents) mainWindow.hasUnsavedMiddlewareEdits = dirty === true;
   });
   ipcMain.on('interface-language', (event, language) => {
     if (event.sender !== mainWindow?.webContents) return;

@@ -12,6 +12,8 @@ import os
 import secrets
 import sys
 import threading
+import time
+from collections import OrderedDict, deque
 from contextlib import contextmanager
 from itertools import chain
 from pathlib import Path
@@ -29,7 +31,8 @@ MAX_STATE_TOKEN = ((_MAX_STATE + 2) // 3) * 4 + 65
 _state_key = secrets.token_bytes(32)
 _EDITOR_SLOTS = threading.BoundedSemaphore(4)
 _editor_lock = threading.Lock()
-_editors: set[threading.Event] = set()
+_editors = {}
+_editor_states = OrderedDict()
 _editors_closing = False
 _catalog_lock = threading.Lock()
 _candidates: dict[str, Path] = {}
@@ -58,7 +61,46 @@ def _plugin_binary(path):
     return candidate
 
 
-def _worker(connection, path, rate, channels, values, state, editor):
+def _show_editor(plugin, connection, dark):
+    from core.vst_window import editor_chrome
+
+    initial = previous = plugin.raw_state
+    style = editor_chrome(str(plugin.name), dark)
+    next_sample = 0
+    if 0 < len(initial) <= _MAX_STATE:
+        connection.send_bytes(b"U" + initial)
+
+    class EditorEvents:
+        # Pedalboard calls this from the native GUI thread.
+        def is_set(self):
+            nonlocal next_sample, previous
+            if connection.poll():
+                return connection.recv_bytes(1) == b"X"
+            if style is not None:
+                style()
+            now = time.monotonic()
+            if now >= next_sample:
+                next_sample = now + 0.3
+                current = plugin.raw_state
+                if current != previous:
+                    previous = current
+                    if 0 < len(current) <= _MAX_STATE:
+                        connection.send_bytes(b"U" + current)
+            return False
+
+    plugin.show_editor(EditorEvents())
+    final = plugin.raw_state
+    if len(final) > _MAX_STATE:
+        connection.send_bytes(b"L")
+    elif final != initial:
+        connection.send_bytes(b"S" + final)
+    else:
+        if final and final != previous:
+            connection.send_bytes(b"U" + final)
+        connection.send_bytes(b"S")
+
+
+def _worker(connection, path, rate, channels, values, state, editor, dark):
     # Native plugin code runs in this worker. Keep application credentials out
     # of the environment before any external code is loaded.
     for key in tuple(os.environ):
@@ -66,66 +108,89 @@ def _worker(connection, path, rate, channels, values, state, editor):
             word in key.upper() for word in ("KEY", "TOKEN", "SECRET", "PASSWORD", "PROXY", "COOKIE", "AUTHORIZATION")
         ):
             os.environ.pop(key, None)
+    dll_directory = None
     try:
         with open(os.devnull, "wb") as sink:
             os.dup2(sink.fileno(), 1)
             os.dup2(sink.fileno(), 2)
         from pedalboard import load_plugin
 
-        plugin = load_plugin(str(_plugin_binary(path)), initialization_timeout=8.0)
-        if not plugin.is_effect:
-            raise ValueError("仅支持音频效果插件")
-        if state is not None:
-            plugin.raw_state = state
-        parameters = plugin.parameters
-        if any(key not in parameters for key in values):
-            raise ValueError("插件参数已变化，请重新添加插件")
-        for key, value in values.items():
-            parameters[key].raw_value = value
+        binary = _plugin_binary(path)
+        # Keep dependent Windows DLLs discoverable for the lifetime of the worker.
+        dll_directory = os.add_dll_directory(str(binary.parent)) if os.name == "nt" else None
+
+        def load():
+            plugin = load_plugin(str(binary), initialization_timeout=8.0)
+            if not plugin.is_effect:
+                raise ValueError("仅支持音频效果插件")
+            if state is not None:
+                plugin.raw_state = state
+            if values:
+                parameters = plugin.parameters
+                if any(key not in parameters for key in values):
+                    raise ValueError("插件参数已变化，请重新添加插件")
+                for key, value in values.items():
+                    parameters[key].raw_value = value
+            return plugin
+
+        plugin = load()
         description = {
             "name": str(plugin.name)[:200],
             "parameters": [
                 {"key": key, "name": str(param.name)[:120], "value": float(param.raw_value)}
-                for key, param in list(parameters.items())[:128]
+                for key, param in list(plugin.parameters.items())[:128] if np.isfinite(param.raw_value)
             ],
         }
         connection.send_bytes(b"J" + json.dumps(description, allow_nan=False).encode())
         if editor:
-            before = plugin.raw_state
-            close_window = threading.Event()
-
-            def wait_for_close():
-                try:
-                    connection.recv_bytes(1)
-                except (EOFError, OSError):
-                    pass
-                finally:
-                    close_window.set()
-
-            threading.Thread(target=wait_for_close, daemon=True).start()
-            plugin.show_editor(close_window)
-            after = plugin.raw_state
-            if len(after) > _MAX_STATE:
-                connection.send_bytes(b"L")
-            else:
-                connection.send_bytes(b"S" + after if before != after else b"S")
+            _show_editor(plugin, connection, dark)
             return
         if not rate:
             return
-        while data := connection.recv_bytes(_MAX_MESSAGE):
-            audio = np.frombuffer(data, dtype=np.float32).reshape(-1, channels).T.copy()
-            rendered = np.asarray(plugin.process(audio, rate, reset=False), dtype=np.float32)
-            output = np.ascontiguousarray(rendered.reshape(channels, -1).T)
+        stereo_adapter = False
+        first_block = True
+        while data := connection.recv_bytes(_MAX_STATE + 1):
+            if data[:1] == b"S":
+                state = data[1:]
+                plugin.raw_state = state
+                connection.send_bytes(b"S")
+                continue
+            if data[:1] != b"A":
+                raise ValueError("VST3 返回的音频格式无效")
+            audio = np.frombuffer(data, offset=1, dtype=np.float32).reshape(-1, channels).T.copy()
+            if first_block:
+                first_block = False
+                try:
+                    rendered = plugin.process(audio, rate, buffer_size=512, reset=False)
+                except ValueError as exc:
+                    detail = str(exc)
+                    if channels != 1 or not any(text in detail for text in (
+                        "does not support 1-channel", "but provided audio data contained 1 channel",
+                    )):
+                        raise
+                    plugin = load()
+                    stereo_adapter = True
+                    rendered = plugin.process(np.repeat(audio, 2, axis=0), rate, buffer_size=512, reset=False)
+            else:
+                adapted = np.repeat(audio, 2, axis=0) if stereo_adapter else audio
+                rendered = plugin.process(adapted, rate, buffer_size=512, reset=False)
+            if stereo_adapter:
+                rendered = np.asarray(rendered).reshape(2, -1).mean(axis=0, keepdims=True)
+            output = np.ascontiguousarray(np.asarray(rendered, dtype=np.float32).reshape(channels, -1).T)
             connection.send_bytes(b"A" + output.tobytes())
     except (EOFError, BrokenPipeError):
         pass
-    except Exception:
+    except Exception as exc:
         try:
-            connection.send_bytes(b"E")
+            message = str(exc)
+            expected = {"仅支持音频效果插件", "插件参数已变化，请重新添加插件"}
+            connection.send_bytes(b"E" + (message.encode() if message in expected else b""))
         except OSError:
             pass
     finally:
         connection.close()
+        if dll_directory is not None:
+            dll_directory.close()
 
 
 def _receive(connection, deadline, max_message=_MAX_MESSAGE):
@@ -137,13 +202,15 @@ def _receive(connection, deadline, max_message=_MAX_MESSAGE):
         raise ValueError("VST3 插件进程异常退出") from exc
     if payload[:1] == b"L":
         raise ValueError("插件状态超出保存上限")
-    if payload[:1] not in {b"A", b"J", b"S"}:
+    if payload[:1] == b"E" and payload[1:]:
+        raise ValueError(payload[1:].decode())
+    if payload[:1] not in {b"A", b"J", b"S", b"U"}:
         raise ValueError("VST3 插件无法加载或处理音频，请检查兼容性")
     return payload[:1], payload[1:]
 
 
 @contextmanager
-def _host(path, rate=0, channels=0, values=None, *, state=None, editor=False):
+def _host(path, rate=0, channels=0, values=None, *, state=None, editor=False, dark=False):
     if not available():
         raise ValueError("VST3 宿主组件不可用")
     slots = _EDITOR_SLOTS if editor else _HOST_SLOTS
@@ -151,7 +218,7 @@ def _host(path, rate=0, channels=0, values=None, *, state=None, editor=False):
         raise ValueError("请先关闭一个 VST3 编辑窗口" if editor else "VST3 渲染已占满，请减少同时启用的插件")
     context = multiprocessing.get_context("spawn")
     parent, child = context.Pipe()
-    worker = context.Process(target=_worker, args=(child, str(path), rate, channels, values or {}, state, editor), daemon=True)
+    worker = context.Process(target=_worker, args=(child, str(path), rate, channels, values or {}, state, editor, dark), daemon=True)
     try:
         worker.start()
         child.close()
@@ -288,43 +355,95 @@ def close_editors():
     global _editors_closing
     with _editor_lock:
         _editors_closing = True
-        for closed in _editors:
+        for closed in _editors.values():
             closed.set()
 
 
-def edit(plugin_id, token=None, values=None):
+def close_editor(instance):
+    with _editor_lock:
+        if closed := _editors.get(instance):
+            closed.set()
+            return True
+    return False
+
+
+def _editor_state(plugin_id, instance, fallback):
+    if instance is None:
+        return fallback
+    with _editor_lock:
+        current = _editor_states.get(instance)
+        return current[1] if current and current[0] == plugin_id else fallback
+
+
+def edit(plugin_id, token=None, values=None, *, instance=None, dark=False):
     path = _registered_path(plugin_id)
     state = _decode_state(plugin_id, token)
     closed = threading.Event()
+    instance = instance or uuid4().hex
     with _editor_lock:
-        if _editors_closing:
+        if _editors_closing or instance in _editors:
             raise ValueError("无法打开 VST3 编辑窗口")
-        _editors.add(closed)
+        _editors[instance] = closed
+        _editor_states.pop(instance, None)
+
+    def update(raw):
+        with _editor_lock:
+            existing = _editor_states.get(instance)
+            if existing is not None and raw == existing[1]:
+                return
+            _editor_states[instance] = (plugin_id, raw)
+            _editor_states.move_to_end(instance)
+            if len(_editor_states) > 16:
+                _editor_states.popitem(last=False)
+
     try:
-        with _host(path, values=values, state=state, editor=True) as (connection, _):
-            while not connection.poll(0.2):
-                if closed.is_set():
-                    try:
-                        connection.send_bytes(b"X")
-                    except (BrokenPipeError, OSError):
-                        pass
-                    return {"changed": False, "state": token}
-            kind, updated = _receive(connection, 0, _MAX_STATE + 1)
-            if kind != b"S":
-                raise ValueError("无法读取 VST3 编辑器状态")
+        with _host(path, values=values, state=state, editor=True, dark=dark) as (connection, _):
+            close_deadline = None
+            while True:
+                if closed.is_set() and close_deadline is None:
+                    connection.send_bytes(b"X")
+                    close_deadline = time.monotonic() + 8
+                if close_deadline is not None and time.monotonic() >= close_deadline:
+                    raise ValueError("VST3 插件响应超时")
+                if not connection.poll(0.1):
+                    continue
+                kind, updated = _receive(connection, 0, _MAX_STATE + 1)
+                if kind == b"U" and updated:
+                    update(updated)
+                    continue
+                if kind != b"S":
+                    raise ValueError("无法读取 VST3 编辑器状态")
+                if updated:
+                    update(updated)
+                break
         return {"changed": bool(updated), "state": _encode_state(plugin_id, updated) if updated else token}
+    except (OSError, ValueError):
+        with _editor_lock:
+            _editor_states.pop(instance, None)
+        raise
     finally:
         with _editor_lock:
-            _editors.discard(closed)
+            _editors.pop(instance, None)
 
 
-def process(blocks, rate, channels, plugin_id, values, token=None):
+def _process(blocks, rate, channels, plugin_id, values, token, instance=None):
     if channels not in {1, 2}:
         raise ValueError("VST3 效果链支持单声道与立体声")
-    state = _decode_state(plugin_id, token)
+    baseline = _decode_state(plugin_id, token)
+    state = _editor_state(plugin_id, instance, baseline)
+    if state is not baseline:
+        values = None
     with _host(_registered_path(plugin_id), rate, channels, values, state=state) as (connection, _):
         def render(block):
-            connection.send_bytes(np.ascontiguousarray(block, dtype=np.float32).tobytes())
+            nonlocal state
+            latest = _editor_state(plugin_id, instance, baseline)
+            if latest is not None and latest != state:
+                connection.send_bytes(b"S" + latest)
+                kind, _ = _receive(connection, 8.0)
+                if kind != b"S":
+                    raise ValueError("无法读取 VST3 编辑器状态")
+                state = latest
+            connection.send_bytes(b"A" + np.ascontiguousarray(block, dtype=np.float32).tobytes())
             kind, raw = _receive(connection, 8.0)
             if kind != b"A" or len(raw) % (4 * channels):
                 raise ValueError("VST3 返回的音频格式无效")
@@ -338,6 +457,8 @@ def process(blocks, rate, channels, plugin_id, values, token=None):
             for offset in range(0, len(block), 8192):
                 chunk = block[offset:offset + 8192]
                 expected += len(chunk)
+                if expected - delivered > 64 * 4096:
+                    raise ValueError("VST3 未返回完整的渲染音频")
                 audio = render(chunk)
                 if len(audio) > expected - delivered:
                     raise ValueError("VST3 返回的音频长度无效")
@@ -354,3 +475,53 @@ def process(blocks, rate, channels, plugin_id, values, token=None):
                 yield audio
         if delivered != expected:
             raise ValueError("VST3 未返回完整的渲染音频")
+
+
+
+def process(blocks, rate, channels, plugin_id, values, token=None, *, instance=None, on_error=None):
+    if on_error is None:
+        yield from _process(blocks, rate, channels, plugin_id, values, token)
+        return
+
+    # Keep only the input still awaiting plug-in output. If a plug-in fails,
+    # resume with the corresponding dry samples so the preview keeps its time.
+    pending = deque()
+    source = iter(blocks)
+
+    class InputFailure(Exception):
+        pass
+
+    def tapped():
+        try:
+            for block in source:
+                pending.append(block.copy())
+                yield block
+        except (OSError, ValueError) as exc:
+            raise InputFailure from exc
+
+    rendered = _process(tapped(), rate, channels, plugin_id, values, token, instance)
+    try:
+        while True:
+            try:
+                audio = next(rendered)
+            except StopIteration:
+                return
+            except InputFailure as exc:
+                raise exc.__cause__ from None
+            except (OSError, ValueError) as exc:
+                on_error(plugin_id, str(exc))
+                yield from pending
+                yield from source
+                return
+            frames = len(audio)
+            while frames and pending:
+                dry = pending.popleft()
+                if frames < len(dry):
+                    pending.appendleft(dry[frames:])
+                    break
+                frames -= len(dry)
+            yield audio
+    finally:
+        rendered.close()
+        if close := getattr(source, "close", None):
+            close()

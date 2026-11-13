@@ -5,10 +5,13 @@ from __future__ import annotations
 import asyncio
 import hmac
 import os
+import threading
+import time
+from collections import OrderedDict
 from pathlib import Path
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Path as PathParameter, Query
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
@@ -37,6 +40,7 @@ class EffectRequest(BaseModel):
     values: dict[str, Annotated[float, Field(allow_inf_nan=False)]] = Field(default_factory=dict, max_length=128)
     plugin_id: str | None = Field(default=None, max_length=64)
     plugin_state: str | None = Field(default=None, max_length=vst.MAX_STATE_TOKEN)
+    plugin_instance: str | None = Field(default=None, pattern=r"^[a-f0-9]{32}$")
     bands: list[EQBandRequest] = Field(default_factory=list, max_length=8)
 
 
@@ -90,6 +94,11 @@ class MixRequest(BaseModel):
     rate: int = Field(default=48000, ge=8000, le=384000)
     channels: int = Field(default=2, ge=1, le=32)
     start: Time = 0
+
+
+class PreviewRequest(MixRequest):
+    master_effects: list[EffectRequest] = Field(default_factory=list, max_length=12)
+    request_id: str | None = Field(default=None, pattern=r"^[a-f0-9-]{36}$")
 
 
 class DAWRequest(BaseModel):
@@ -161,7 +170,8 @@ def _clip(project_id, request, *, allow_host=True):
 
 def _effects(requests):
     effects = tuple(validate_effect(Effect(item.kind, item.values, item.plugin_id,
-                                          tuple(EQBand(**band.model_dump()) for band in item.bands), item.plugin_state))
+                                          tuple(EQBand(**band.model_dump()) for band in item.bands),
+                                          item.plugin_state, item.plugin_instance))
                     for item in requests)
     if any(effect.kind == "normalize" for effect in effects[1:]):
         raise ValueError("响度归一化需置于处理链首位")
@@ -232,30 +242,71 @@ def file_loudness(file_id: str, project_id: str):
         raise HTTPException(422, str(exc)) from exc
 
 
+_preview_lock = threading.Lock()
+_preview_warnings = OrderedDict()
+
+
+@router.get("/preview/{request_id}/warnings")
+def preview_warnings(request_id: str):
+    with _preview_lock:
+        warnings = _preview_warnings.pop(request_id, {})
+    return {"plugins": warnings}
+
+
 @router.post("/preview")
-def preview(request: MixRequest):
+def preview(request: PreviewRequest):
+    def report(plugin_id, message):
+        if request.request_id is None:
+            return
+        with _preview_lock:
+            warnings = _preview_warnings.setdefault(request.request_id, {})
+            warnings.setdefault(plugin_id, message)
+            if len(_preview_warnings) > 128:
+                _preview_warnings.popitem(last=False)
+
     try:
         tracks, duration = _mix_request(request)
-        blocks = mix(tracks, request.rate, request.channels, duration, start=request.start)
-        if any(track.effects or any(clip.effects for clip in track.clips) for track in tracks):
+        master = _effects(request.master_effects)
+        chains = [master, *(track.effects for track in tracks),
+                  *(clip.effects for track in tracks for clip in track.clips)]
+        live = any(effect.plugin_instance for effects in chains for effect in effects)
+        frames = round(duration * request.rate) - round(request.start * request.rate)
+        if frames < 1 or frames * request.channels * 2 > 0xffffffff - 36:
+            raise ValueError("预览时长超出 WAV 限制")
+        blocks = mix(tracks, request.rate, request.channels, duration, start=request.start,
+                     master_effects=master, on_plugin_error=report if request.request_id else None)
+        if any(chains):
             first = next(blocks, None)
             if first is None:
                 raise ValueError("选区没有可播放的音频")
 
             def prepared():
+                # HTTP can otherwise render a whole file ahead of its audible
+                # position, leaving live plug-in edits trapped behind that buffer.
+                started = time.monotonic()
+                emitted = len(first)
                 try:
                     yield first
-                    yield from blocks
+                    if not live:
+                        yield from blocks
+                        return
+                    while emitted < frames:
+                        delay = started + emitted / request.rate - 0.25 - time.monotonic()
+                        if delay > 0:
+                            time.sleep(delay)
+                        block = next(blocks, None)
+                        if block is None:
+                            break
+                        emitted += len(block)
+                        yield block
                 finally:
                     blocks.close()
 
             source = prepared()
         else:
             source = blocks
-        return _stream(source,
-                       request.rate, request.channels,
-                       round(duration*request.rate) - round(request.start*request.rate))
-    except (ValueError, AudioServiceError) as exc:
+        return _stream(source, request.rate, request.channels, frames)
+    except (OSError, ValueError, AudioServiceError) as exc:
         raise HTTPException(422, str(exc)) from exc
 
 
@@ -276,6 +327,15 @@ def load_plugin(plugin_id: str, x_soundbot_ipc: str | None = Header(None)):
 class PluginEditorRequest(BaseModel):
     state: str | None = Field(default=None, max_length=vst.MAX_STATE_TOKEN)
     values: dict[str, Annotated[float, Field(ge=0, le=1, allow_inf_nan=False)]] = Field(default_factory=dict, max_length=128)
+    instance: str | None = Field(default=None, pattern=r"^[a-f0-9]{32}$")
+    dark: bool = False
+
+
+@router.post("/effects/editors/{instance}/close")
+def close_editor(instance: Annotated[str, PathParameter(pattern=r"^[a-f0-9]{32}$")],
+                 x_soundbot_ipc: str | None = Header(None)):
+    _trusted(x_soundbot_ipc)
+    return {"closed": vst.close_editor(instance)}
 
 
 @router.post("/effects/editors/close")
@@ -289,7 +349,8 @@ def close_editors(x_soundbot_ipc: str | None = Header(None)):
 def edit_plugin(plugin_id: str, request: PluginEditorRequest, x_soundbot_ipc: str | None = Header(None)):
     _trusted(x_soundbot_ipc)
     try:
-        return vst.edit(plugin_id, request.state, request.values if request.state is None else None)
+        return vst.edit(plugin_id, request.state, request.values if request.state is None else None,
+                        instance=request.instance, dark=request.dark)
     except (OSError, ValueError) as exc:
         raise HTTPException(422, "无法打开 VST3 编辑窗口" if isinstance(exc, OSError) else str(exc)) from exc
 

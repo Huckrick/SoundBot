@@ -1152,6 +1152,16 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
   </div>
 </div>
 <div id="clipMenu" class="eq-menu" role="menu" hidden></div>
+<dialog id="actionDialog" class="modal" aria-labelledby="actionMessage" aria-describedby="actionDetail">
+  <form method="dialog">
+    <h3 id="actionMessage"></h3>
+    <p id="actionDetail" class="modal-hint" hidden></p>
+    <div class="modal-foot">
+      <button id="actionCancel" class="ghost-btn" value="cancel" autofocus></button>
+      <button id="actionConfirm" class="pill-btn solid" value="ok"></button>
+    </div>
+  </form>
+</dialog>
 <dialog id="pluginDialog" class="modal">
   <button class="modal-close" id="btnClosePlugins" aria-label="关闭">✕</button>
   <h3>添加 VST3 效果器</h3>

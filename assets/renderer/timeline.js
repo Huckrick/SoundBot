@@ -1058,8 +1058,9 @@
             $('inspWwisePath').textContent = source?.path || '—';
             $('wwiseCurrentSource').textContent = source?.name || '—';
             const label = t('轨道效果器');
-            fx.useRack(track?.effects, track ? `${label} · ${trackName(track)}` : label, () => {
-                if (!state.dockEditing) ui.refreshAudition();
+            fx.useRack(track?.effects, track ? `${label} · ${trackName(track)}` : label, ({ live } = {}) => {
+                if (!tracks.includes(track)) return;
+                if (!live && !state.dockEditing) ui.refreshAudition();
                 dirtyState(true);
             }, target?.sample_rate || 48000);
         }
@@ -1186,7 +1187,7 @@
         renderDock();
     }
 
-    function mixRequest() {
+    function mixRequest(live = false) {
         return {
             project_id: state.library?.id || 'default',
             rate: target.sample_rate,
@@ -1199,7 +1200,7 @@
                     const curve = track.crossfades.get(overlapKey(left, right));
                     return curve ? [[track.clips.indexOf(left), track.clips.indexOf(right), curve]] : [];
                 }),
-                effects: fx.enabled(track.effects),
+                effects: fx.enabled(track.effects, live),
                 clips: track.clips.map(({ id, name, maxDuration, peaks, ...clip }) => clip)
             }))
         };
@@ -1209,10 +1210,7 @@
         if (!target || !duration() || busy) return say(t('请先选择音频源并添加剪辑'));
         const start = state.position < duration() ? state.position : 0;
         const token = ++previewGeneration;
-        return playback.playPCM(api.url('/api/v1/preview'), {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...mixRequest(), start })
-        }, start, () => {
+        return fx.preview({ ...mixRequest(true), start }, start, () => {
             state.position = 0;
             if (state.loop && token === previewGeneration && state.workspace === 'wwise') attempt(play);
             syncTransport();
@@ -1231,12 +1229,13 @@
         if (busy || expectedTarget !== target) return;
         pause(true);
         const previous = source;
-        const session = { ...mixRequest(), token: target.token };
         busy = true;
         dirtyState(true);
         renderHostLabels();
         renderLog(() => t('正在渲染并验证…'));
         try {
+            await fx.finishEditing(tracks.map(track => track.effects));
+            const session = { ...mixRequest(), token: target.token };
             const result = await desktop.desktopMedia('writeback', session);
             dirtyState(false);
             if (replace) {
@@ -1244,6 +1243,8 @@
                 renderLog(() => t('源 WAV 已更新 · Wwise 转换状态待确认'));
                 say(t('已更新 Wwise 源 WAV'));
             } else {
+                for (const track of tracks) track.effects = fx.create();
+                renderControls();
                 deliveredFile = result.path;
                 renderLog(() => `${t('已交付 {name}', { name: result.name })} · ${t(host === 'fmod'
                     ? '在 FMOD Assets 中右键选择 Import。'
