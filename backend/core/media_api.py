@@ -36,6 +36,7 @@ class EffectRequest(BaseModel):
     kind: Literal["normalize", "eq", "compressor", "reverb", "vst3"]
     values: dict[str, Annotated[float, Field(allow_inf_nan=False)]] = Field(default_factory=dict, max_length=128)
     plugin_id: str | None = Field(default=None, max_length=64)
+    plugin_state: str | None = Field(default=None, max_length=vst.MAX_STATE_TOKEN)
     bands: list[EQBandRequest] = Field(default_factory=list, max_length=8)
 
 
@@ -68,6 +69,9 @@ class ClipRequest(BaseModel):
         return points
 
 
+ClipIndex = Annotated[int, Field(ge=0, lt=128)]
+
+
 class TrackRequest(BaseModel):
     clips: list[ClipRequest] = Field(max_length=128)
     gain: Gain = 0
@@ -77,6 +81,7 @@ class TrackRequest(BaseModel):
     effects: list[EffectRequest] = Field(default_factory=list, max_length=12)
     auto_crossfade: bool = False
     crossfade_curve: Curve = "linear"
+    crossfade_overrides: list[tuple[ClipIndex, ClipIndex, Curve | Literal["off"]]] = Field(default_factory=list, max_length=127)
 
 
 class MixRequest(BaseModel):
@@ -156,7 +161,7 @@ def _clip(project_id, request, *, allow_host=True):
 
 def _effects(requests):
     effects = tuple(validate_effect(Effect(item.kind, item.values, item.plugin_id,
-                                          tuple(EQBand(**band.model_dump()) for band in item.bands)))
+                                          tuple(EQBand(**band.model_dump()) for band in item.bands), item.plugin_state))
                     for item in requests)
     if any(effect.kind == "normalize" for effect in effects[1:]):
         raise ValueError("响度归一化需置于处理链首位")
@@ -168,7 +173,8 @@ def _mix_request(request):
     for track in request.tracks:
         clips = tuple(_clip(request.project_id, clip)[0] for clip in track.clips)
         tracks.append(Track(clips, track.gain, track.mute, track.solo, track.channels,
-                            _effects(track.effects), track.auto_crossfade, track.crossfade_curve))
+                            _effects(track.effects), track.auto_crossfade, track.crossfade_curve,
+                            tuple(track.crossfade_overrides)))
     if sum(len(track.clips) for track in tracks) > 128:
         raise ValueError("单次预览或写回最多支持 128 个剪辑")
     duration = max((clip.start + clip.duration for track in tracks for clip in track.clips), default=0)
@@ -265,6 +271,27 @@ def load_plugin(plugin_id: str, x_soundbot_ipc: str | None = Header(None)):
         return vst.load_discovered(plugin_id)
     except (OSError, ValueError) as exc:
         raise HTTPException(422, "无法加载本地 VST3" if isinstance(exc, OSError) else str(exc)) from exc
+
+
+class PluginEditorRequest(BaseModel):
+    state: str | None = Field(default=None, max_length=vst.MAX_STATE_TOKEN)
+    values: dict[str, Annotated[float, Field(ge=0, le=1, allow_inf_nan=False)]] = Field(default_factory=dict, max_length=128)
+
+
+@router.post("/effects/editors/close")
+def close_editors(x_soundbot_ipc: str | None = Header(None)):
+    _trusted(x_soundbot_ipc)
+    vst.close_editors()
+    return {"closed": True}
+
+
+@router.post("/effects/plugins/{plugin_id}/edit")
+def edit_plugin(plugin_id: str, request: PluginEditorRequest, x_soundbot_ipc: str | None = Header(None)):
+    _trusted(x_soundbot_ipc)
+    try:
+        return vst.edit(plugin_id, request.state, request.values if request.state is None else None)
+    except (OSError, ValueError) as exc:
+        raise HTTPException(422, "无法打开 VST3 编辑窗口" if isinstance(exc, OSError) else str(exc)) from exc
 
 
 @router.post("/delivery")

@@ -37,6 +37,8 @@
     let libraryPanel = 'tabDetail';
     let wwisePanel = 'tabDetail';
     const peakCache = new Map();
+    const miniPeaks = new Map();
+    const miniLimit = 8192;
     const artCache = new Map();
     const artworkRequests = new Map();
     let sourceDetails;
@@ -239,7 +241,7 @@
             name,
             range: state.range && [...state.range],
             controls,
-            effects: structuredClone(state.effects)
+            effects: state.effects
         });
     }
 
@@ -257,7 +259,7 @@
         stop(true);
         state.selected = item;
         const saved = item && clipSessions.get(item.id);
-        state.effects = item && (saved?.effects ? structuredClone(saved.effects) : fx()?.create());
+        state.effects = item && (saved?.effects || fx()?.create());
         fx()?.resetLoudness();
         if (isLibrary()) showLibraryEffects();
         state.range = saved?.range && saved.range[1] <= item.duration ? [...saved.range] : null;
@@ -300,6 +302,15 @@
             state.waveform = result.peaks;
             if (!item.duration && result.duration) item.duration = result.duration;
             rememberPreview(peakCache, key, result.peaks, 512);
+            if ((!item.source_fingerprint || result.source_fingerprint === item.source_fingerprint) && !miniPeaks.has(key)) {
+                const compact = new Float32Array(256);
+                for (let index = 0; index < compact.length; index++) {
+                    const lo = Math.floor(index * result.peaks.length / compact.length);
+                    const hi = Math.floor((index + 1) * result.peaks.length / compact.length);
+                    compact[index] = Math.max(...result.peaks.slice(lo, hi));
+                }
+                rememberPreview(miniPeaks, key, compact, miniLimit);
+            }
             scheduleMiniPeaks();
             setText($('waveformStatus'), '');
             syncTransport();
@@ -694,8 +705,6 @@
         state.dockEditing = false;
         libraryEditor = null;
         clipSessions.clear();
-        peakCache.clear();
-        artCache.clear();
         syncBottomStage();
         if (library) localStorage.setItem('soundbot-library', library.id);
         else localStorage.removeItem('soundbot-library');
@@ -737,7 +746,7 @@
             state.cursor = result.next_cursor;
             state.total = result.total ?? state.total;
             if (reset) $('rows').scrollTop = 0;
-            renderRows();
+            renderRows(!reset);
         } catch (error) {
             if (error.name !== 'AbortError') throw error;
         } finally {
@@ -872,11 +881,25 @@
         while (nextRows.size > Math.max(128, count)) nextRows.delete(nextRows.keys().next().value);
         rowNodes = nextRows;
         if (box.scrollTop !== offset) box.scrollTop = offset;
+        paintMiniPreviews(parts.flatMap(row => [...row.querySelectorAll('canvas.mini-preview')]));
         scheduleMiniPeaks();
     }
 
     const previewKey = item => JSON.stringify([state.library?.id, item.id, item.path, item.source_fingerprint, item.missing]);
     const cachedPeaks = item => peakCache.get(previewKey(item));
+
+    const miniFor = item => miniPeaks.get(previewKey(item)) || cachedPeaks(item);
+
+    function paintMiniPreviews(canvases) {
+        if (!canvases.length) return;
+        const waveColor = color('--tx2');
+        for (const node of canvases) {
+            const item = previewItems.get(node);
+            if (!item || item.missing) continue;
+            const peaks = miniFor(item);
+            if (peaks) waveform.drawMini(node, { waveformData: peaks, inactiveColor: waveColor });
+        }
+    }
 
     function rememberPreview(cache, key, value, limit) {
         if (cache.size >= limit && !cache.has(key)) cache.delete(cache.keys().next().value);
@@ -899,7 +922,7 @@
         return canvas;
     }
 
-    let miniTimer;
+    let miniFrame;
     let loadingPeaks = false;
     let loadingArtwork = false;
     const failedPeaks = new Map();
@@ -978,8 +1001,9 @@
     }
 
     function scheduleMiniPeaks() {
-        clearTimeout(miniTimer);
-        miniTimer = setTimeout(() => {
+        if (miniFrame != null) return;
+        miniFrame = requestAnimationFrame(() => {
+            miniFrame = null;
             const library = state.library?.id;
             if (!library) return;
             const waves = new Map();
@@ -990,8 +1014,14 @@
                 if (!item || item.missing) continue;
                 const key = previewKey(item);
                 if (node.tagName === 'CANVAS') {
-                    const peaks = peakCache.get(key);
-                    if (peaks) waveform.drawMini(node, { waveformData: peaks, inactiveColor: waveColor });
+                    const peaks = miniPeaks.get(key) || peakCache.get(key);
+                    if (peaks) {
+                        waveform.drawMini(node, { waveformData: peaks, inactiveColor: waveColor });
+                        if (miniPeaks.has(key)) {
+                            miniPeaks.delete(key);
+                            miniPeaks.set(key, peaks);
+                        }
+                    }
                     else if (Date.now() - (failedPeaks.get(key) || 0) > 20000) waves.set(key, item);
                 } else if (artCache.has(key)) showArtwork(node, artCache.get(key));
                 else if (Date.now() - (failedArtwork.get(key) || 0) > 20000) covers.set(key, item);
@@ -1001,13 +1031,14 @@
                 loadingPeaks = true;
                 const waveBatch = [...waves].slice(0, 2);
                 api.post('/api/v1/waveforms/batch', {
-                    project_id: library, file_ids: waveBatch.map(([, item]) => item.id)
+                    project_id: library, points: 256, file_ids: waveBatch.map(([, item]) => item.id)
                 }).then(result => {
-                    if (library !== state.library?.id) return;
-                    const peaks = new Map(result.items.filter(item => item.ok).map(item => [item.file_id, item.peaks]));
+                    const loaded = new Map(result.items.filter(item => item.ok).map(item => [item.file_id, item]));
                     for (const [key, item] of waveBatch) {
-                        if (peaks.has(item.id)) rememberPreview(peakCache, key, peaks.get(item.id), 512);
-                        else rememberPreview(failedPeaks, key, Date.now(), 256);
+                        const result = loaded.get(item.id);
+                        if (result && (!item.source_fingerprint || result.source_fingerprint === item.source_fingerprint)) {
+                            rememberPreview(miniPeaks, key, Float32Array.from(result.peaks), miniLimit);
+                        } else rememberPreview(failedPeaks, key, Date.now(), 256);
                     }
                 }).catch(() => waveBatch.forEach(([key]) => rememberPreview(failedPeaks, key, Date.now(), 256)))
                     .finally(() => { loadingPeaks = false; scheduleMiniPeaks(); });
@@ -1018,7 +1049,7 @@
                 requestArtwork(item).catch(() => rememberPreview(failedArtwork, key, Date.now(), 256))
                     .finally(() => { loadingArtwork = false; scheduleMiniPeaks(); });
             }
-        }, 55);
+        });
     }
 
     $('rows').onscroll = () => {

@@ -4,6 +4,19 @@ Release history for SoundBot. / SoundBot 版本记录。
 
 ## [Unreleased] / 未发布
 
+## [1.0.4] - 2026-11-13
+
+### Changed / 变更
+
+- Browse and search the full Wwise project tree with viewport-based rendering. / Wwise 工程树支持完整浏览和搜索，界面只渲染可见行。
+- Edit fades directly on clips, set individual crossfade shapes, and draw stereo pan automation on the waveform. / 在剪辑块上直接调整淡化，为单个交叉区设置曲线，在波形上编辑立体声声像。
+- Open native VST3 editors, retain their state for audition and delivery, and reorder, bypass, or remove effects in the rack. / 打开 VST3 原生界面，保留插件状态用于试听和交付，并在效果链排序、旁通或移除。
+
+### Fixed / 修复
+
+- Reuse compact waveform previews when browsing and refreshing library results. / 浏览和刷新音效库时复用轻量波形预览。
+- Report non-finite VST3 output as a render error. / VST3 返回非有限采样时报告渲染错误。
+
 ## [1.0.3] - 2026-11-13
 
 ### Changed / 变更
@@ -187,7 +200,8 @@ Release history for SoundBot. / SoundBot 版本记录。
 - The Windows release gate starts the frozen backend with a clean `PATH` and no system FFmpeg, then requires the complete format matrix, exact waveforms, CLAP, Chroma, hybrid search, `win-unpacked`, and NSIS installer integrity checks to pass before publishing. / Windows 发布门禁会在干净 `PATH`、无系统 FFmpeg 下启动冻结后端，并要求全格式矩阵、精确波形、CLAP、Chroma、混合搜索、`win-unpacked` 与 NSIS 安装包完整性检查全部通过后才允许发布。
 - CI builds Windows x64 and macOS arm64 only on native runners and blocks release creation if any functional smoke test, model check, metadata check, package check, or installer check fails. / CI 仅在原生 runner 构建 Windows x64 与 macOS arm64，并在任一功能冒烟、模型、元数据、应用包或安装包检查失败时阻止创建 Release。
 
-[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.3...HEAD
+[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.4...HEAD
+[1.0.4]: https://github.com/Huckrick/SoundBot/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/Huckrick/SoundBot/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/Huckrick/SoundBot/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/Huckrick/SoundBot/compare/v1.0.0...v1.0.1

@@ -41,6 +41,7 @@ class Track:
     effects: tuple[Effect, ...] = ()
     auto_crossfade: bool = False
     crossfade_curve: str = "linear"
+    crossfade_overrides: tuple[tuple[int, int, str], ...] = ()
 
 
 def read_region(path, offset, frames, rate, channels):
@@ -164,14 +165,17 @@ def _clip_blocks(clip, channels, rate, start, stop):
     return _skip_frames(apply_effects(read(0), rate, channels, clip.effects, measure=lambda: read(0)), start)
 
 
-def _crossfades(regions):
+def _crossfades(regions, default_curve, overrides):
     """Find boundary overlaps between consecutive clips on a track."""
     transitions = [[] for _ in regions]
+    curves = {(left, right): curve for left, right, curve in overrides}
     ordered = sorted(enumerate(regions), key=lambda item: item[1][0])
     for (a, (a_start, a_end)), (b, (b_start, b_end)) in zip(ordered, ordered[1:]):
         if a_start < b_start < a_end < b_end:
-            transitions[a].append((b_start, a_end, False))
-            transitions[b].append((b_start, a_end, True))
+            curve = curves.get((a, b), default_curve)
+            if curve != "off":
+                transitions[a].append((b_start, a_end, False, curve))
+                transitions[b].append((b_start, a_end, True, curve))
     return transitions
 
 
@@ -180,7 +184,8 @@ def _track_blocks(track, rate, channels, origin, stop, pan_enabled):
     active = []
     regions = [(round(clip.start * rate), round(clip.start * rate) + round(clip.duration * rate))
                for clip in track.clips]
-    crossfades = _crossfades(regions) if track.auto_crossfade else [()] * len(regions)
+    crossfades = (_crossfades(regions, track.crossfade_curve, track.crossfade_overrides)
+                  if track.auto_crossfade else [()] * len(regions))
     try:
         for clip, (left, right), fades in zip(track.clips, regions, crossfades):
             if right <= origin or left >= stop:
@@ -196,13 +201,12 @@ def _track_blocks(track, rate, channels, origin, stop, pan_enabled):
                 if begin >= finish:
                     continue
                 samples = _map_channels(reader.take(finish-begin), channels)
-                for fade_start, fade_end, fade_in in fades:
+                for fade_start, fade_end, fade_in, curve in fades:
                     if finish <= fade_start or begin >= fade_end:
                         continue
                     first = max(begin, fade_start)
                     last = min(finish, fade_end)
                     blend = (np.arange(first, last) - fade_start) / max(1, fade_end - fade_start - 1)
-                    curve = track.crossfade_curve
                     shaped = _fade(blend, curve)
                     envelope = shaped if fade_in else (
                         _fade(1 - blend, curve) if curve == "equal_power" else 1 - shaped

@@ -173,6 +173,12 @@ class CoreDeliveryTests(unittest.TestCase):
         self.assertGreater(overlap["equal_power"][6000], overlap["linear"][6000])
         self.assertLess(overlap["ease_in"][6000], overlap["ease_out"][6000])
         self.assertLess(overlap["smooth"][5000], overlap["linear"][5000])
+        reversed_clips = tuple(reversed(clips))
+        track = editing.Track(reversed_clips, auto_crossfade=True,
+                              crossfade_overrides=((1, 0, "off"),))
+        with patch.object(editing, "read_region", read_region):
+            off = np.concatenate(list(editing.mix([track], rate, 1, 1.5)))[:, 0]
+        self.assertAlmostEqual(float(off[6000]), 0.6, places=5)
         with self.assertRaises(ValueError):
             ClipRequest(duration=1, pan=[(0.5, 0), (0.5, 1)])
 
@@ -197,6 +203,36 @@ class CoreDeliveryTests(unittest.TestCase):
             self.assertEqual(self.client.post(url, headers=self.headers).raise_for_status().json()["id"], "registered")
             register.assert_called_once_with(bundle.resolve())
             self.assertEqual(self.client.post("/api/v1/effects/plugins/invalid/load", headers=self.headers).status_code, 422)
+
+    def test_native_editor_state_is_bound_to_registered_plugin(self):
+        from contextlib import contextmanager
+        from unittest.mock import Mock
+
+        plugin_id = "a" * 32
+        state = vst._encode_state(plugin_id, b"old state")
+        with self.assertRaises(ValueError):
+            vst._decode_state("b" * 32, state)
+        with self.assertRaises(ValueError):
+            vst._decode_state(plugin_id, state[:-1] + "!")
+
+        connection = Mock()
+        connection.poll.return_value = True
+        connection.recv_bytes.return_value = b"Snew state"
+
+        @contextmanager
+        def host(path, *, values, state, editor):
+            self.assertEqual(path, "fixture.vst3")
+            self.assertIsNone(values)
+            self.assertEqual(state, b"old state")
+            self.assertTrue(editor)
+            yield connection, {}
+
+        route = f"/api/v1/effects/plugins/{plugin_id}/edit"
+        self.assertEqual(self.client.post(route, json={"state": state}).status_code, 403)
+        with patch.object(vst, "_registered_path", return_value="fixture.vst3"), patch.object(vst, "_host", host):
+            result = self.client.post(route, headers=self.headers, json={"state": state}).raise_for_status().json()
+        self.assertTrue(result["changed"])
+        self.assertEqual(vst._decode_state(plugin_id, result["state"]), b"new state")
 
     def test_import_metadata_fts_rescan_and_exclusion(self):
         folder = self.root / "input"
@@ -376,6 +412,11 @@ class CoreDeliveryTests(unittest.TestCase):
         self.assertFalse(self.client.post("/api/v1/waveforms/batch", json=batch).json()["items"][0]["ok"])
         peaks = self.client.get(f"/api/v1/files/{identifier}/waveform", params={"project_id": "default"}).json()
         self.assertEqual(len(peaks["peaks"]), 2000)
+        compact = self.client.post("/api/v1/waveforms/batch", json={**batch, "points": 256}).json()["items"][0]
+        self.assertTrue(compact["cached"])
+        self.assertEqual(len(compact["peaks"]), 256)
+        self.assertEqual(compact["source_fingerprint"], peaks["source_fingerprint"])
+        self.assertAlmostEqual(max(compact["peaks"]), max(peaks["peaks"]), places=4)
         self.assertTrue(self.client.post("/api/v1/waveforms/batch", json=batch).json()["items"][0]["cached"])
         clip = {"file_id": identifier, "offset": 0.25, "duration": 0.5, "fade_in": 0.025}
         preview = self.client.post("/api/v1/preview", json={

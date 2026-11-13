@@ -338,21 +338,28 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
 .track-controls{display:grid;grid-template-columns:22px 22px minmax(24px,1fr) 25px 22px;align-items:center;gap:4px;margin-top:6px}
 .track-btn{height:20px;min-width:22px;padding:0 5px;border:1px solid var(--line2);border-radius:4px;color:var(--tx3);font-size:9px;font-weight:600}
 .track-btn:hover{color:var(--tx1);border-color:var(--tx3)}
-.track-remove:hover,#clipControls #btnRemoveClip:hover{color:var(--err, #dd6d68)}
+.track-remove:hover{color:var(--err, #dd6d68)}
 .track-btn.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
 .track-vol{min-width:0;width:100%!important;margin:0}
 .track-channel{display:block;width:100%;height:19px;margin-top:5px;padding:0 5px;font-size:9px;cursor:pointer}
 .track-lane{position:relative;min-width:0;overflow:hidden;cursor:crosshair}
 .track-lane.drop-target{background-color:var(--acc-dim2);box-shadow:inset 0 0 0 1px var(--tx2)}
-.clip-crossfade{position:absolute;z-index:5;top:26px;height:calc(100% - 38px);pointer-events:none;border-inline:1px solid var(--line2);background:var(--acc-dim2);fill:none;stroke:var(--tx2);stroke-width:1.2}
+.clip-crossfade{position:absolute;z-index:5;top:28px;bottom:12px;pointer-events:none;background:color-mix(in srgb,var(--bg3) 60%,transparent);border-inline:1px solid var(--line2)}
+.crossfade-paths{position:absolute;inset:0;width:100%;height:100%;fill:none;stroke:var(--tx1);stroke-width:1.25}
+.crossfade-paths path+path{stroke:var(--tx2);stroke-dasharray:3 2}
+.clip-crossfade.off{background:transparent;border-inline-style:dashed;opacity:.65}
+.crossfade-menu-handle{position:absolute;top:-10px;left:50%;transform:translateX(-50%);width:18px;height:15px;border:1px solid var(--line2);background:var(--bg2);color:var(--tx2);border-radius:4px;pointer-events:auto;font-size:11px}
+.crossfade-menu-handle:is(:hover,:focus-visible){color:var(--tx1);border-color:var(--tx2)}
+.track-lane:has(.clip-pan-layer.editing) .clip-crossfade{z-index:4}
 .wwise-icon{width:15px;height:15px;flex:none;color:var(--tx2);fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round}
 .wwise-node{width:100%;min-width:0;padding-left:5px;text-align:left}
 .wwise-node .tree-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.wwise-tree summary{list-style:none}
-.wwise-tree summary::-webkit-details-marker{display:none}
-.wwise-tree summary::before{content:"";width:6px;height:6px;flex:none;border:solid var(--tx3);border-width:0 1px 1px 0;transform:rotate(-45deg);margin-right:1px}
-.wwise-tree details[open]>summary::before{transform:rotate(45deg) translateY(-2px)}
-.wwise-leaf::before{content:"";width:7px;flex:none}
+#wwiseTree{overflow-anchor:none;--wwise-indent:14px}
+#wwiseTree .wwise-node{position:relative;padding-left:calc(5px + var(--tree-depth) * var(--wwise-indent))}
+.wwise-guides{position:absolute;inset:0 auto 0 4px;width:calc(var(--tree-depth) * var(--wwise-indent));pointer-events:none;background:repeating-linear-gradient(to right,var(--line2) 0 1px,transparent 1px var(--wwise-indent))}
+.wwise-disclosure{width:7px;flex:none;height:7px}
+.wwise-disclosure:is(.open,.closed){border:solid var(--tx3);border-width:0 1px 1px 0;transform:rotate(-45deg)}
+.wwise-disclosure.open{transform:rotate(45deg) translateY(-2px)}
 .wwise-tree-note{padding:12px 9px;font-size:11px;color:var(--tx3)}
 .lane-playhead{position:absolute;z-index:8;top:0;bottom:0;left:calc(var(--play,0)*100%);width:7px;transform:translateX(-3px);cursor:ew-resize;touch-action:none}
 .lane-playhead::after{content:"";position:absolute;top:0;bottom:0;left:3px;width:1px;background:var(--tx1);box-shadow:0 0 8px var(--acc-glow);pointer-events:none}
@@ -361,21 +368,43 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
 .daw-clip:hover{border-color:var(--tx3)}
 .daw-clip.sel{border-color:var(--tx1);box-shadow:0 0 12px -4px var(--acc-glow)}
 .daw-clip:active{cursor:grabbing}
-.clip-name{position:absolute;z-index:4;left:17px;right:35px;top:3px;font-size:9px;color:var(--tx1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
-.clip-fade{position:absolute;z-index:3;top:17px;height:22px;pointer-events:none;fill:var(--acc-dim2);stroke:var(--tx2);stroke-width:1}
+.clip-caption{position:absolute;inset:0 0 auto;z-index:4;height:21px;display:flex;align-items:center;justify-content:space-between;gap:4px;padding:0 4px 0 8px;background:color-mix(in srgb,var(--bg3) 75%,transparent);pointer-events:none}
+.clip-name{color:var(--tx1);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.clip-gain{width:33px;flex:none;border:1px solid transparent;background:transparent;color:var(--tx2);font-size:9px;padding:1px;border-radius:3px;text-align:center;pointer-events:auto;appearance:textfield;opacity:0}
+.clip-gain::-webkit-inner-spin-button{appearance:none}
+.clip-gain{pointer-events:none}
+.daw-clip.sel .clip-gain,.clip-gain:focus{opacity:1;pointer-events:auto}
+.clip-gain:is(:hover,:focus){background:var(--bg1);border-color:var(--line2)}
+.daw-clip{container-type:inline-size}
+@container(max-width:70px){.clip-gain{display:none}}
+.clip-fade{position:absolute;z-index:3;top:24px;height:calc(100% - 29px);pointer-events:none;fill:color-mix(in srgb,var(--bg0) 48%,transparent);stroke:var(--tx1);stroke-width:1.15}
+.clip-fade path:first-child{stroke:none}
+.clip-fade path+path{fill:none}
 .clip-fade.in{left:0}
 .clip-fade.out{right:0}
-.clip-pan{position:absolute;z-index:4;left:5%;width:90%;bottom:7px;height:18px;pointer-events:none;fill:none;stroke:var(--tx1);stroke-dasharray:3 2}
-.clip-fade-handle{position:absolute;z-index:7;top:0;width:12px;height:13px;background:var(--tx1);color:var(--acc-ink);cursor:ew-resize;touch-action:none;opacity:.85}
-.clip-fade-handle.in{left:0;border-radius:6px 0 7px 0}
-.clip-fade-handle.out{right:0;border-radius:0 6px 0 7px}
-.clip-fade-handle::after{content:"";position:absolute;left:3px;right:3px;top:5px;height:1px;background:var(--acc-ink)}
+.clip-fade-handle{position:absolute;z-index:7;top:20px;width:13px;height:13px;display:grid;place-items:center;color:var(--tx2);cursor:ew-resize;touch-action:none}
+.clip-fade-handle.in{left:clamp(0px,calc(var(--fade-edge) - 6px),calc(100% - 13px))}
+.clip-fade-handle.out{right:clamp(0px,calc(var(--fade-edge) - 6px),calc(100% - 13px))}
+.daw-clip.overlap-handles .clip-fade-handle.out{top:31px}
+.clip-fade-handle::after{content:"";width:7px;height:7px;transform:rotate(45deg);border:1px solid currentColor;background:var(--bg1);border-radius:1px}
+.clip-fade-handle:is(:hover,:focus-visible),.daw-clip.sel .clip-fade-handle{color:var(--tx1)}
+.clip-fade-handle:is(:hover,:focus-visible)::after{background:var(--acc)}
+.clip-pan-layer{position:absolute;inset:35px 8px 8px;z-index:4;pointer-events:none;opacity:.75}
+.clip-pan-layer.editing{z-index:6;pointer-events:auto;cursor:crosshair;opacity:1;touch-action:none}
+.daw-clip:has(.clip-pan-layer.editing){z-index:6}
+.clip-pan{width:100%;height:100%;overflow:visible;pointer-events:none;fill:none;stroke:var(--tx1);stroke-width:1.35}
+.clip-pan-center{stroke:var(--tx3);stroke-width:1;stroke-dasharray:3 3}
+.clip-pan-markers{position:absolute;inset:0}
+.clip-pan-node{position:absolute;width:12px;height:12px;transform:translate(-50%,-50%);border:2px solid var(--bg1);border-radius:50%;background:var(--acc);box-shadow:0 0 0 1px var(--tx2);cursor:grab}
+.clip-pan-node:is(:hover,:focus-visible){box-shadow:0 0 0 2px var(--tx1)}
+.clip-pan-left,.clip-pan-right{position:absolute;left:4px;pointer-events:none;font-size:8px;color:var(--tx2)}
+.clip-pan-left{top:0}.clip-pan-right{bottom:0}
 .clip-trim{position:absolute;z-index:6;top:34px;bottom:0;width:9px;border:0;background:transparent;cursor:ew-resize;touch-action:none}
 .clip-trim.left{left:0}.clip-trim.right{right:0}
 .clip-trim::after{content:"";position:absolute;top:5px;bottom:5px;width:2px;border-radius:2px;background:var(--tx2);opacity:.65}
 .clip-trim.left::after{left:2px}.clip-trim.right::after{right:2px}
 .clip-trim:hover::after{background:var(--tx1);opacity:1;box-shadow:0 0 6px var(--acc-glow)}
-.daw-clip canvas{position:absolute;left:0;right:0;bottom:0;width:100%;height:41px;pointer-events:none}
+.daw-clip canvas{position:absolute;inset:24px 0 0;width:100%;height:calc(100% - 24px);pointer-events:none;opacity:.63}
 .daw-log{min-height:34px;flex:none;display:flex;align-items:center;gap:10px;padding:5px 14px;border-top:1px solid var(--line);background:var(--bg1);overflow:hidden}
 .daw-log .log-row{padding:0;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .daw-log .log-empty{padding:0;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -459,48 +488,13 @@ select,#textValue,#llmKey{font:inherit;background:var(--bg2);color:var(--tx1);bo
 #rows{overscroll-behavior:contain} .row{content-visibility:auto;contain-intrinsic-size:auto 52px}
 .row canvas{width:58px;height:26px} .tree-row{min-width:0} .tree-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;text-align:left}
 .tree{padding-right:0;padding-left:0}
-#clipControls{flex:none;min-width:0;display:flex;align-items:center;gap:8px;padding:5px 10px;border-top:1px solid var(--line);background:var(--bg1)}
-.clip-edit-name{flex:1 1 115px;min-width:0;font-size:11px;color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#clipEditFields{flex:0 1 auto;min-width:0;display:grid;grid-template-columns:repeat(3,minmax(0,auto)) auto auto;gap:6px;align-items:end;border:0;margin:0;padding:0}
-#clipEditFields label{display:grid;gap:3px;font-size:9px;color:var(--tx2);white-space:nowrap}
-.clip-edit-inputs{display:flex;gap:3px}
-.clip-edit-inputs input,#clipEditFields input{width:52px}
-.clip-edit-inputs select{min-width:0;max-width:88px}
-#clipControls :is(input,select,button),#crossfadeCurve,#panDialog input{height:24px;border:1px solid var(--line2);border-radius:5px;background:var(--bg2);color:var(--tx1);font:inherit;font-size:10px}
-#clipControls :is(input,select),#crossfadeCurve,#panDialog input{padding:0 4px}
-#clipControls .ghost-btn{white-space:nowrap;padding:0 6px}
-#btnRemoveClip{justify-self:end;width:26px;padding:0}
-#btnRemoveClip svg{display:block;margin:auto}
-#btnClipPan.on{border-color:var(--acc)}
-#clipEditFields:disabled{opacity:.5}
+#crossfadeCurve{height:24px;border:1px solid var(--line2);border-radius:5px;background:var(--bg2);color:var(--tx1);padding:0 4px;font:inherit;font-size:10px}
 #dawDuration{flex:none;font-variant-numeric:tabular-nums}
 .daw-toolbar{height:auto;min-height:40px;flex-wrap:wrap;padding-block:4px;row-gap:4px}
-@media(max-width:1200px){
-  #clipControls{display:block;padding-block:4px}
-  .clip-edit-name{display:block;margin-bottom:4px}
-  #clipEditFields{grid-template-columns:repeat(3,minmax(0,auto)) minmax(0,1fr) auto}
-  #clipControls input{width:43px}
-  .clip-edit-inputs select{max-width:67px}
-  #btnClipPan{justify-self:start}
-}
-@media(max-width:990px){
-  #clipEditFields{grid-template-columns:repeat(3,minmax(0,1fr)) 26px}
-  #btnClipPan{grid-column:1 / 4;grid-row:2}
-  #btnRemoveClip{grid-column:4;grid-row:1 / 3;align-self:center}
-}
-#panDialog{width:min(560px,90vw)}
-.pan-chart{display:grid;grid-template-columns:max-content 1fr;gap:10px;margin:24px 8px 16px 0}
-.pan-scale{display:flex;flex-direction:column;justify-content:space-between;color:var(--tx2);font-size:11px;text-align:right}
-.pan-graph{position:relative;height:132px;border:1px solid var(--line2);border-radius:6px;background:var(--bg2);touch-action:none;cursor:crosshair}
-.pan-graph svg,.pan-handles{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-.pan-graph svg{overflow:visible;fill:none;stroke:var(--acc);stroke-width:1.8}
-.pan-graph .pan-center{stroke:var(--tx3);stroke-width:1;stroke-dasharray:4 4}
-.pan-node{position:absolute;width:14px;height:14px;transform:translate(-50%,-50%);border:1px solid var(--tx1);border-radius:50%;background:var(--bg1);pointer-events:auto;cursor:grab}
-.pan-node[aria-pressed=true]{background:var(--acc);box-shadow:0 0 0 2px var(--acc-dim2)}
-.pan-editor{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.pan-editor label{display:flex;gap:4px;align-items:center;font-size:11px}
-.pan-editor input{width:59px}
-#panDialog .sub{line-height:1.5}
+#clipMenu{min-width:166px;max-height:calc(100vh - 16px);overflow:auto}
+.clip-menu-label{color:var(--tx3);font-size:10px;padding:7px 9px 3px;border-top:1px solid var(--line);margin-top:4px}
+.clip-menu-danger:enabled{color:var(--err,#df7674)}
+#clipMenu .eq-menu-item:disabled{opacity:.4}
 #pluginFilter{width:100%;margin:10px 0;padding:6px 8px;border:1px solid var(--line2);border-radius:5px;background:var(--bg2);color:var(--tx1);font:inherit}
 #pluginChoices{max-height:48vh;overflow:auto}
 .track-lane{background-image:linear-gradient(to right,var(--line) 1px,transparent 1px)}
@@ -531,14 +525,10 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
 .settings-credits summary{cursor:pointer}
 .fx-header{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .fx-card .switch{flex:none} .fx-card .knob{touch-action:none}
-.fx-controls{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap}
-.fx-parameters{display:grid;gap:7px;max-height:210px;overflow:auto;margin-top:8px}
-.fx-parameters label{display:grid;grid-template-columns:minmax(0,1fr) minmax(72px,1fr);gap:8px;align-items:center;font-size:11px}
-.fx-parameters label span{overflow:hidden;text-overflow:ellipsis}
 .plugin-list{display:grid;gap:6px}
 .plugin-list>div{display:flex;gap:6px;align-items:center}
 .plugin-list>div>span{flex:1;overflow-wrap:anywhere}
-#dawTracks .daw-clip{border-radius:5px} .daw-clip[aria-selected=true]{outline:2px solid var(--tx1)}
+#dawTracks .daw-clip{border-radius:5px} .daw-clip[aria-selected=true]{outline:1px solid var(--tx2)}
 @media(max-width:1280px){.inspector{width:260px}.topbar{gap:7px}}
 .rail{width:var(--rail-width,232px);border-right:0}
 .wwise-rail{width:var(--rail-width,275px)}
@@ -680,6 +670,20 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
 .eq-dialog .eq-plot{height:min(330px,48vh)}
 .eq-dialog-head{display:flex;align-items:center;gap:8px;margin-bottom:9px}
 .eq-dialog-head h3{flex:1;margin:0}
+.vst-row{display:grid;grid-template-columns:17px minmax(0,1fr) repeat(4,22px);align-items:center;gap:3px;min-height:40px;padding:5px 6px;border:1px solid var(--line2);border-radius:8px;background:var(--bg2);position:relative}
+.vst-editor{text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--tx1);font-size:12px;font-weight:550;padding:4px 2px;border-radius:4px}
+.vst-editor:not(:disabled):hover{background:var(--bg3)}
+.vst-editor:disabled,.vst-row.bypassed .vst-editor{color:var(--tx3)}
+.vst-action{width:22px;height:22px;border-radius:4px;color:var(--tx2);font-size:13px}
+.vst-action:disabled{opacity:.32}
+.vst-action:is(:hover,:focus-visible):enabled{background:var(--bg3);color:var(--tx1)}
+.vst-power[aria-pressed=false]{color:var(--acc)}
+.vst-remove:hover:enabled{color:var(--err,#df7674)}
+.vst-grab{color:var(--tx3);cursor:grab;font-size:17px;text-align:center}
+.vst-row.dragging{opacity:.55}
+.vst-drop-top::after,.vst-drop-bottom::after{content:"";position:absolute;z-index:4;left:4px;right:4px;height:2px;border-radius:1px;background:var(--acc);pointer-events:none}
+.vst-drop-top::after{top:-6px}
+.vst-drop-bottom::after{bottom:-6px}
 .fx-body.reverb-controls{display:grid;grid-template-columns:repeat(2,1fr);justify-items:center}
 </style>
 </head>
@@ -783,7 +787,7 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
           <div class="conn-line"><span class="conn-dot" id="wwiseConnDot"></span><span id="wwiseConnText">未连接</span></div>
           <div class="wwise-filter"><input id="wwiseFilter" placeholder="筛选对象或路径…" aria-label="筛选工程素材"></div>
         </div>
-        <button class="ghost-btn connect-button" id="btnConnectInline">连接</button><div class="wwise-tree" id="wwiseTree"></div>
+        <button class="ghost-btn connect-button" id="btnConnectInline">连接</button><div class="wwise-tree" id="wwiseTree" role="tree" tabindex="0" aria-labelledby="middlewareTreeTitle"></div>
       </aside>
       <div class="rail-resize" data-rail="wwise" role="separator" aria-controls="wwiseRail" aria-orientation="vertical" aria-label="调整左侧栏宽度" tabindex="0"></div>
       <section class="center daw-center">
@@ -817,6 +821,7 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
           <div class="timeline-tools">
             <button class="ghost-btn" id="timelineCrossfade" aria-pressed="true">交叉淡化</button>
             <select id="crossfadeCurve" aria-label="交叉淡化曲线"></select>
+            <button class="ghost-btn" id="timelinePan" aria-pressed="false" disabled>声像曲线</button>
             <button class="ghost-btn" id="timelineZoomOut" aria-label="缩小时间线">−</button>
             <button class="ghost-btn" id="timelineZoomReset" aria-label="适应时间线">100%</button>
             <button class="ghost-btn" id="timelineZoomIn" aria-label="放大时间线">+</button>
@@ -828,16 +833,6 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
           <div class="ruler-viewport" id="dawRulerViewport" tabindex="0" aria-label="拖动播放头"><div class="ruler-scale" id="dawRuler"></div></div>
         </div>
         <div class="daw-tracks" id="dawTracks"></div>
-        <div id="clipControls">
-          <span class="clip-edit-name" id="clipEditName">选择剪辑以编辑</span>
-          <fieldset id="clipEditFields" aria-label="剪辑编辑" disabled>
-            <label>剪辑增益 (dB)<input id="timelineClipGain" type="number" step="1" min="-96" max="24"></label>
-            <label>淡入 (秒)<span class="clip-edit-inputs"><input id="clipFadeIn" type="number" step="0.01" min="0"><select id="clipFadeInCurve" aria-label="淡入曲线"></select></span></label>
-            <label>淡出 (秒)<span class="clip-edit-inputs"><input id="clipFadeOut" type="number" step="0.01" min="0"><select id="clipFadeOutCurve" aria-label="淡出曲线"></select></span></label>
-            <button class="ghost-btn" id="btnClipPan">声像曲线</button>
-            <button class="ghost-btn" id="btnRemoveClip" aria-label="移除剪辑" title="移除剪辑"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 6h18m-2 0-1 15H6L5 6m4 0V3h6v3m-5 4v7m4-7v7"/></svg></button>
-          </fieldset>
-        </div>
         <div class="daw-log" id="wwiseLogs"><div class="log-empty" id="middlewareLogText" aria-live="polite"></div><button class="ghost-btn hidden" id="btnRevealMiddlewareFile">打开文件位置</button></div>
       </section>
     </div>
@@ -1156,25 +1151,7 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
     <div class="modal-foot"><button class="pill-btn solid" data-close="ovSettings">完成</button></div>
   </div>
 </div>
-<dialog id="panDialog" class="modal" aria-labelledby="panTitle">
-  <button class="modal-close" id="btnClosePan" aria-label="关闭">✕</button>
-  <h3 id="panTitle">声像曲线</h3>
-  <p class="sub">点击添加声像点，拖动调整位置和左右声像。首尾沿用最近点的值。</p>
-  <div class="pan-chart">
-    <div class="pan-scale" aria-hidden="true"><span>L</span><span>C</span><span>R</span></div>
-    <div class="pan-graph" id="panGraph" role="group" aria-label="声像曲线">
-      <svg viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><path class="pan-center" d="M0 20H100" vector-effect="non-scaling-stroke"/><path id="panPlot" vector-effect="non-scaling-stroke"/></svg>
-      <div class="pan-handles" id="panHandles"></div>
-    </div>
-  </div>
-  <div class="pan-editor">
-    <label>位置 (%)<input id="panPosition" type="number" min="0" max="100" step="0.1"></label>
-    <label>声像 (%)<input id="panValue" type="number" min="-100" max="100" step="1"></label>
-    <button class="ghost-btn" id="btnAddPan">添加点</button>
-    <button class="ghost-btn" id="btnRemovePan">移除点</button>
-  </div>
-  <div class="modal-foot"><button class="ghost-btn" id="btnResetPan">清除声像曲线</button><button class="pill-btn solid" id="btnApplyPan">应用</button></div>
-</dialog>
+<div id="clipMenu" class="eq-menu" role="menu" hidden></div>
 <dialog id="pluginDialog" class="modal">
   <button class="modal-close" id="btnClosePlugins" aria-label="关闭">✕</button>
   <h3>添加 VST3 效果器</h3>

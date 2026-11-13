@@ -87,7 +87,7 @@ class WaveformBatchRequest(BaseModel):
     """可见文件波形批量请求。"""
     file_ids: List[str] = Field(..., min_length=1, max_length=100)
     project_id: Optional[str] = Field(default=None)
-    points: Literal[2000] = 2000
+    points: Literal[2000, 256] = 2000
     cached_only: bool = False
 
 

@@ -18,7 +18,7 @@ SoundBot 把音效查找、剪辑和交付放在同一个桌面应用里。素�
 
 ### 下载和安装
 
-当前源码版本为 **v1.0.3（稳定版）**。安装包的发布状态以 GitHub Releases 为准。旧版保留在发行记录中，供查阅和回退。 [发行页](https://github.com/Huckrick/SoundBot/releases) · [更新日志](CHANGELOG.md)
+当前源码版本为 **v1.0.4（稳定版）**。安装包的发布状态以 GitHub Releases 为准。旧版保留在发行记录中，供查阅和回退。 [发行页](https://github.com/Huckrick/SoundBot/releases) · [更新日志](CHANGELOG.md)
 
 | 平台 | 发行文件 | 安装方式 |
 | --- | --- | --- |
@@ -35,9 +35,9 @@ SoundBot 把音效查找、剪辑和交付放在同一个桌面应用里。素�
 
 在底部波形上滚动鼠标滚轮，以光标位置为中心缩放。按住 Shift 滚动可横移。从列表的缩略波形拖动整条素材到「中间件工作台」标签或时间线。拖到 DAW 时按住 Alt（Mac 上是 Option）。初次交付时选择工程媒体目录，文件准备好后再拖一次。
 
-Wwise 工程浏览器按层级显示可用的对象类型与颜色。拖动标尺可定位播放头，拖动剪辑两侧下半部可裁剪。选择剪辑后，可在时间线下方编辑增益、淡入淡出和立体声声像曲线。同轨相邻剪辑部分重叠时会自动交叉淡化，曲线可在工具栏切换。
+Wwise 工程浏览器可浏览和搜索整个已读取的工程树。拖动标尺可定位播放头，拖动剪辑两侧下半部可裁剪。在剪辑上拖动淡化手柄，右键选择曲线。在立体声目标上开启「声像曲线」，直接在波形上添加、拖动或右键移除控制点。同轨相邻剪辑部分重叠时自动交叉淡化，可在交叉区单独选择曲线。
 
-打开 VST 面板时，SoundBot 自动查找标准安装目录中的 VST3。安装新插件后，可在 **设置 → VST3** 重新扫描。
+打开 VST 面板时，SoundBot 自动查找标准安装目录中的 VST3。添加插件后会打开插件自己的窗口，也可以点击插件名重新打开。关闭窗口后，设置应用到下一次试听和交付。可在右侧效果链拖动排序、旁通或移除插件。安装新插件后，可在 **设置 → VST3** 重新扫描。
 
 ### 文件权限和隐私
 
@@ -72,7 +72,7 @@ SoundBot supports **Simplified Chinese, Traditional Chinese, Japanese, English, 
 
 ### Download and install
 
-The current source version is **v1.0.3 (stable)**. GitHub Releases shows which installers have been published. Older releases remain in the archive for reference and rollback. [Releases](https://github.com/Huckrick/SoundBot/releases) · [Changelog](CHANGELOG.md)
+The current source version is **v1.0.4 (stable)**. GitHub Releases shows which installers have been published. Older releases remain in the archive for reference and rollback. [Releases](https://github.com/Huckrick/SoundBot/releases) · [Changelog](CHANGELOG.md)
 
 | Platform | Release file | Installation |
 | --- | --- | --- |
@@ -89,9 +89,9 @@ Download the installer and `SHA256SUMS.txt` from the same release. Run `shasum -
 
 Scroll over the waveform editor to zoom around the pointer. Hold Shift while scrolling to pan. Drag a thumbnail waveform to send the whole sound to the middleware tab or timeline. Hold Alt (Option on Mac) to drag it to a DAW. On the first delivery, choose the project's media folder and drag again once the WAV is ready.
 
-The Wwise project browser shows the hierarchy with available object types and colors. Drag the timeline ruler to seek and the lower part of either clip edge to trim. Select a clip to edit its gain, fades, and stereo pan curve below the timeline. Partial overlaps between adjacent clips on the same track crossfade automatically. Choose the crossfade curve in the timeline toolbar.
+Browse or search the full hierarchy loaded from Wwise. Drag the ruler to seek and the lower clip edges to trim. Drag a fade handle on the clip and right-click it to choose a curve. For stereo targets, turn on Pan curve to add, drag, or remove points on the waveform. Partial overlaps between adjacent clips on the same track crossfade automatically. Choose a curve for an individual overlap from its menu.
 
-SoundBot searches the standard VST3 folders when you open the VST panel. After installing a plug-in, you can rescan in **Settings → VST3**.
+SoundBot searches the standard VST3 folders when you open the VST panel. Adding a plug-in opens its native editor. Click its name to reopen the editor. Closing the editor applies its settings to the next audition and delivery. Drag to reorder plug-ins in the effects rack, or use the bypass and remove buttons. Rescan in **Settings → VST3** after installing a plug-in.
 
 ### Permissions and privacy
 

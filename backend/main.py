@@ -999,6 +999,12 @@ async def get_waveforms_batch(request: schemas.WaveformBatchRequest):
             try:
                 payload = await _waveform_payload(record.path, project_id, cached_only=request.cached_only,
                                                   background=True)
+                if request.points == 256:
+                    peaks = payload["peaks"]
+                    payload["peaks"] = [
+                        round(max(peaks[index * len(peaks) // 256:(index + 1) * len(peaks) // 256]), 4)
+                        for index in range(256)
+                    ]
                 return {"file_id": file_id, "ok": True, **payload}
             except SoundBotAPIError as exc:
                 return {"file_id": file_id, "ok": False, "error": exc.payload}

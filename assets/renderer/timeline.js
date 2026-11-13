@@ -30,14 +30,16 @@
     let zoom = 1;
     let zoomReference = 8;
     let editingClip = false;
+    let panClip;
     const expanded = new Map();
+    const filteredExpansion = new Map();
     let previewGeneration = 0;
     const minClip = 0.01;
     const limit = (value, lo, hi) => Math.max(lo, Math.min(hi, value));
     const startAt = time => Math.max(0, snap ? Math.round(time / grid) * grid : time);
     const makeTrack = ({ name, label, number: trackNumber, clips = [] }) => ({
         id: crypto.randomUUID(), name, label, trackNumber, clips, mute: false, solo: false,
-        gain: 0, channels: null, effects: fx.create()
+        gain: 0, channels: null, effects: fx.create(), crossfades: new Map()
     });
     const trackName = track => track.name || t(track.label, { count: track.trackNumber });
     const duration = () => Math.max(0, ...tracks.flatMap(track => track.clips.map(clip => clip.start + clip.duration)));
@@ -52,7 +54,7 @@
         $('wwiseWriteState').textContent = value ? t(host === 'wwise' ? '有未写回编辑' : '有未交付编辑') : t('未修改');
         $('btnExportWwise').disabled = !value || !target || busy || !duration();
         $('dawTracks').inert = busy;
-        $('clipControls').inert = busy;
+        if (busy) closeClipMenu();
         $('crossfadeCurve').disabled = busy || !autoCrossfade;
         if (state.workspace === 'wwise') $('rack').parentElement.inert = busy;
     }
@@ -67,7 +69,7 @@
         target = null;
         source = null;
         tracks = [];
-        selectedTrack = selectedClip = null;
+        selectedTrack = selectedClip = panClip = null;
         zoom = 1;
         zoomReference = 8;
         autoCrossfade = true;
@@ -123,59 +125,172 @@
         return level;
     }
 
-    function renderTree() {
-        const query = $('wwiseFilter').value.trim().toLowerCase();
-        const filtered = connection?.sources.filter(item => (item.path || item.name).toLowerCase().includes(query)) || [];
+    const treeRowHeight = 29;
+    let treeRows = [];
+    let treeFrame;
+    let treeFocus;
+    let treeWindow;
+    let treeExpansion = expanded;
+
+    function drawTree() {
         const root = $('wwiseTree');
+        if (!treeRows.length || !root.clientHeight) return;
+        const first = Math.max(0, Math.floor(root.scrollTop / treeRowHeight) - 8);
+        const last = Math.min(treeRows.length, first + Math.ceil(root.clientHeight / treeRowHeight) + 16);
+        if (treeWindow?.rows === treeRows && treeWindow.first === first && treeWindow.last === last && treeWindow.focus === treeFocus) return;
+        treeWindow = { rows: treeRows, first, last, focus: treeFocus };
+        const fragment = document.createDocumentFragment();
+        const spacer = count => {
+            const node = el('div');
+            node.style.height = `${count * treeRowHeight}px`;
+            node.setAttribute('aria-hidden', 'true');
+            fragment.append(node);
+        };
+        spacer(first);
+        for (let index = first; index < last; index++) {
+            const row = treeRows[index];
+            const { depth, item, path, label, metadata, key, open, hasChildren } = row;
+            const node = el('button', null, 'wwise-node');
+            node.type = 'button';
+            node.dataset.treeIndex = index;
+            node.tabIndex = -1;
+            node.setAttribute('role', 'treeitem');
+            node.setAttribute('aria-level', depth + 1);
+            node.style.setProperty('--tree-depth', depth);
+            if (depth) {
+                const guides = el('span', null, 'wwise-guides');
+                guides.setAttribute('aria-hidden', 'true');
+                node.append(guides);
+            }
+            const arrow = el('span', null, 'wwise-disclosure');
+            if (hasChildren) {
+                arrow.classList.add(open ? 'open' : 'closed');
+                node.setAttribute('aria-expanded', String(open));
+            }
+            node.append(arrow);
+            treeLabel(node, item?.name || label, item ? item.type || 'AudioFileSource' : metadata?.type,
+                item?.color || metadata?.color);
+            if (item) {
+                node.setAttribute('aria-selected', String(source?.id === item.id));
+                node.classList.toggle('sel', source?.id === item.id);
+            }
+            node.title = path;
+            node.onfocus = () => { treeFocus = index; };
+            node.onclick = () => {
+                treeFocus = index;
+                if (item) attempt(() => choose(item));
+                else if (hasChildren) {
+                    treeExpansion.set(key, !open);
+                    renderTree();
+                }
+                root.querySelector(`[data-tree-index="${index}"]`)?.focus({ preventScroll: true });
+            };
+            fragment.append(node);
+        }
+        spacer(treeRows.length - last);
+        if (connection?.truncated && last === treeRows.length) fragment.append(
+            el('p', t('素材目录超出扫描上限，请选择更具体的素材目录。'), 'wwise-tree-note'));
+        const focused = root.contains(document.activeElement) && document.activeElement !== root;
+        const offset = root.scrollTop;
+        root.replaceChildren(fragment);
+        root.scrollTop = offset;
+        if (focused) {
+            const next = root.querySelector(`[data-tree-index="${treeFocus}"]`);
+            (next || root).focus({ preventScroll: true });
+        }
+    }
+
+    function renderTree() {
+        const root = $('wwiseTree');
+        const query = $('wwiseFilter').value.trim().toLowerCase();
         const objects = connection?.objects || {};
-        const branches = Object.entries(objects).filter(([path, node]) =>
-            node.type !== 'Sound' && (!query || path.toLowerCase().includes(query)));
-        if (!connection || (!filtered.length && !branches.length)) {
+        const tree = new Map();
+        const separator = host === 'wwise' ? '\\' : '/';
+        const prefix = host === 'wwise' ? separator : '';
+        const focusKey = treeRows[treeFocus]?.key;
+        treeExpansion = query ? filteredExpansion : expanded;
+        for (const [path, node] of Object.entries(objects)) {
+            if (node.type !== 'Sound' && path.toLowerCase().includes(query)) {
+                treeBranch(tree, path.split(separator).filter(Boolean));
+            }
+        }
+        for (const item of connection?.sources || []) {
+            if (!(item.path || item.name).toLowerCase().includes(query)) continue;
+            const parts = (item.path || '').split(separator).filter(Boolean);
+            treeBranch(tree, parts.slice(0, -1)).set(item.id, { item });
+        }
+        treeRows = [];
+        function flatten(entries, parents = []) {
+            for (const [label, node] of entries) {
+                const depth = parents.length;
+                if (node.item) {
+                    treeRows.push({ depth, item: node.item, key: node.item.id, path: node.item.path });
+                    continue;
+                }
+                const parts = [...parents, label];
+                const path = prefix + parts.join(separator);
+                const metadata = objects[path];
+                const key = metadata?.id || path;
+                const hasChildren = node.items.size > 0;
+                const open = hasChildren && (treeExpansion.get(key) ?? (Boolean(query) || depth < 2));
+                treeRows.push({ depth, path, label, metadata, key, hasChildren, open });
+                if (open) flatten(node.items, parts);
+            }
+        }
+        flatten(tree);
+        treeFocus = Math.max(0, treeRows.findIndex(row => row.key === focusKey));
+        if (treeRows.length) {
+            root.scrollTop = Math.min(root.scrollTop, Math.max(0, treeRows.length * treeRowHeight - root.clientHeight));
+            drawTree();
+        } else {
             root.replaceChildren(el('div', connection
                 ? t(host === 'wwise' ? '没有匹配的 Sound SFX 源' : '没有匹配的工程音频源')
                 : t(host === 'wwise' ? '连接后显示当前工程的 Sound SFX 源' : '打开工程后显示素材目录中的音频'), 'wwise-tree-note'));
-            return;
         }
-        const tree = new Map();
-        const visible = filtered.slice(0, 600);
-        const prefix = host === 'wwise' ? '\\' : '';
-        const separator = host === 'wwise' ? '\\' : '/';
-        const scrollTop = root.scrollTop;
-        for (const [path] of branches.slice(0, 600)) treeBranch(tree, path.split('\\').filter(Boolean));
-        for (const item of visible) {
-            const parts = (item.path || '').split(/[\\/]/).filter(Boolean);
-            treeBranch(tree, parts.slice(0, -1)).set(item.id, { item });
-        }
-        const build = (entries, parents = []) => [...entries.entries()].map(([label, node]) => {
-            if (node.item) {
-                const leaf = button('', () => choose(node.item), 'wwise-node wwise-leaf');
-                treeLabel(leaf, node.item.name, node.item.type || 'AudioFileSource', node.item.color);
-                leaf.classList.toggle('sel', source?.id === node.item.id);
-                leaf.title = node.item.path;
-                return leaf;
+    }
+
+    function bindTree() {
+        const root = $('wwiseTree');
+        root.onscroll = () => {
+            if (treeFrame != null) return;
+            treeFrame = requestAnimationFrame(() => {
+                treeFrame = null;
+                drawTree();
+            });
+        };
+        new ResizeObserver(drawTree).observe(root);
+        root.onfocus = () => {
+            const index = Math.min(treeRows.length - 1, Math.max(0, Math.floor(root.scrollTop / treeRowHeight)));
+            if (index >= 0) {
+                const row = root.querySelector(`[data-tree-index="${index}"]`);
+                if (row) { treeFocus = index; row.focus({ preventScroll: true }); }
             }
-            const parts = [...parents, label];
-            const path = prefix + parts.join(separator);
-            const metadata = objects[path];
-            const key = metadata?.id || path;
-            const branch = el('details');
-            branch.open = Boolean(query) || (expanded.get(key) ?? parents.length < 2);
-            const title = el('summary', null, 'wwise-node');
-            if (!query) title.onclick = () => expanded.set(key, !branch.open);
-            treeLabel(title, label, metadata?.type, metadata?.color);
-            title.title = label;
-            const children = el('div', null, 'tree-children');
-            children.append(...build(node.items, parts));
-            branch.append(title, children);
-            return branch;
-        });
-        root.replaceChildren(...build(tree));
-        root.scrollTop = scrollTop;
-        if (filtered.length > visible.length || branches.length > 600 || connection.truncated) {
-            root.append(el('p', t(connection.truncated
-                ? '素材目录超出扫描上限，请选择更具体的素材目录。'
-                : '仅显示前 {count} 条，请缩小搜索范围。', { count: 600 }), 'wwise-tree-note'));
-        }
+        };
+        root.onkeydown = event => {
+            const row = treeRows[treeFocus];
+            if (!row) return;
+            let next = treeFocus;
+            if (event.key === 'ArrowDown') next++;
+            else if (event.key === 'ArrowUp') next--;
+            else if (event.key === 'Home') next = 0;
+            else if (event.key === 'End') next = treeRows.length - 1;
+            else if (event.key === 'ArrowRight' && row.hasChildren) {
+                if (row.open) next++;
+                else { treeExpansion.set(row.key, true); renderTree(); }
+            } else if (event.key === 'ArrowLeft') {
+                if (row.open) { treeExpansion.set(row.key, false); renderTree(); }
+                else while (next > 0 && treeRows[next].depth >= row.depth) next--;
+            } else return;
+            event.preventDefault();
+            treeFocus = limit(next, 0, treeRows.length - 1);
+            const y = treeFocus * treeRowHeight;
+            if (y < root.scrollTop) root.scrollTop = y;
+            else if (y + treeRowHeight > root.scrollTop + root.clientHeight) {
+                root.scrollTop = y + treeRowHeight - root.clientHeight;
+            }
+            drawTree();
+            root.querySelector(`[data-tree-index="${treeFocus}"]`)?.focus({ preventScroll: true });
+        };
     }
 
     function renderHostLabels() {
@@ -332,11 +447,221 @@
         return `M0 ${y(points[0][1])} ${points.map(([x, value]) => `L${x * 100} ${y(value)}`).join(' ')} L100 ${y(points.at(-1)[1])}`;
     }
 
+    function closeClipMenu() {
+        const menu = $('clipMenu');
+        if (!menu.hidden) menu.hidden = true;
+    }
+
+    function showClipMenu(event, anchor, label, options) {
+        event.preventDefault();
+        event.stopPropagation();
+        const menu = $('clipMenu');
+        menu.setAttribute('aria-label', t(label));
+        const controls = [];
+        for (const section of options) {
+            if (section.label) controls.push(el('div', t(section.label), 'clip-menu-label'));
+            for (const item of section.items) {
+                const action = button(t(item.label), () => {
+                    closeClipMenu();
+                    item.run();
+                }, 'eq-menu-item');
+                action.setAttribute('role', item.checked == null ? 'menuitem' : 'menuitemradio');
+                if (item.checked != null) action.setAttribute('aria-checked', String(item.checked));
+                if (item.danger) action.classList.add('clip-menu-danger');
+                action.disabled = Boolean(item.disabled);
+                controls.push(action);
+            }
+        }
+        menu.replaceChildren(...controls);
+        menu.hidden = false;
+        const bounds = anchor.getBoundingClientRect();
+        menu.style.left = `${Math.max(8, Math.min(event.clientX || bounds.left, innerWidth - menu.offsetWidth - 8))}px`;
+        menu.style.top = `${Math.max(8, Math.min(event.clientY || bounds.bottom, innerHeight - menu.offsetHeight - 8))}px`;
+        const items = controls.filter(node => node.tagName === 'BUTTON' && !node.disabled);
+        items[0]?.focus({ preventScroll: true });
+        menu.onkeydown = key => {
+            if (key.key === 'Escape' || key.key === 'Tab') {
+                closeClipMenu();
+                anchor.focus({ preventScroll: true });
+                if (key.key === 'Escape') key.preventDefault();
+            } else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(key.key) && items.length) {
+                key.preventDefault();
+                const index = items.indexOf(document.activeElement);
+                const next = key.key === 'Home' ? 0 : key.key === 'End' ? items.length - 1 :
+                    (index + (key.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length;
+                items[next].focus({ preventScroll: true });
+            }
+        };
+    }
+
+    function editClip(action) {
+        pause();
+        action();
+        dirtyState(true);
+        render();
+    }
+
+    function curveOptions(selected, apply) {
+        return Object.entries(curves).map(([value, [label]]) => ({
+            label, checked: value === selected, run: () => editClip(() => apply(value))
+        }));
+    }
+
+    function fadeMenu(event, anchor, clip, field) {
+        const key = `${field}_curve`;
+        showClipMenu(event, anchor, field === 'fade_in' ? '淡入曲线' : '淡出曲线', [
+            { items: curveOptions(clip[key] || 'linear', value => {
+                clip[key] = value;
+                clip[field] ||= Math.min(0.15, clip.duration / 3);
+            }) },
+            { items: [{ label: '清除淡化', disabled: !clip[field], run: () => editClip(() => { clip[field] = 0; }) }] }
+        ]);
+    }
+
+    function clipMenu(event, node, clip, track) {
+        if (busy) return;
+        selectedTrack = track.id;
+        selectedClip = clip.id;
+        renderControls();
+        showClipMenu(event, node, '剪辑操作', [
+            { items: [
+                { label: '声像曲线', checked: panClip === clip.id, disabled: target?.channels !== 2, run: () => {
+                    panClip = panClip === clip.id ? null : clip.id;
+                    render();
+                } },
+                { label: '清除声像曲线', disabled: !clip.pan?.length, run: () => editClip(() => { clip.pan = []; }) }
+            ] },
+            { label: '淡入曲线', items: curveOptions(clip.fade_in_curve || 'linear', value => {
+                clip.fade_in_curve = value;
+                clip.fade_in ||= Math.min(0.15, clip.duration / 3);
+            }) },
+            { label: '淡出曲线', items: curveOptions(clip.fade_out_curve || 'linear', value => {
+                clip.fade_out_curve = value;
+                clip.fade_out ||= Math.min(0.15, clip.duration / 3);
+            }) },
+            { items: [
+                { label: '清除淡化', disabled: !(clip.fade_in || clip.fade_out),
+                    run: () => editClip(() => { clip.fade_in = clip.fade_out = 0; }) },
+                { label: '移除剪辑', danger: true, run: removeClip }
+            ] }
+        ]);
+    }
+
+    function clipPanEditor(clip, node) {
+        const editable = panClip === clip.id && target?.channels === 2;
+        const graph = el('div', null, `clip-pan-layer${editable ? ' editing' : ''}`);
+        const curves = curveGraphic('clip-pan', ['M0 20H100', panLine(clip.pan || [])]);
+        curves.firstChild.classList.add('clip-pan-center');
+        graph.append(curves);
+        if (!editable) return graph;
+        const markers = el('div', null, 'clip-pan-markers');
+        graph.append(markers, el('span', 'L', 'clip-pan-left'), el('span', 'R', 'clip-pan-right'));
+        graph.title = t('在波形上添加或拖动声像点');
+        graph.setAttribute('role', 'group');
+        graph.setAttribute('aria-label', t('声像曲线'));
+        let gesture;
+        const paint = () => {
+            const points = clip.pan || [];
+            curves.lastChild.setAttribute('d', panLine(points));
+            while (markers.children.length > points.length) markers.lastChild.remove();
+            for (let index = markers.children.length; index < points.length; index++) {
+                const marker = button('', () => {}, 'clip-pan-node');
+                marker.dataset.panIndex = index;
+                marker.setAttribute('aria-label', t('声像点 {count}', { count: index + 1 }));
+                markers.append(marker);
+            }
+            points.forEach(([x, y], index) => {
+                const marker = markers.children[index];
+                marker.style.left = `${x * 100}%`;
+                marker.style.top = `${(y + 1) * 50}%`;
+                marker.title = y === 0 ? 'C' : `${y < 0 ? 'L' : 'R'} ${Math.round(Math.abs(y) * 100)}%`;
+            });
+        };
+        const pointer = event => {
+            const box = markers.getBoundingClientRect();
+            return [limit((event.clientX - box.left) / Math.max(box.width, 1), 0, 1),
+                limit((event.clientY - box.top) / Math.max(box.height, 1) * 2 - 1, -1, 1)];
+        };
+        const move = (index, x, y) => {
+            const points = clip.pan;
+            const low = index ? points[index - 1][0] + 0.001 : 0;
+            const high = index + 1 < points.length ? points[index + 1][0] - 0.001 : 1;
+            points[index] = [limit(x, low, high), Math.abs(y) < 0.035 ? 0 : limit(y, -1, 1)];
+            paint();
+        };
+        graph.onpointerdown = event => {
+            event.stopPropagation();
+            if (event.button !== 0 || busy || gesture) return;
+            event.preventDefault();
+            const before = (clip.pan || []).map(point => [...point]);
+            const [x, y] = pointer(event);
+            const marker = event.target.closest('.clip-pan-node');
+            marker?.focus({ preventScroll: true });
+            let index = marker ? Number(marker.dataset.panIndex) : before.findIndex(point => Math.abs(point[0] - x) < 0.002);
+            if (index < 0) {
+                if (before.length >= 32) return;
+                clip.pan = [...before, [x, y]].sort((a, b) => a[0] - b[0]);
+                index = clip.pan.findIndex(point => point[0] === x);
+            }
+            gesture = { index, before, id: event.pointerId, changed: !marker && clip.pan.length !== before.length };
+            pause();
+            editingClip = true;
+            node.classList.add('editing-envelope');
+            graph.setPointerCapture(event.pointerId);
+            paint();
+        };
+        graph.onpointermove = event => {
+            if (event.pointerId !== gesture?.id) return;
+            gesture.changed = true;
+            move(gesture.index, ...pointer(event));
+        };
+        const finish = cancelled => {
+            if (!gesture) return;
+            if (cancelled) clip.pan = gesture.before;
+            else if (gesture.changed) dirtyState(true);
+            gesture = null;
+            editingClip = false;
+            node.classList.remove('editing-envelope');
+            paint();
+        };
+        graph.onpointerup = () => finish(false);
+        graph.onpointercancel = graph.onlostpointercapture = () => finish(true);
+        graph.oncontextmenu = event => {
+            const marker = event.target.closest('.clip-pan-node');
+            if (!marker) return;
+            showClipMenu(event, marker, '声像曲线', [
+                { items: [{ label: '移除点', run: () => editClip(() => clip.pan.splice(Number(marker.dataset.panIndex), 1)) }] }
+            ]);
+        };
+        graph.onkeydown = event => {
+            const marker = event.target.closest('.clip-pan-node');
+            if (!marker) return;
+            const index = Number(marker.dataset.panIndex);
+            const [x, y] = clip.pan[index];
+            const deltas = { ArrowLeft: [-0.01, 0], ArrowRight: [0.01, 0], ArrowUp: [0, -0.05], ArrowDown: [0, 0.05] };
+            const delta = deltas[event.key];
+            if (!delta && !['Delete', 'Backspace'].includes(event.key)) return;
+            event.stopPropagation();
+            event.preventDefault();
+            pause();
+            if (delta) move(index, x + delta[0], y + delta[1]);
+            else {
+                clip.pan.splice(index, 1);
+                paint();
+                (markers.children[Math.min(index, markers.children.length - 1)] || node).focus();
+            }
+            dirtyState(true);
+        };
+        paint();
+        return graph;
+    }
+
     function clipEditor(clip, track, lane, length) {
         const node = el('div', null, `daw-clip ${selectedClip === clip.id ? 'sel' : ''}`);
         node.tabIndex = 0;
         node.dataset.clipId = clip.id;
         node.setAttribute('aria-label', clip.name);
+        node.setAttribute('aria-haspopup', 'menu');
         node.onfocus = () => {
             if (busy || selectedClip === clip.id) return;
             selectedTrack = track.id;
@@ -346,7 +671,28 @@
         node.setAttribute('aria-selected', String(selectedClip === clip.id));
         node.style.left = `${clip.start / length * 100}%`;
         node.style.width = `${Math.max(0.25, clip.duration / length * 100)}%`;
-        node.append(el('span', clip.name, 'clip-name'));
+        const caption = el('div', null, 'clip-caption');
+        const title = el('span', clip.name, 'clip-name');
+        const gain = el('input', null, 'clip-gain');
+        Object.assign(gain, { type: 'number', min: -96, max: 24, step: 1, value: clip.gain });
+        gain.title = t('剪辑增益 (dB)');
+        gain.setAttribute('aria-label', gain.title);
+        gain.onchange = () => {
+            const value = limit(Number(gain.value) || 0, -96, 24);
+            gain.value = value;
+            pause();
+            clip.gain = value;
+            dirtyState(true);
+        };
+        caption.append(title, gain);
+        node.append(caption);
+        node.oncontextmenu = event => {
+            if (!event.target.closest('input')) clipMenu(event, node, clip, track);
+        };
+        node.onkeydown = event => {
+            if (event.target !== node || !(event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) return;
+            clipMenu(event, node, clip, track);
+        };
         let paint = () => {};
         if (clip.peaks) {
             const canvas = el('canvas');
@@ -356,31 +702,56 @@
                 if (!canvas.isConnected) return;
                 const from = Math.floor(clip.offset / clip.maxDuration * clip.peaks.length);
                 const to = Math.ceil((clip.offset + clip.duration) / clip.maxDuration * clip.peaks.length);
-                waveform.drawMini(canvas, { waveformData: clip.peaks.slice(from, to), color: '#888' });
+                waveform.drawMini(canvas, { waveformData: clip.peaks.slice(from, to), inactiveColor: getComputedStyle(node).getPropertyValue('--tx2').trim() });
             };
             requestAnimationFrame(paint);
         }
         const startHandle = el('span', null, 'clip-trim left');
         const endHandle = el('span', null, 'clip-trim right');
-        const fadeIn = curveGraphic('clip-fade in', [curveLine(curves[clip.fade_in_curve || 'linear'][1]) + ' L100 40 Z']);
-        const fadeOut = curveGraphic('clip-fade out', [curveLine(x => curves[clip.fade_out_curve || 'linear'][1](1 - x)) + ' L0 40 Z']);
-        const fadeInHandle = el('span', null, 'clip-fade-handle in');
-        const fadeOutHandle = el('span', null, 'clip-fade-handle out');
+        const incoming = curveLine(curves[clip.fade_in_curve || 'linear'][1]);
+        const outgoing = curveLine(x => curves[clip.fade_out_curve || 'linear'][1](1 - x));
+        const fadeIn = curveGraphic('clip-fade in', [incoming + ' L100 0 L0 0 Z', incoming]);
+        const fadeOut = curveGraphic('clip-fade out', [outgoing + ' L100 0 L0 0 Z', outgoing]);
+        const fadeInHandle = button('', () => {}, 'clip-fade-handle in');
+        const fadeOutHandle = button('', () => {}, 'clip-fade-handle out');
+        for (const [handle, field, label] of [
+            [fadeInHandle, 'fade_in', '淡入曲线'], [fadeOutHandle, 'fade_out', '淡出曲线']
+        ]) {
+            handle.setAttribute('aria-label', t(label));
+            handle.oncontextmenu = event => fadeMenu(event, handle, clip, field);
+            handle.onkeydown = event => {
+                if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) fadeMenu(event, handle, clip, field);
+                if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+                event.preventDefault();
+                const step = (event.key === 'ArrowRight' ? 1 : -1) * (field === 'fade_in' ? 1 : -1);
+                pause();
+                clip[field] = limit(clip[field] + step * (event.shiftKey ? 0.1 : 0.01), 0, clip.duration);
+                setFades();
+                dirtyState(true);
+            };
+        }
         startHandle.title = t('裁剪起点');
         endHandle.title = t('裁剪终点');
         fadeInHandle.title = t('淡入 (秒)');
         fadeOutHandle.title = t('淡出 (秒)');
-        if (clip.pan?.length) node.append(curveGraphic('clip-pan', [panLine(clip.pan)]));
+        if (clip.pan?.length || panClip === clip.id) node.append(clipPanEditor(clip, node));
         node.append(startHandle, endHandle, fadeIn, fadeOut, fadeInHandle, fadeOutHandle);
         const setFades = () => {
-            fadeIn.style.width = `${clip.fade_in / clip.duration * 100}%`;
-            fadeOut.style.width = `${clip.fade_out / clip.duration * 100}%`;
+            const incoming = clip.fade_in / clip.duration * 100;
+            const outgoing = clip.fade_out / clip.duration * 100;
+            fadeIn.style.width = `${incoming}%`;
+            fadeOut.style.width = `${outgoing}%`;
+            fadeInHandle.style.setProperty('--fade-edge', `${incoming}%`);
+            node.classList.toggle('overlap-handles', incoming + outgoing >= 93);
+            fadeOutHandle.style.setProperty('--fade-edge', `${outgoing}%`);
+            fadeInHandle.title = `${t('淡入 (秒)')} · ${number(clip.fade_in, { maximumFractionDigits: 3 })}`;
+            fadeOutHandle.title = `${t('淡出 (秒)')} · ${number(clip.fade_out, { maximumFractionDigits: 3 })}`;
         };
         setFades();
         let gesture;
         let hoveredLane;
         node.onpointerdown = event => {
-            if (event.button !== 0 || busy) return;
+            if (event.button !== 0 || busy || event.target.closest('input')) return;
             event.stopPropagation();
             selectedTrack = track.id;
             selectedClip = clip.id;
@@ -450,21 +821,55 @@
         return node;
     }
 
+    const overlapKey = (left, right) => `${left.id}/${right.id}`;
+
+    function trackOverlaps(track) {
+        const rate = target?.sample_rate || 48000;
+        const ordered = [...track.clips].sort((a, b) => Math.round(a.start * rate) - Math.round(b.start * rate));
+        const overlaps = [];
+        for (let index = 1; index < ordered.length; index++) {
+            const left = ordered[index - 1], right = ordered[index];
+            const end = left.start + left.duration;
+            const a = Math.round(left.start * rate), b = Math.round(right.start * rate);
+            const aEnd = a + Math.round(left.duration * rate), bEnd = b + Math.round(right.duration * rate);
+            if (a < b && b < aEnd && aEnd < bEnd) overlaps.push({ left, right, end });
+        }
+        return overlaps;
+    }
+
     function drawCrossfades(lane, track, length) {
         lane.querySelectorAll('.clip-crossfade').forEach(marker => marker.remove());
         if (!autoCrossfade) return;
-        const ordered = [...track.clips].sort((a, b) => a.start - b.start);
-        for (const [index, right] of ordered.entries()) {
-            const left = ordered[index - 1];
-            if (!left || left.start >= right.start) continue;
-            const end = left.start + left.duration;
-            if (end <= right.start || end >= right.start + right.duration) continue;
-            const shape = curves[crossfadeCurve][1];
-            const outgoing = crossfadeCurve === 'equal_power' ? x => shape(1 - x) : x => 1 - shape(x);
-            const region = curveGraphic('clip-crossfade', [curveLine(shape), curveLine(outgoing)]);
+        for (const { left, right, end } of trackOverlaps(track)) {
+            const key = overlapKey(left, right);
+            const override = track.crossfades.get(key);
+            const curve = override || crossfadeCurve;
+            const region = el('div', null, `clip-crossfade${curve === 'off' ? ' off' : ''}`);
             region.style.left = `${right.start / length * 100}%`;
             region.style.width = `${(end - right.start) / length * 100}%`;
-            region.setAttribute('aria-hidden', 'true');
+            if (curve !== 'off') {
+                const shape = curves[curve][1];
+                const outgoing = curve === 'equal_power' ? x => shape(1 - x) : x => 1 - shape(x);
+                region.append(curveGraphic('crossfade-paths', [curveLine(shape), curveLine(outgoing)]));
+            }
+            const open = event => {
+                if (busy) return;
+                showClipMenu(event, handle, '交叉淡化曲线', [
+                    { items: [
+                        { label: '跟随默认曲线', checked: !override, run: () => editClip(() => track.crossfades.delete(key)) },
+                        ...curveOptions(override, value => track.crossfades.set(key, value)),
+                        { label: '关闭此处交叉淡化', checked: curve === 'off',
+                            run: () => editClip(() => track.crossfades.set(key, 'off')) }
+                    ] }
+                ]);
+            };
+            const handle = button('×', () => {}, 'crossfade-menu-handle');
+            handle.title = t('交叉淡化曲线');
+            handle.setAttribute('aria-label', handle.title);
+            handle.setAttribute('aria-haspopup', 'menu');
+            handle.onclick = open;
+            region.oncontextmenu = open;
+            region.append(handle);
             lane.append(region);
         }
     }
@@ -502,6 +907,7 @@
 
     function render() {
         if (editingClip) return;
+        closeClipMenu();
         $('wwiseObjName').textContent = source?.name || t('选择工程音频源');
         $('wwiseObjPath').textContent = source?.path || '';
         $('dawTrackCount').textContent = t('轨道：{count}', { count: tracks.length });
@@ -659,133 +1065,10 @@
         }
         const clip = track?.clips.find(item => item.id === selectedClip);
         $('btnShowLibrary').disabled = !clip?.file_id;
-        $('clipEditFields').disabled = !clip || busy;
-        $('clipEditName').textContent = clip?.name || t('选择剪辑以编辑');
-        $('clipEditName').title = clip?.name || '';
-        for (const [id, field] of [
-            ['timelineClipGain', 'gain'], ['clipFadeIn', 'fade_in'], ['clipFadeOut', 'fade_out'],
-            ['clipFadeInCurve', 'fade_in_curve'], ['clipFadeOutCurve', 'fade_out_curve']
-        ]) {
-            const input = $(id);
-            const curve = field.endsWith('_curve');
-            if (!curve && field !== 'gain') input.max = clip?.duration || 0;
-            input.value = clip?.[field] ?? (curve ? 'linear' : '');
-            input.onchange = () => {
-                pause();
-                clip[field] = curve ? input.value : limit(Number(input.value) || 0, Number(input.min), Number(input.max));
-                dirtyState(true);
-                render();
-            };
-        }
-        $('btnClipPan').disabled = target?.channels !== 2;
-        $('btnClipPan').title = target?.channels === 2 ? t('声像曲线') : t('声像曲线需要立体声目标');
-        $('btnClipPan').classList.toggle('on', Boolean(clip?.pan?.length));
-        $('btnClipPan').onclick = () => openPan(clip);
-    }
-
-    function openPan(clip) {
-        if (!clip || target?.channels !== 2) return;
-        const dialog = $('panDialog');
-        const graph = $('panGraph');
-        const position = $('panPosition');
-        const value = $('panValue');
-        const add = $('btnAddPan');
-        const remove = $('btnRemovePan');
-        let points = (clip.pan || []).map(point => [...point]);
-        let selected = points[0];
-        let drag;
-        const normalize = (point, x, y) => {
-            const index = points.indexOf(point);
-            const low = index > 0 ? points[index - 1][0] + 0.001 : 0;
-            const high = index < points.length - 1 ? points[index + 1][0] - 0.001 : 1;
-            point[0] = limit(x, low, high);
-            point[1] = limit(y, -1, 1);
-        };
-        const update = (focus = false) => {
-            $('panPlot').setAttribute('d', panLine(points));
-            const handles = $('panHandles');
-            handles.replaceChildren(...points.map((point, index) => {
-                const handle = button('', () => { selected = point; update(true); }, 'pan-node');
-                handle.style.left = `${point[0] * 100}%`;
-                handle.style.top = `${(point[1] + 1) * 50}%`;
-                handle.dataset.index = index;
-                handle.setAttribute('aria-label', t('声像点 {count}', { count: index + 1 }));
-                handle.setAttribute('aria-pressed', String(selected === point));
-                return handle;
-            }));
-            add.disabled = points.length >= 32;
-            remove.disabled = position.disabled = value.disabled = !selected;
-            position.value = selected ? (selected[0] * 100).toFixed(1) : '';
-            value.value = selected ? (selected[1] * 100).toFixed(0) : '';
-            if (focus && selected) handles.children[points.indexOf(selected)]?.focus();
-        };
-        const insert = (x, y) => {
-            if (points.length >= 32) return;
-            const nearby = points.find(point => Math.abs(point[0] - x) < 0.002);
-            if (nearby) { selected = nearby; return; }
-            selected = [x, y];
-            points.push(selected);
-            points.sort((a, b) => a[0] - b[0]);
-        };
-        const pointer = event => {
-            const rect = graph.getBoundingClientRect();
-            return [limit((event.clientX - rect.left) / rect.width, 0, 1),
-                limit((event.clientY - rect.top) / rect.height * 2 - 1, -1, 1)];
-        };
-        graph.onpointerdown = event => {
-            if (event.button !== 0) return;
-            const handle = event.target.closest('.pan-node');
-            if (handle) selected = points[Number(handle.dataset.index)];
-            else {
-                const [x, y] = pointer(event);
-                insert(x, y);
-            }
-            if (!selected) return;
-            drag = event.pointerId;
-            graph.setPointerCapture(drag);
-            update();
-        };
-        graph.onpointermove = event => {
-            if (event.pointerId !== drag) return;
-            normalize(selected, ...pointer(event));
-            update();
-        };
-        graph.onpointerup = graph.onpointercancel = graph.onlostpointercapture = () => { drag = undefined; };
-        position.onchange = value.onchange = () => {
-            if (!selected) return;
-            normalize(selected, Number(position.value) / 100, Number(value.value) / 100);
-            update();
-        };
-        add.onclick = () => {
-            const anchors = [0, ...points.map(point => point[0]), 1];
-            let left = 0;
-            let width = 0;
-            for (let i = 1; i < anchors.length; i++) {
-                if (anchors[i] - anchors[i - 1] <= width) continue;
-                left = anchors[i - 1];
-                width = anchors[i] - left;
-            }
-            insert(left + width / 2, 0);
-            update(true);
-        };
-        remove.onclick = () => {
-            const index = points.indexOf(selected);
-            if (index < 0) return;
-            points.splice(index, 1);
-            selected = points[Math.min(index, points.length - 1)];
-            update();
-            (selected ? remove : add).focus();
-        };
-        $('btnResetPan').onclick = () => { points = []; selected = undefined; update(); };
-        $('btnApplyPan').onclick = () => {
-            pause();
-            clip.pan = points;
-            dialog.close();
-            dirtyState(true);
-            render();
-        };
-        update();
-        dialog.showModal();
+        const panButton = $('timelinePan');
+        panButton.disabled = !clip || target?.channels !== 2 || busy;
+        panButton.setAttribute('aria-pressed', String(Boolean(clip && panClip === clip.id)));
+        panButton.title = t(target?.channels === 2 ? '在波形上添加或拖动声像点' : '声像曲线需要立体声目标');
     }
 
     function removeClip() {
@@ -793,6 +1076,7 @@
         if (!track || !selectedClip || busy) return;
         pause();
         track.clips = track.clips.filter(clip => clip.id !== selectedClip);
+        if (panClip === selectedClip) panClip = null;
         selectedClip = null;
         dirtyState(true);
         render();
@@ -911,6 +1195,10 @@
                 gain: track.gain, mute: track.mute, solo: track.solo, channels: track.channels,
                 auto_crossfade: autoCrossfade,
                 crossfade_curve: crossfadeCurve,
+                crossfade_overrides: trackOverlaps(track).flatMap(({ left, right }) => {
+                    const curve = track.crossfades.get(overlapKey(left, right));
+                    return curve ? [[track.clips.indexOf(left), track.clips.indexOf(right), curve]] : [];
+                }),
                 effects: fx.enabled(track.effects),
                 clips: track.clips.map(({ id, name, maxDuration, peaks, ...clip }) => clip)
             }))
@@ -981,6 +1269,7 @@
     }
 
     function bind() {
+        bindTree();
         const on = (id, fn) => { $(id).onclick = () => attempt(fn); };
         const viewport = $('dawRulerViewport');
         const box = $('dawTracks');
@@ -990,13 +1279,11 @@
         on('timelineZoomIn', () => resizeTimeline(1.5));
         on('timelineZoomOut', () => resizeTimeline(1 / 1.5));
         on('timelineZoomReset', () => resizeTimeline(1));
-        for (const id of ['crossfadeCurve', 'clipFadeInCurve', 'clipFadeOutCurve']) {
-            for (const [key, [label]] of Object.entries(curves)) {
-                const option = el('option');
-                setText(option, () => t(label));
-                option.value = key;
-                $(id).append(option);
-            }
+        for (const [key, [label]] of Object.entries(curves)) {
+            const option = el('option');
+            setText(option, () => t(label));
+            option.value = key;
+            $('crossfadeCurve').append(option);
         }
         $('crossfadeCurve').onchange = event => {
             if (busy) return;
@@ -1005,8 +1292,16 @@
             if (target) dirtyState(true);
             render();
         };
-        on('btnRemoveClip', removeClip);
-        on('btnClosePan', () => $('panDialog').close());
+        on('timelinePan', () => {
+            if (!selectedClip || target?.channels !== 2 || busy) return;
+            panClip = panClip === selectedClip ? null : selectedClip;
+            render();
+        });
+        document.addEventListener('pointerdown', event => {
+            if (!event.target.closest('#clipMenu')) closeClipMenu();
+        });
+        box.addEventListener('scroll', closeClipMenu, { passive: true });
+        window.addEventListener('resize', closeClipMenu);
         on('timelineCrossfade', () => {
             if (busy) return;
             pause();
@@ -1106,6 +1401,8 @@
         $('wwiseFilter').oninput = event => {
             if (event.isComposing) return;
             if (state.workspace === 'wwise') $('searchInput').value = event.target.value;
+            $('wwiseTree').scrollTop = 0;
+            filteredExpansion.clear();
             renderTree();
         };
         let searchTimer;
@@ -1127,7 +1424,7 @@
         });
         document.addEventListener('keydown', event => {
             if (state.workspace === 'wwise' && !state.dockEditing && ['Delete', 'Backspace'].includes(event.key) &&
-                !event.target.closest('input,textarea,select,dialog,.overlay')) {
+                event.target.closest('.daw-clip') && !event.target.closest('input,.clip-pan-node')) {
                 event.preventDefault();
                 removeClip();
             }

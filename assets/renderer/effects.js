@@ -26,17 +26,20 @@
     const create = () => Object.keys(builtins).map(defaults);
     function resetEffect(effect) {
         if (builtins[effect.kind]) Object.assign(effect, defaults(effect.kind));
-        else {
-            effect.values = Object.fromEntries(effect.parameters.map(param => [param.key, param.value]));
+        else if (!editingPlugins.has(effect)) {
+            delete effect.plugin_state;
             effect.on = true;
         }
     }
     const activeBand = band => band.enabled && (band.gain !== 0 || band.shape.endsWith('_cut'));
     const enabled = chain => (chain || []).filter(item => item.on && (!item.bands || item.bands.some(activeBand)))
-        .map(({ kind, values, plugin_id, bands }) => ({
+        .map(({ kind, values, plugin_id, plugin_state, bands }) => ({
             kind, values: { ...values }, ...(plugin_id && { plugin_id }),
+            ...(plugin_state && { plugin_state }),
             ...(bands && { bands: bands.filter(activeBand).map(band => ({ ...band })) })
         }));
+    const editingPlugins = new WeakSet();
+    let draggedPlugin;
     let current;
     let analysis;
     let peak = [0, 0];
@@ -167,6 +170,111 @@
         return { root: wrapper, update };
     }
 
+    async function editPlugin(effect, context) {
+        if (editingPlugins.has(effect)) return;
+        editingPlugins.add(effect);
+        if (current?.chain === context.chain) render();
+        try {
+            const result = await desktop.desktopMedia('edit-plugin', {
+                id: effect.plugin_id, state: effect.plugin_state, values: effect.values
+            });
+            if (!result?.changed || !context.chain.includes(effect)) return;
+            effect.plugin_state = result.state;
+            effect.values = {};
+            context.changed();
+        } finally {
+            editingPlugins.delete(effect);
+            if (current?.chain === context.chain) render();
+        }
+    }
+
+    function movePlugin(context, effect, index) {
+        const chain = context.chain;
+        const previous = chain.indexOf(effect);
+        if (previous < 0 || previous === index || index < 0 || index >= chain.length ||
+            chain[index].kind === 'normalize') return;
+        chain.splice(previous, 1);
+        chain.splice(index, 0, effect);
+        context.changed();
+        render();
+        $('rack').children[index]?.querySelector('.vst-editor')?.focus({ preventScroll: true });
+    }
+
+    function pluginRow(effect, context) {
+        const { chain, changed } = context;
+        const index = chain.indexOf(effect);
+        const row = el('div', null, 'vst-row');
+        const iconButton = (text, label, callback, className = '') => {
+            const control = button(text, callback, `vst-action ${className}`);
+            control.title = label;
+            control.setAttribute('aria-label', label);
+            return control;
+        };
+        const handle = el('span', '⠿', 'vst-grab');
+        handle.draggable = true;
+        handle.title = t('拖动调整效果顺序');
+        handle.ondragstart = event => {
+            draggedPlugin = { chain, effect };
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('application/x-soundbot-vst', 'reorder');
+            row.classList.add('dragging');
+        };
+        handle.ondragend = () => {
+            draggedPlugin = null;
+            row.classList.remove('dragging');
+            $('rack').querySelectorAll('.vst-drop-top,.vst-drop-bottom').forEach(node =>
+                node.classList.remove('vst-drop-top', 'vst-drop-bottom'));
+        };
+        const name = button(effect.name, () => attempt(() => editPlugin(effect, context)), 'vst-editor');
+        name.disabled = editingPlugins.has(effect);
+        name.title = t(name.disabled ? 'VST3 编辑窗口已打开' : '打开插件界面');
+        name.setAttribute('aria-label', `${effect.name} · ${name.title}`);
+        const toggle = iconButton('⏻', t('旁通插件'), () => {
+            effect.on = !effect.on;
+            toggle.setAttribute('aria-pressed', String(!effect.on));
+            row.classList.toggle('bypassed', !effect.on);
+            changed();
+        }, 'vst-power');
+        toggle.setAttribute('aria-pressed', String(!effect.on));
+        row.classList.toggle('bypassed', !effect.on);
+        const up = iconButton('↑', t('上移'), () => movePlugin(context, effect, index - 1));
+        up.disabled = index < 1 || chain[index - 1]?.kind === 'normalize';
+        const down = iconButton('↓', t('下移'), () => movePlugin(context, effect, index + 1));
+        down.disabled = index >= chain.length - 1;
+        const remove = iconButton('×', t('移除插件'), () => {
+            chain.splice(chain.indexOf(effect), 1);
+            changed();
+            render();
+        }, 'vst-remove');
+        row.append(handle, name, toggle, up, down, remove);
+        return row;
+    }
+
+    function acceptPluginDrop(row, effect, context) {
+        const accepts = event => draggedPlugin?.chain === context.chain && draggedPlugin.effect !== effect &&
+            effect.kind !== 'normalize' && event.dataTransfer.types.includes('application/x-soundbot-vst');
+        const below = event => event.clientY >= row.getBoundingClientRect().top + row.offsetHeight / 2;
+        const clear = () => row.classList.remove('vst-drop-top', 'vst-drop-bottom');
+        row.ondragover = event => {
+            if (!accepts(event)) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+            const after = below(event);
+            row.classList.toggle('vst-drop-top', !after);
+            row.classList.toggle('vst-drop-bottom', after);
+        };
+        row.ondragleave = event => { if (!row.contains(event.relatedTarget)) clear(); };
+        row.ondrop = event => {
+            clear();
+            if (!accepts(event)) return;
+            event.preventDefault();
+            const chain = context.chain;
+            const source = draggedPlugin.effect;
+            const targetIndex = chain.indexOf(effect) + Number(below(event));
+            movePlugin(context, source, targetIndex - Number(chain.indexOf(source) < targetIndex));
+        };
+    }
+
     function render() {
         const rack = $('rack');
         redraw.length = 0;
@@ -178,6 +286,12 @@
         rack.replaceChildren();
         if (!chain) return;
         for (const effect of chain) {
+            if (effect.kind === 'vst3') {
+                const row = pluginRow(effect, current);
+                acceptPluginDrop(row, effect, current);
+                rack.append(row);
+                continue;
+            }
             const definition = builtins[effect.kind];
             const card = el('div', null, `fx-card ${effect.on ? 'on' : 'off'}`);
             const head = el('div', null, 'fx-head');
@@ -218,7 +332,7 @@
                 paintSpectrum = editor.paint;
                 redraw.push(editor.paint);
                 card.append(editor.root);
-            } else if (definition) {
+            } else {
                 const reverb = effect.kind === 'reverb';
                 const body = el('div', null, reverb ? 'fx-body reverb-controls' : 'fx-body');
                 const curve = reverb ? null : el('canvas', null, 'fx-curve');
@@ -236,34 +350,8 @@
                 }
                 if (curve) body.append(curve);
                 card.append(body);
-            } else {
-                const parameters = el('div', null, 'fx-parameters');
-                for (const item of effect.parameters) {
-                    const label = el('label');
-                    const input = el('input');
-                    Object.assign(input, { type: 'range', min: 0, max: 1, step: 0.001, value: effect.values[item.key] });
-                    input.oninput = () => { effect.values[item.key] = Number(input.value); changed(); };
-                    label.append(el('span', item.name), input);
-                    parameters.append(label);
-                }
-                const controls = el('div', null, 'fx-controls');
-                const index = chain.indexOf(effect);
-                const move = step => {
-                    [chain[index], chain[index + step]] = [chain[index + step], chain[index]];
-                    changed();
-                    render();
-                };
-                const up = button(t('上移'), () => move(-1), 'ghost-btn');
-                up.disabled = chain[index - 1]?.kind !== 'vst3';
-                const down = button(t('下移'), () => move(1), 'ghost-btn');
-                down.disabled = chain[index + 1]?.kind !== 'vst3';
-                controls.append(up, down, button(t('移除'), () => {
-                    chain.splice(index, 1);
-                    changed();
-                    render();
-                }, 'ghost-btn'));
-                card.append(parameters, controls);
             }
+            acceptPluginDrop(card, effect, current);
             rack.append(card);
         }
         requestAnimationFrame(() => redraw.forEach(paint => paint()));
@@ -339,12 +427,12 @@
                 try {
                     const loaded = await desktop.desktopMedia('load-plugin', plugin);
                     if (!loaded || !dialog.open || current?.chain !== context.chain) return;
-                    const values = Object.fromEntries(loaded.parameters.map(param => [param.key, param.value]));
-                    context.chain.push({ kind: 'vst3', plugin_id: loaded.id, name: loaded.name,
-                        values, parameters: loaded.parameters, on: true });
+                    const effect = { kind: 'vst3', plugin_id: loaded.id, name: loaded.name, values: {}, on: true };
+                    context.chain.push(effect);
                     dialog.close();
-                    context.changed();
+                    current.changed();
                     render();
+                    await editPlugin(effect, current);
                 } finally {
                     choices.inert = false;
                     query.disabled = false;

@@ -84,6 +84,7 @@ let backendProcess = null;
 let backendStartupPromise = null;
 let ipcHandlersInitialized = false;
 let backendPort = Number(process.env.SOUNDBOT_PORT || 8000);
+let openPluginEditors = 0;
 let backendOrigin = `http://127.0.0.1:${backendPort}`;
 let backendWsOrigin = `ws://127.0.0.1:${backendPort}`;
 let apiBaseUrl = `${backendOrigin}/api/v1`;
@@ -1579,6 +1580,19 @@ function setupIpcHandlers() {
         if (approval.response !== 1) return null;
         return await requestBackendJson(apiBaseUrl + `/effects/plugins/${data.id}/load`, { method: 'POST' });
       }
+      if (action === 'edit-plugin') {
+        if (typeof data.id !== 'string' || !/^[a-f0-9]{32}$/.test(data.id)) throw new Error('未知媒体操作');
+        if (quitInProgress) return null;
+        openPluginEditors++;
+        try {
+          return await requestBackendJson(apiBaseUrl + `/effects/plugins/${data.id}/edit`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ state: data.state, values: data.values })
+          });
+        } finally {
+          openPluginEditors--;
+        }
+      }
       if (action === 'connect') {
         const host = data.host;
         let selection;
@@ -1814,6 +1828,18 @@ app.on('before-quit', async (event) => {
   }
   event.preventDefault();
   quitInProgress = true;
+  if (openPluginEditors && backendProcess) {
+    try {
+      await requestBackendJson(apiBaseUrl + '/effects/editors/close', {
+        method: 'POST', signal: AbortSignal.timeout(1500)
+      });
+      // Let editor workers close before Windows terminates the backend process.
+      const deadline = Date.now() + 1200;
+      while (openPluginEditors && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 80));
+    } catch (error) {
+      console.warn('[Backend] Could not close VST3 editors:', error.message);
+    }
+  }
   await stopBackend();
   app.exit(0);
 });

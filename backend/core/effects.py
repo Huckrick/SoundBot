@@ -40,9 +40,12 @@ class Effect:
     values: dict[str, float]
     plugin_id: str | None = None
     bands: tuple[EQBand, ...] = ()
+    plugin_state: str | None = None
 
 
 def validate_effect(effect: Effect) -> Effect:
+    if effect.plugin_state is not None and (effect.kind != "vst3" or effect.values):
+        raise ValueError("VST3 参数无效")
     if effect.bands:
         if effect.kind != "eq" or effect.values or effect.plugin_id or len(effect.bands) > 8 or any(
             band.shape not in EQ_FILTERS or not 20 <= band.frequency <= 20000
@@ -155,7 +158,7 @@ def process(blocks, rate, channels, effects, *, measure):
                 ("acompressor", f"threshold={threshold}:ratio={values['ratio']}:attack=12:release=180"),
             ])
         elif effect.kind == "vst3":
-            blocks = vst.process(blocks, rate, channels, effect.plugin_id, values)
+            blocks = vst.process(blocks, rate, channels, effect.plugin_id, values, effect.plugin_state)
         elif effect.kind == "reverb" and values["mix"]:
             blocks = _reverb(blocks, rate, channels, values)
     yield from blocks

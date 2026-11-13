@@ -6,7 +6,7 @@
     const miniCache = new WeakMap();
 
     function isValidData(value) {
-        return Array.isArray(value) && value.length > 0 && value.every(Number.isFinite);
+        return (Array.isArray(value) || value instanceof Float32Array) && value.length > 0 && value.every(Number.isFinite);
     }
 
     function syncFromPeaks(sound) {
