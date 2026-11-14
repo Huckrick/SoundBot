@@ -74,9 +74,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
     selectAudioFiles: (options = {}) => ipcRenderer.invoke('file-import', 'select-audio', options),
     // 打开文件夹选择对话框
     selectFolder: (options = {}) => ipcRenderer.invoke('file-import', 'select-folder', options),
-    // 处理拖放的文件
-    handleDropFiles: (files) => ipcRenderer.invoke('file-import', 'handle-drop',
-      files.map(file => webUtils.getPathForFile(file)).filter(Boolean)),
+    onLibraryDrop: (callback) => {
+      window.addEventListener('drop', async (event) => {
+        if (!event.isTrusted || !event.target?.closest?.('#libraryView') || !event.dataTransfer?.files.length) return;
+        event.preventDefault();
+        const paths = Array.from(event.dataTransfer.files, file => webUtils.getPathForFile(file)).filter(Boolean);
+        if (!paths.length) return;
+        let result;
+        try {
+          result = await ipcRenderer.invoke('file-import', 'handle-drop', paths);
+        } catch (error) {
+          result = { success: false, error: error.message };
+        }
+        callback(result);
+      });
+    },
     // 获取文件信息
     getFileInfo: (filePath) => ipcRenderer.invoke('file-import', 'get-info', filePath),
     // 验证文件类型

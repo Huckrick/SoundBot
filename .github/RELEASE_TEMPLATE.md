@@ -1,6 +1,6 @@
 # SoundBot
 
-**Version / 版本:** 1.0.7<br>
+**Version / 版本:** 1.0.8<br>
 **Status / 状态:** Stable / 稳定版<br>
 
 ## 功能 / Features
@@ -16,7 +16,7 @@
 | macOS 14+ arm64 | DMG |
 | Windows 10/11 x64 | NSIS EXE |
 
-发布资产附带 `SHA256SUMS.txt`。升级时应用先备份 SQLite，再迁移到 v4。 / Releases include `SHA256SUMS.txt`. Upgrades back up SQLite before migrating to v4.
+发布资产附带 `SHA256SUMS.txt`。升级时应用先备份 SQLite，再迁移到 v5。 / Releases include `SHA256SUMS.txt`. Upgrades back up SQLite before migrating to v5.
 
 ## 验收 / Verification
 

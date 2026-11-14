@@ -605,14 +605,20 @@ async def get_asset_groups(project_id: str, file_id: str):
 @app.post("/api/v1/projects/{project_id}/sources/{source_id}/scan")
 async def scan_library_source(project_id: str, source_id: str, background_tasks: BackgroundTasks):
     db = _require_library(project_id)
-    with db.get_cursor() as cur:
-        source = cur.execute("SELECT path,recursive FROM library_sources WHERE id=? AND project_id=?",
-                             (source_id, project_id)).fetchone()
-    if not source:
-        raise SoundBotAPIError("source_not_found", "来源目录不存在", status_code=404)
-    job_id = await asyncio.to_thread(catalog.create_import, db, project_id, source_id=source_id)
+    try:
+        job_id = await asyncio.to_thread(catalog.create_import, db, project_id, source_id=source_id)
+    except ValueError as exc:
+        raise SoundBotAPIError("source_not_found", "来源目录不存在", status_code=404) from exc
     background_tasks.add_task(_run_catalog_job, job_id, project_id)
     return {"task_id": job_id, "job_id": job_id, "project_id": project_id, "state": "pending"}
+
+
+@app.delete("/api/v1/projects/{project_id}/sources/{source_id}")
+async def remove_library_source(project_id: str, source_id: str):
+    removed = await asyncio.to_thread(catalog.remove_source, _require_library(project_id), project_id, source_id)
+    if removed is None:
+        raise SoundBotAPIError("source_not_found", "来源目录不存在", status_code=404)
+    return {"removed": removed}
 
 
 class LibraryItemUpdate(BaseModel):

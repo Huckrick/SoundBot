@@ -175,7 +175,7 @@ def read_artwork(source, av):
         if cover:
             return cover
     # FFmpeg also recognizes attachments in containers Mutagen cannot read.
-    with av.open(str(source), mode="r", timeout=(2.0, 2.0)) as container:
+    with av.open(str(source), mode="r", timeout=(2.0, 2.0), metadata_errors="replace") as container:
         pictures = [stream for stream in container.streams.video
                     if stream.disposition & av.stream.Disposition.attached_pic
                     and not stream.disposition & av.stream.Disposition.timed_thumbnails]
@@ -292,7 +292,7 @@ def read_details(source, av):
     media = _native_file(source)
     native = _native_tags(media)
     info = getattr(media, "info", None)
-    with av.open(str(source), mode="r", timeout=(4.0, 4.0)) as container:
+    with av.open(str(source), mode="r", timeout=(4.0, 4.0), metadata_errors="replace") as container:
         stream = next(iter(container.streams.audio), None)
         if stream is None:
             raise ValueError("container has no audio stream")

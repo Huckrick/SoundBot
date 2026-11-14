@@ -167,6 +167,21 @@ def rebuild_keywords(cursor):
     cursor.execute(f"INSERT INTO library_search({_SEARCH_COLUMNS}) SELECT {_SEARCH_VALUES} FROM files r")
 
 
+def migrate_source_ownership(cursor):
+    """Keep loose files and recover explicit imports recorded by existing jobs."""
+    cursor.execute("ALTER TABLE files ADD COLUMN imported_individually INTEGER NOT NULL DEFAULT 1")
+    cursor.execute("UPDATE files SET imported_individually=0 WHERE id IN (SELECT file_id FROM source_files)")
+    explicit = cursor.connection.execute("""SELECT j.project_id, item.value
+        FROM catalog_imports i JOIN jobs j ON j.id=i.job_id
+        JOIN json_each(i.files_json) item ON item.key<i.discovered
+        WHERE i.source_id IS NULL AND NOT EXISTS (
+            SELECT 1 FROM import_failures WHERE job_id=i.job_id AND path=item.value
+        )""")
+    cursor.executemany("""UPDATE files SET imported_individually=1
+        WHERE project_id=? AND canonical_path=? AND imported_individually=0""",
+        ((project_id, canonicalize_path(path)) for project_id, path in explicit))
+
+
 def path_bounds(path):
     prefix = path.rstrip("/") + "/"
     return prefix, prefix[:-1] + "0"
@@ -398,6 +413,8 @@ def _commit_batch(db, job_id, project_id, source_id, items, pool, explicit, path
     results = list(pool.map(_probe, pending.values()))
     commit_started = perf_counter()
     with _WRITE_LOCK, db.get_cursor() as cur:
+        if not cur.execute("SELECT 1 FROM jobs WHERE id=? AND state='running'", (job_id,)).fetchone():
+            return
         for path, message in path_failures:
             _write_failure(cur, job_id, path, message)
         if path_failures and source_id:
@@ -405,6 +422,18 @@ def _commit_batch(db, job_id, project_id, source_id, items, pool, explicit, path
         failures = len(path_failures)
         unchanged_count = len(unchanged)
         inserted = 0
+        if unchanged:
+            ids = tuple(unchanged.values())
+            still_present = {row[0] for row in cur.execute(
+                f"SELECT id FROM files WHERE id IN ({','.join('?' for _ in ids)})", ids,
+            )}
+            # A different source can be removed between the lookup and this write.
+            for item in {item.key: item for item in items}.values():
+                if item.key not in unchanged or unchanged[item.key] in still_present:
+                    continue
+                del unchanged[item.key]
+                unchanged_count -= 1
+                results.append(_probe(item))
         for item, fields in results:
             # A user may have excluded the record while the probe ran.
             if not explicit and cur.execute(
@@ -415,8 +444,9 @@ def _commit_batch(db, job_id, project_id, source_id, items, pool, explicit, path
             fingerprint = FileFingerprint(item.size, item.mtime).source_key
             file_id = cur.execute("""
                 INSERT INTO files(file_uuid,project_id,path,canonical_path,filename,file_size,mtime_ns,
-                    source_fingerprint,duration,sample_rate,channels,format,title,description,keywords,library_name,ucs,probe_error)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    source_fingerprint,duration,sample_rate,channels,format,title,description,keywords,library_name,ucs,
+                    probe_error,imported_individually)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(project_id,canonical_path) DO UPDATE SET
                     path=excluded.path, filename=excluded.filename, file_size=excluded.file_size,
                     mtime_ns=excluded.mtime_ns, source_fingerprint=excluded.source_fingerprint,
@@ -429,7 +459,7 @@ def _commit_batch(db, job_id, project_id, source_id, items, pool, explicit, path
                         THEN files.waveform_fingerprint END
                 RETURNING id,file_uuid
                 """, (uuid4().hex, project_id, item.path, item.key,
-                      Path(item.path).name, item.size, item.mtime, fingerprint, *fields)).fetchone()
+                      Path(item.path).name, item.size, item.mtime, fingerprint, *fields, int(explicit))).fetchone()
             if item.key in known:
                 cur.execute("""UPDATE file_artifacts SET state='stale',source_fingerprint=?
                     WHERE file_uuid=? AND source_fingerprint IS NOT ?""",
@@ -444,6 +474,7 @@ def _commit_batch(db, job_id, project_id, source_id, items, pool, explicit, path
         for key, file_id in unchanged.items():
             if explicit:
                 cur.execute("DELETE FROM library_exclusions WHERE project_id=? AND canonical_path=?", (project_id, key))
+                cur.execute("UPDATE files SET imported_individually=1 WHERE id=? AND imported_individually=0", (file_id,))
             if source_id:
                 cur.execute("""INSERT INTO source_files(source_id,file_id,scan_id)
                     SELECT ?,id,? FROM files WHERE id=? ON CONFLICT(source_id,file_id)
@@ -471,8 +502,8 @@ def _scan_directory(db, job_id, project_id, source, directory, pool, timings=Non
             failures.clear()
         if directories:
             with _WRITE_LOCK, db.get_cursor() as cur:
-                cur.executemany("INSERT OR IGNORE INTO import_directories(job_id,path) VALUES (?,?)",
-                                ((job_id, path) for path in directories))
+                cur.executemany("""INSERT OR IGNORE INTO import_directories(job_id,path)
+                    SELECT id,? FROM jobs WHERE id=? AND state='running'""", ((path, job_id) for path in directories))
             directories.clear()
 
     batch, directories, failures = [], [], []
@@ -527,6 +558,8 @@ def run_import(db, job_id, *, timings=None):
                             break
                     except OSError as exc:
                         with _WRITE_LOCK, db.get_cursor() as cur:
+                            if not cur.execute("SELECT 1 FROM jobs WHERE id=?", (job_id,)).fetchone():
+                                return
                             _write_failure(cur, job_id, directory["path"], str(exc))
                             cur.execute("""UPDATE catalog_imports SET failures=failures+1,incomplete=1
                                 WHERE job_id=?""", (job_id,))
@@ -573,6 +606,27 @@ def sources(db, project_id):
         return [dict(row) for row in cur.execute("""SELECT s.id,s.path,s.recursive,COUNT(f.file_id) AS count
             FROM library_sources s LEFT JOIN source_files f ON f.source_id=s.id
             WHERE s.project_id=? GROUP BY s.id ORDER BY s.path COLLATE NOCASE""", (project_id,))]
+
+
+def remove_source(db, project_id, source_id):
+    with _WRITE_LOCK, db.get_cursor() as cur:
+        cur.execute("BEGIN IMMEDIATE")
+        source = cur.execute("SELECT canonical_path FROM library_sources WHERE id=? AND project_id=?",
+                             (source_id, project_id)).fetchone()
+        if not source:
+            return None
+        cur.execute("DELETE FROM jobs WHERE id IN (SELECT job_id FROM catalog_imports WHERE source_id=?)",
+                    (source_id,))
+        removed = cur.execute("""DELETE FROM files WHERE project_id=? AND imported_individually=0 AND id IN (
+            SELECT file_id FROM source_files WHERE source_id=?
+        ) AND NOT EXISTS (SELECT 1 FROM source_files WHERE file_id=files.id AND source_id<>?)""",
+            (project_id, source_id, source_id)).rowcount
+        mappings = cur.execute("SELECT id,folder_path FROM imported_folder_mappings WHERE project_id=?",
+                               (project_id,)).fetchall()
+        cur.executemany("DELETE FROM imported_folder_mappings WHERE id=?",
+                        ((row['id'],) for row in mappings if canonicalize_path(row['folder_path']) == source[0]))
+        cur.execute("DELETE FROM library_sources WHERE id=?", (source_id,))
+    return removed
 
 
 def facets(db, project_id):

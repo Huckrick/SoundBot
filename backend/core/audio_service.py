@@ -342,7 +342,7 @@ class AudioService:
         sample_rate = 0
         mapped = None
         try:
-            with temp_path.open("wb") as sink, _av.open(str(source), mode="r") as container:
+            with temp_path.open("wb") as sink, _av.open(str(source), mode="r", metadata_errors="replace") as container:
                 stream = next(
                     (item for item in container.streams if item.type == "audio"), None
                 )
@@ -553,7 +553,9 @@ class AudioService:
 
     @staticmethod
     def _probe_with_pyav(source: Path) -> AudioMetadata:
-        with _av.open(str(source), mode='r', timeout=(4.0, 4.0)) as container:
+        # The pinned PyAV version defaults to strict UTF-8 for tags. Older
+        # WAV INFO/bext chunks can contain valid audio and legacy tag bytes.
+        with _av.open(str(source), mode='r', timeout=(4.0, 4.0), metadata_errors='replace') as container:
             stream = next((item for item in container.streams if item.type == 'audio'), None)
             if stream is None:
                 raise ValueError('container has no audio stream')
@@ -584,7 +586,7 @@ class AudioService:
         source: Path, target_sample_rate: Optional[int], mono: bool
     ) -> DecodedAudio:
         chunks: list[np.ndarray] = []
-        with _av.open(str(source), mode='r') as container:
+        with _av.open(str(source), mode='r', metadata_errors='replace') as container:
             stream = next((item for item in container.streams if item.type == 'audio'), None)
             if stream is None:
                 raise ValueError('container has no audio stream')

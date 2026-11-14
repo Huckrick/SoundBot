@@ -105,7 +105,7 @@ def get_chroma_db_path(project_id: str = "default") -> Path:
 # ==================== 项目基础配置 ====================
 
 APP_NAME = "SoundBot"
-APP_VERSION = "1.0.7"
+APP_VERSION = "1.0.8"
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
 # ==================== 服务器配置 ====================

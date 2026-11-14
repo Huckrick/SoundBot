@@ -13,7 +13,9 @@ import sys
 import tempfile
 import unittest
 import wave
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Event
 from unittest.mock import patch
 
 import numpy as np
@@ -111,6 +113,63 @@ class CoreDeliveryTests(unittest.TestCase):
         self.assertEqual(get_db_manager().get_all_projects(), [])
         created = self.client.post("/api/v1/projects", json={"name": "New library"}).json()["project_id"]
         self.assertEqual(self.client.get(f"/api/v1/projects/{created}").json()["file_count"], 0)
+        self.client.post(f"/api/v1/projects/{created}/imports", json={"file_paths": [str(source)]}).raise_for_status()
+        self.assertEqual(self.client.get(f"/api/v1/projects/{created}/catalog").json()["total"], 1)
+
+    def test_remove_source_keeps_originals_and_other_imports(self):
+        folder = self.root / "source"
+        child = folder / "nested"
+        child.mkdir(parents=True)
+        removable = audio_file(folder / "remove.wav")
+        separate = audio_file(folder / "direct.wav")
+        shared = audio_file(child / "shared.wav")
+        parent_job = self.import_folder(folder)
+        child_job = self.import_folder(child)
+        self.client.post("/api/v1/projects/default/imports", json={"file_paths": [str(separate)]}).raise_for_status()
+        prior = {item["filename"]: item["id"] for item in self.items()["files"]}
+        source_id = parent_job["source_id"]
+        other = self.client.post("/api/v1/projects", json={"name": "Other"}).json()["project_id"]
+        self.client.post(f"/api/v1/projects/{other}/imports", json={"folder_path": str(folder)}).raise_for_status()
+        self.assertEqual(self.client.delete(f"/api/v1/projects/{other}/sources/{source_id}").status_code, 404)
+        removed = self.client.delete(f"/api/v1/projects/default/sources/{source_id}").raise_for_status().json()
+        self.assertEqual(removed, {"removed": 1})
+        self.assertEqual(self.items(q="remove")["total"], 0)
+        self.assertEqual({item["filename"]: item["id"] for item in self.items()["files"]},
+                         {name: prior[name] for name in (separate.name, shared.name)})
+        self.assertEqual(self.client.get(f"/api/v1/projects/{other}/catalog").json()["total"], 3)
+        self.assertEqual([row["id"] for row in catalog.sources(get_db_manager(), "default")], [child_job["source_id"]])
+        self.assertEqual(self.client.get(f"/api/v1/jobs/{parent_job['id']}").status_code, 404)
+        self.assertTrue(all(path.is_file() for path in (removable, separate, shared)))
+        self.assertEqual(self.import_folder(folder)["stage"], "done")
+        self.assertEqual(self.items()["total"], 3)
+
+    def test_removing_source_blocks_in_flight_batch(self):
+        folder = self.root / "source"
+        folder.mkdir()
+        source = audio_file(folder / "tone.wav")
+        db = get_db_manager()
+        job_id = catalog.create_import(db, "default", root=str(folder))
+        source_id = catalog.import_status(db, job_id)["source_id"]
+        probing, resume = Event(), Event()
+        real_probe = catalog._probe
+
+        def wait_to_probe(item):
+            probing.set()
+            if not resume.wait(10):
+                raise TimeoutError("Timed out waiting for source removal")
+            return real_probe(item)
+
+        with patch.object(catalog, "_probe", side_effect=wait_to_probe), ThreadPoolExecutor(1) as worker:
+            future = worker.submit(catalog.run_import, db, job_id)
+            try:
+                self.assertTrue(probing.wait(10))
+                self.client.delete(f"/api/v1/projects/default/sources/{source_id}").raise_for_status()
+            finally:
+                resume.set()
+            future.result(timeout=10)
+        self.assertEqual(self.items()["total"], 0)
+        self.assertIsNone(catalog.import_status(db, job_id))
+        self.assertTrue(source.is_file())
 
     def test_active_jobs_and_ranged_native_source(self):
         source = audio_file(self.root / "source.wav")
@@ -386,6 +445,23 @@ class CoreDeliveryTests(unittest.TestCase):
         repaired = self.items(q="broken")["files"][0]
         self.assertEqual(repaired["id"], first["id"])
         self.assertEqual(repaired["sample_rate"], 48000)
+
+    def test_playable_wave_with_legacy_tag_imports_and_displays_details(self):
+        source = audio_file(self.root / "legacy.wav")
+        tag = b"\xa9 Studio\x00"
+        info = b"INFOICOP" + struct.pack("<I", len(tag)) + tag + b"\0"
+        contents = source.read_bytes()[8:] + b"LIST" + struct.pack("<I", len(info)) + info
+        source.write_bytes(b"RIFF" + struct.pack("<I", len(contents)) + contents)
+        job = self.import_folder(self.root)
+        self.assertEqual((job["stage"], job["failures"]), ("done", 0), job)
+        item = self.items(q="legacy")["files"][0]
+        self.assertEqual((item["duration"], item["sample_rate"], item["channels"]), (1, 48000, 1))
+        base = f"/api/v1/files/{item['id']}"
+        params = {"project_id": "default"}
+        waveform = self.client.get(f"{base}/waveform", params=params).raise_for_status().json()
+        self.assertTrue(waveform["peaks"])
+        details = self.client.get(f"{base}/details", params=params).raise_for_status().json()
+        self.assertEqual(details["audio"]["codec"], "pcm_s16le")
 
     def test_parametric_eq_and_reverb_process_the_preview(self):
         import numpy as np

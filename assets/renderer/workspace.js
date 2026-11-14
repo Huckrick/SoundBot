@@ -696,15 +696,17 @@
         };
     }
 
-    async function loadLibraries(preferred, expectedRevision) {
+    async function loadLibraries(preferred = state.library?.id, expectedRevision = libraryRevision) {
         const { projects } = await api.get('/api/v1/projects');
-        if (expectedRevision !== undefined && expectedRevision !== libraryRevision) return;
+        if (expectedRevision !== libraryRevision) return;
         state.libraries = projects;
-        renderLibraryPicker();
-        const active = projects.find(item => item.id === preferred) || projects[0];
-        if (active?.id !== state.library?.id || !active) await switchLibrary(active || null);
-        else if (active) state.library = active;
-        if (state.library) $('contextPill').value = state.library.id;
+        const active = projects.find(item => item.id === preferred) || projects[0] || null;
+        if (active?.id !== state.library?.id) await switchLibrary(active);
+        else {
+            state.library = active;
+            renderLibraryPicker();
+            if (!active) { renderRows(); await renderTree(); }
+        }
     }
 
     function renderLibraryPicker() {
@@ -716,22 +718,30 @@
         }));
         if (state.library) picker.value = state.library.id;
         picker.disabled = !state.libraries.length;
-        if (picker.disabled) picker.append(el('option', t('新建音效库…')));
-        for (const id of ['btnRenameLib', 'btnRemoveLib', 'btnImport', 'impFile', 'impFolder', 'btnRebuild', 'btnCreateGroup', 'aiSend']) {
-            $(id).disabled = picker.disabled;
+        if (picker.disabled) picker.append(el('option', t('暂无音效库')));
+        for (const id of ['btnRenameLib', 'btnRemoveLib', 'btnRebuild', 'btnCreateGroup', 'aiSend']) {
+            $(id).disabled = !state.library;
         }
     }
 
     async function switchLibrary(library) {
         if (timeline()?.hasLibraryClips() && !await timeline().discard()) {
-            $('contextPill').value = state.library?.id || '';
+            renderLibraryPicker();
             return;
         }
         const revision = ++libraryRevision;
         listRequest?.abort();
         await select(null);
+        if (!library || !state.library) {
+            state.search = '';
+            state.view = 'folder';
+            if (isLibrary()) $('searchInput').value = '';
+            for (const id of ['filterFormat', 'filterChannels', 'filterDuration']) $(id).value = '';
+            renderSortControls();
+        }
         state.library = library;
         state.filter = {};
+        $('queryEcho').textContent = '';
         state.facets = null;
         state.selectedIds.clear();
         state.jobs = [];
@@ -746,6 +756,7 @@
         syncBottomStage();
         if (library) localStorage.setItem('soundbot-library', library.id);
         else localStorage.removeItem('soundbot-library');
+        renderLibraryPicker();
         renderRows();
         await Promise.all([loadItems(true), renderTree(), refreshJobs(revision), timeline()?.loadDock()]);
     }
@@ -907,7 +918,7 @@
         if (state.cursor) parts.push(button(t('加载更多'), () => loadItems(), 'more'));
         if (!parts.length) parts.push(state.library
             ? el('div', state.search ? t('没有匹配的素材') : t('将音频或文件夹拖到这里'), 'empty')
-            : button(t('新建音效库…'), () => $('btnNewLib').click(), 'empty empty-library'));
+            : button(t('新建音效库…'), createLibrary, 'empty empty-library'));
         const offset = box.scrollTop;
         const keep = new Set(parts);
         for (const child of [...box.children]) if (!keep.has(child)) child.remove();
@@ -1222,7 +1233,8 @@
                 await api.post(route(`/sources/${encodeURIComponent(item.id)}/scan`, library), {});
                 modal('ovJobs');
                 await refreshJobs();
-            }], [t('重定位…'), () => relocateItem({ source_id: item.id }, true)]);
+            }], [t('重定位…'), () => relocateItem({ source_id: item.id }, true)],
+            [t('从音效库移除文件夹…'), () => removeFolderSource(item, library)]);
         }
         actions.push([t('在文件管理器中显示'), () => desktop.revealFile(item.path)]);
         const options = actions.map(([label, action]) => {
@@ -1277,12 +1289,17 @@
     }
 
     let polling = false;
+    let removingLibrary = null;
     async function refreshJobs(revision = libraryRevision) {
         const library = state.library?.id;
+        if (library && library === removingLibrary) return;
         const [jobs, running] = await Promise.all([
-            library ? api.get(route('/jobs', library)) : [], api.get('/api/v1/jobs/active')
+            library ? api.get(route('/jobs', library)).catch(error => {
+                if (revision !== libraryRevision || library === removingLibrary) return [];
+                throw error;
+            }) : [], api.get('/api/v1/jobs/active')
         ]);
-        if (revision !== libraryRevision) return;
+        if (revision !== libraryRevision || library && library === removingLibrary) return;
         const updates = jobs.some(job => {
             const prior = state.jobs.find(item => item.id === job.id);
             return job.imported && (!prior || job.imported > prior.imported);
@@ -1351,8 +1368,24 @@
         $('jobsList').replaceChildren(...(rows.length ? rows : [el('p', t('当前音效库暂无任务'))]));
     }
 
+    let creatingLibrary;
+    async function createLibrary() {
+        if (creatingLibrary) return creatingLibrary;
+        creatingLibrary = (async () => {
+            const name = await promptText(t('音效库名称'));
+            if (!name) return;
+            const data = await api.post('/api/v1/projects', { name });
+            await loadLibraries(data.project_id);
+            return data.project_id;
+        })();
+        try { return await creatingLibrary; }
+        finally { creatingLibrary = null; }
+    }
+
     async function addFiles(files, libraryId = state.library?.id) {
-        if (!libraryId || !files.length) return;
+        if (!files.length) return;
+        libraryId ||= await createLibrary();
+        if (!libraryId) return;
         const directories = files.filter(item => item.isDirectory);
         for (const dir of directories) await api.post(route('/imports', libraryId), { folder_path: dir.path });
         const paths = files.filter(item => !item.isDirectory).map(item => item.path);
@@ -1364,13 +1397,34 @@
     }
 
     async function importFiles(folder) {
-        if (!state.library) return;
         const libraryId = state.library?.id;
         const picker = folder ? desktop.fileImport.selectFolder : desktop.fileImport.selectAudioFiles;
         const result = await picker({});
         if (result.canceled) return;
         if (!result.success) throw new Error(result.error || '无法打开文件选择器');
         return addFiles(folder ? [{ path: result.folder, isDirectory: true }] : result.files, libraryId);
+    }
+
+    async function removeFolderSource(item, library) {
+        const name = item.path.split(/[/\\]/).filter(Boolean).at(-1) || item.path;
+        const accepted = await confirm(t('移除来源文件夹「{name}」？原音频文件会保留。', { name }));
+        if (!accepted || state.library?.id !== library) return;
+        await api.delete(route(`/sources/${encodeURIComponent(item.id)}`, library));
+        if (state.library?.id !== library) return;
+        const selected = state.selected;
+        if (selected) {
+            try { await api.get(route(`/catalog/items/${encodeURIComponent(selected.id)}`, library)); }
+            catch (error) {
+                if (error.code !== 'file_not_found') throw error;
+                if (state.selected === selected) await select(null);
+                clipSessions.delete(selected.id);
+            }
+        }
+        if (state.library?.id !== library) return;
+        state.selectedIds.clear();
+        await Promise.all([state.filter.folder ? setFilter({}) : loadItems(true),
+            renderTree(), loadLibraries(library), refreshJobs(), timeline()?.loadDock()]);
+        say(t('已移除来源文件夹'));
     }
 
     async function relocateItem(payload, directory) {
@@ -1942,12 +1996,7 @@
             if (event.target.closest('.dropdown button')) event.target.closest('.dropdown').classList.remove('show');
         });
         $('contextPill').onchange = () => attempt(() => switchLibrary(state.libraries.find(item => item.id === $('contextPill').value)));
-        on('btnNewLib', async () => {
-            const name = await promptText(t('音效库名称'));
-            if (!name) return;
-            const data = await api.post('/api/v1/projects', { name });
-            await loadLibraries(data.project_id);
-        });
+        on('btnNewLib', createLibrary);
         on('btnRenameLib', async () => {
             const name = await promptText(t('音效库名称'), state.library.name);
             if (!name) return;
@@ -1956,21 +2005,22 @@
         });
         on('btnRemoveLib', async () => {
             const library = state.library;
-            if (!library || !await confirm(t('移除音效库「{name}」？原音频文件会保留。', { name: libraryName(library) }))) return;
+            if (removingLibrary || !library || !await confirm(t('移除音效库「{name}」？原音频文件会保留。', { name: libraryName(library) }))) return;
             if (timeline()?.hasLibraryClips() && !await timeline().discard()) return;
-            await api.delete(route('', library.id));
-            await loadLibraries();
+            removingLibrary = library.id;
+            try {
+                await api.delete(route('', library.id));
+                await loadLibraries();
+            } finally { removingLibrary = null; }
         });
         on('impFile', () => importFiles(false));
         on('impFolder', () => importFiles(true));
         $('libraryView').addEventListener('dragover', event => { if (event.dataTransfer.types.includes('Files')) event.preventDefault(); });
-        $('libraryView').addEventListener('drop', event => {
-            if (!event.dataTransfer.files.length) return;
-            event.preventDefault();
+        desktop.fileImport.onLibraryDrop(result => {
+            const library = state.library?.id;
             attempt(async () => {
-                const result = await desktop.fileImport.handleDropFiles([...event.dataTransfer.files]);
                 if (!result.success) throw new Error(result.error);
-                await addFiles(result.files);
+                await addFiles(result.files, library);
             });
         });
         on('btnBulk', async () => { await fillBulkGroups(); $('bulkDialog').showModal(); });

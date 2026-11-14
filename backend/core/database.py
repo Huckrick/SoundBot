@@ -50,7 +50,7 @@ from datetime import datetime
 
 logger = None  # 延迟初始化
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 ARTIFACT_KINDS = ("waveform", "audio_vector", "text_vector")
 ARTIFACT_STATES = ("pending", "processing", "ready", "failed", "stale")
 SAFE_PROJECT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
@@ -486,8 +486,9 @@ class DatabaseManager:
                 # 全新数据库，直接创建所有表
                 cursor.execute("BEGIN IMMEDIATE")
                 _execute_sql_statements(cursor, CREATE_TABLE_SQL)
-                from core.catalog import migrate
+                from core.catalog import migrate, migrate_source_ownership
                 migrate(cursor)
+                migrate_source_ownership(cursor)
                 integrity = cursor.execute("PRAGMA quick_check").fetchone()
                 if not integrity or integrity[0] != "ok":
                     raise sqlite3.DatabaseError(
@@ -530,6 +531,11 @@ class DatabaseManager:
                         if not cursor.connection.in_transaction:
                             cursor.execute("BEGIN IMMEDIATE")
                         migrate(cursor)
+                    if current_version < 5:
+                        from core.catalog import migrate_source_ownership
+                        if not cursor.connection.in_transaction:
+                            cursor.execute("BEGIN IMMEDIATE")
+                        migrate_source_ownership(cursor)
                     schema_version_pending = True
 
             # A process can stop between claiming an artifact/job and recording

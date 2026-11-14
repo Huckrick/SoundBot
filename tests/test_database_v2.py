@@ -83,7 +83,7 @@ class DatabaseV2Tests(unittest.TestCase):
 
         manager = DatabaseManager(str(database_path))
         migrated = manager.get_file(str(audio), "default")
-        backup = Path(f"{database_path}.pre-v0-to-v4.bak")
+        backup = Path(f"{database_path}.pre-v0-to-v{database_module.SCHEMA_VERSION}.bak")
 
         self.assertIsNotNone(migrated)
         self.assertEqual(migrated.get_tags(), ["legacy-tag"])
@@ -131,7 +131,7 @@ class DatabaseV2Tests(unittest.TestCase):
         finally:
             restored.close()
         self.assertEqual(row, ("original.wav", "original.wav"))
-        self.assertTrue(Path(f"{database_path}.pre-v0-to-v4.bak").is_file())
+        self.assertTrue(Path(f"{database_path}.pre-v0-to-v{database_module.SCHEMA_VERSION}.bak").is_file())
 
     def test_migration_schema_and_backfill_roll_back_as_one_transaction(self) -> None:
         database_path = self.root / "atomic-migration.db"
@@ -337,12 +337,12 @@ class DatabaseV2Tests(unittest.TestCase):
         audio_manifest = manager.get_index_manifest("default", "audio_vector")
         self.assertEqual(audio_manifest["state"], "stale")
         self.assertEqual(audio_manifest["revision"], 5)
-        self.assertTrue(Path(f"{database_path}.pre-v2-to-v4.bak").is_file())
+        self.assertTrue(Path(f"{database_path}.pre-v2-to-v{database_module.SCHEMA_VERSION}.bak").is_file())
         with manager.get_cursor() as cursor:
             version = cursor.execute(
                 "SELECT value FROM schema_meta WHERE key='schema_version'"
             ).fetchone()[0]
-        self.assertEqual(version, "4")
+        self.assertEqual(version, str(database_module.SCHEMA_VERSION))
 
     def test_windows_aware_ancestor_check_uses_separator_boundary(self) -> None:
         self.assertTrue(

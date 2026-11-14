@@ -68,7 +68,7 @@ def read_region(path, offset, frames, rate, channels):
 
     service = get_audio_service()
     service._require_pyav()
-    with _av.open(str(service._validate_source(path)), mode="r") as container:
+    with _av.open(str(service._validate_source(path)), mode="r", metadata_errors="replace") as container:
         stream = container.streams.audio[0]
         origin = float((stream.start_time or 0) * stream.time_base) if stream.time_base else 0.0
         if offset > 2 and stream.time_base:

@@ -42,6 +42,7 @@ async function run() {
     electronAPI: typeof window.electronAPI,
     selectAudioFiles: typeof window.electronAPI?.fileImport?.selectAudioFiles,
     selectFolder: typeof window.electronAPI?.fileImport?.selectFolder,
+    onLibraryDrop: typeof window.electronAPI?.fileImport?.onLibraryDrop,
     getCapabilities: typeof window.electronAPI?.fileImport?.getCapabilities,
     importFiles: typeof window.electronAPI?.backendAPI?.importFiles,
     importFolderAsync: typeof window.electronAPI?.backendAPI?.importFolderAsync,
@@ -54,6 +55,7 @@ async function run() {
   for (const key of [
     'selectAudioFiles',
     'selectFolder',
+    'onLibraryDrop',
     'getCapabilities',
     'importFiles',
     'importFolderAsync',
