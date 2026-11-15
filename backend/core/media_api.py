@@ -106,6 +106,7 @@ class DAWRequest(BaseModel):
     project_id: str
     directory: str
     clip: ClipRequest
+    source_fingerprint: str | None = Field(default=None, max_length=128)
     rate: int | None = Field(default=None, ge=8000, le=384000)
     channels: Literal[1, 2] | None = None
     bits: Literal[16, 24] = 24
@@ -405,8 +406,18 @@ def prepare_delivery(request: DAWRequest, x_soundbot_ipc: str | None = Header(No
         clip, rate, channels = _clip(request.project_id, request.clip, allow_host=False)
         if clip.start:
             raise ValueError("单个导出剪辑的时间线必须从零开始")
+        service = get_audio_service()
+        fingerprint = service.fingerprint(clip.path).source_key
+
+        def validate_source():
+            if service.fingerprint(clip.path).source_key != fingerprint or (
+                request.source_fingerprint and request.source_fingerprint != fingerprint
+            ):
+                raise ValueError("源文件在渲染期间发生变化")
+
         target = delivery.publish_daw(request.directory, (request.name or "").strip() or clip.path.stem, [Track((clip,))],
-                                      request.rate or rate, request.channels or channels, clip.duration, request.bits)
+                                      request.rate or rate, request.channels or channels, clip.duration, request.bits,
+                                      validate=validate_source)
         return {"path": str(target), "name": target.name}
     except (OSError, ValueError, AudioServiceError) as exc:
         raise HTTPException(422, str(exc)) from exc

@@ -5,7 +5,6 @@
     const { waveform } = window.SoundBotRenderer;
     const fx = window.SoundBotEffects;
     const { t, number, describeError, setText } = window.SoundBotI18n;
-    const { clipDragType } = ui;
     const hosts = Object.freeze({ wwise: 'Wwise', fmod: 'FMOD Studio', cri: 'CRI Atom Craft' });
     const savedHost = localStorage.getItem('soundbot-middleware-host');
     let host = Object.hasOwn(hosts, savedHost) ? savedHost : 'wwise';
@@ -18,9 +17,16 @@
     let selectedClip;
     let dockSelection;
     let dockItems = [];
-    let dockDrag;
     let pendingClip;
     let dockRequest;
+    let dockQueryKey;
+    let dockCursor = null;
+    let dockNextCursor = null;
+    const dockPrevious = [];
+    let dockFilterRequest;
+    let dockFilters;
+    let dockControlsKey;
+    let dockRowsDirty = false;
     let dirty = false;
     let busy = false;
     let grid = 0.25;
@@ -998,37 +1004,15 @@
             const lane = el('div', null, 'track-lane');
             lane.dataset.trackId = track.id;
             if (snap) lane.style.backgroundSize = `${grid / length * 100}% 100%`;
-            const getTime = event => limit((event.clientX - lane.getBoundingClientRect().left) / lane.clientWidth * length, 0, length);
             lane.onclick = event => {
                 if (event.target !== lane) return;
                 ui.closeDockEditor();
                 pause();
-                state.position = startAt(getTime(event));
+                state.position = startAt(laneTime(lane, event.clientX));
                 selectedTrack = track.id;
                 selectedClip = null;
                 renderControls();
                 syncTransport();
-            };
-            lane.ondragover = event => {
-                if (target && !busy && event.dataTransfer.types.includes(clipDragType)) {
-                    event.preventDefault();
-                    lane.classList.add('drop-target');
-                }
-            };
-            lane.ondragleave = () => lane.classList.remove('drop-target');
-            lane.ondrop = event => {
-                lane.classList.remove('drop-target');
-                const id = event.dataTransfer.getData(clipDragType);
-                if (!target || busy || !id) return;
-                const edit = ui.libraryDrag?.id === id ? wholeAsset(ui.libraryDrag)
-                    : state.dockEditing && state.selected?.id === id ? ui.editorClip()
-                    : dockDrag?.id === id ? wholeAsset(dockDrag) : null;
-                if (!edit) return;
-                event.preventDefault();
-                const position = getTime(event);
-                ui.closeDockEditor();
-                selectedTrack = track.id;
-                attempt(() => addClip(edit.clip, edit.item, false, position));
             };
             lane.append(...track.clips.map(clip => clipEditor(clip, track, lane, length)));
             drawCrossfades(lane, track, length);
@@ -1125,25 +1109,34 @@
         say(t('请选择工程音频源以添加选区'));
     }
 
-    function wholeAsset(item) {
-        if (!item?.duration || item.missing) return null;
-        return {
-            item: { ...item, peaks: ui.cachedPeaks(item) },
-            clip: { file_id: item.id, offset: 0, duration: item.duration, gain: 0, fade_in: 0, fade_out: 0 }
-        };
+    function audioDropLane(node) {
+        return state.workspace === 'wwise' && target && !busy ? node?.closest('.track-lane') : null;
     }
 
-    function stageWholeAsset(item) {
-        const edit = wholeAsset(item);
-        if (edit) stageClip(edit.clip, edit.item);
+    function laneTime(lane, x) {
+        const box = lane.getBoundingClientRect();
+        const length = timelineLength();
+        return box.width ? limit((x - box.left) / box.width * length, 0, length) : 0;
+    }
+
+    function dropAudio(edit, node, x) {
+        const lane = audioDropLane(node);
+        if (!lane) return;
+        const position = laneTime(lane, x);
+        ui.closeDockEditor();
+        selectedTrack = lane.dataset.trackId;
+        addClip(edit.clip, edit.item, false, position);
     }
 
     function insertDock(newTrack, position = state.position) {
-        const edit = wholeAsset(dockSelection);
+        const edit = ui.wholeDrag(dockSelection);
         if (edit) addClip(edit.clip, edit.item, newTrack, position);
     }
 
     function renderDock() {
+        if (ui.draggingAudio) { dockRowsDirty = true; return; }
+        dockRowsDirty = false;
+        const scroll = $('miniRows').scrollLeft;
         const nodes = dockItems.map(item => {
             const node = el('div', null, 'mini-row');
             node.classList.toggle('sel', dockSelection?.id === item.id);
@@ -1151,19 +1144,19 @@
             const info = button(null, () => editDockItem(item), 'mini-name');
             const title = el('div', null, 'mini-card-title');
             title.append(ui.assetCover(item), el('span', item.title || item.filename));
-            info.append(title, ui.miniCanvas(item), el('span', item.missing ? t('离线') : fmt(item.duration), 'mini-dur'));
-            node.append(info);
-            node.draggable = Boolean(item.duration && !item.missing);
-            node.ondragstart = event => {
-                if (!wholeAsset(item)) { event.preventDefault(); return; }
-                dockDrag = item;
-                event.dataTransfer.setData(clipDragType, item.id);
-                event.dataTransfer.effectAllowed = 'copy';
-            };
-            node.ondragend = () => { dockDrag = null; };
+            info.append(title, el('span', item.missing ? t('离线') : fmt(item.duration), 'mini-dur'));
+            const canvas = ui.miniCanvas(item);
+            const wave = button(null, () => editDockItem(item), 'mini-wave');
+            wave.append(canvas);
+            if (ui.wholeDrag(item)) ui.bindAudioDrag(wave, () => ui.wholeDrag(item), () => editDockItem(item));
+            else wave.setAttribute('aria-label', item.title || item.filename);
+            node.append(info, wave);
             return node;
         });
         $('miniRows').replaceChildren(...(nodes.length ? nodes : [el('div', t('没有可用素材'), 'mini-empty')]));
+        $('miniRows').scrollLeft = scroll;
+        $('btnMiniPrev').disabled = !dockPrevious.length;
+        $('btnMiniNext').disabled = !dockNextCursor;
         ui.scheduleMiniPeaks();
         renderControls();
     }
@@ -1177,23 +1170,119 @@
         await ui.openDockEditor(item);
     }
 
-    async function loadDock() {
+    function hideDock() {
+        dockRequest?.abort();
+        dockFilterRequest?.abort();
+    }
+
+    async function loadDock(force = false, navigation) {
+        if (force) { dockQueryKey = dockControlsKey = null; dockFilters = null; }
         dockRequest?.abort();
         if (!state.library) {
             dockItems = [];
             dockSelection = null;
+            dockNextCursor = dockCursor = null;
+            dockPrevious.length = 0;
+            $('miniSearch').value = '';
+            $('miniLibraryName').textContent = t('暂无音效库');
+            $('miniFolder').replaceChildren();
+            $('miniCategory').replaceChildren();
             renderDock();
             return;
         }
-        if (state.workspace !== 'wwise') return;
-        const request = dockRequest = new AbortController();
-        const q = $('miniSearch').value;
+        if (state.workspace !== 'wwise' || $('bottomStage').classList.contains('dock-collapsed')) return;
+        const key = ui.catalogKey();
         const library = state.library.id;
-        const result = await api.get(route(`/catalog?${new URLSearchParams({ q, limit: 24 })}`), { signal: request.signal });
-        if (request.signal.aborted || library !== state.library?.id || state.workspace !== 'wwise') return;
-        dockItems = result.files;
-        dockSelection = dockItems.find(item => item.id === dockSelection?.id);
-        renderDock();
+        const reset = key !== dockQueryKey;
+        $('miniLibraryName').textContent = ui.libraryName(state.library);
+        $('miniLibraryName').title = $('miniLibraryName').textContent;
+        if (document.activeElement !== $('miniSearch')) $('miniSearch').value = state.search;
+        if (!navigation) attempt(loadDockFilters);
+        if (!reset && !navigation) return;
+        const request = dockRequest = new AbortController();
+        const cursor = reset ? null : navigation === 'next' ? dockNextCursor : dockPrevious.at(-1);
+        try {
+            const result = await ui.browseCatalog(48, cursor, request.signal);
+            if (request.signal.aborted || library !== state.library?.id || key !== ui.catalogKey()) return;
+            if (reset) dockPrevious.length = 0;
+            else if (navigation === 'next') dockPrevious.push(dockCursor);
+            else dockPrevious.pop();
+            dockCursor = cursor;
+            dockNextCursor = result.next_cursor;
+            dockQueryKey = key;
+            dockItems = result.files;
+            dockSelection = dockItems.find(item => item.id === dockSelection?.id);
+            $('miniRows').scrollLeft = 0;
+            renderDock();
+        } finally {
+            if (dockRequest === request) dockRequest = null;
+        }
+    }
+
+    const slashPath = path => path?.replaceAll('\\', '/').replace(/\/$/, '') || '';
+    const folderLabel = path => slashPath(path).split('/').at(-1) || path;
+
+    async function loadDockFilters() {
+        const library = state.library?.id;
+        if (!library) return;
+        const key = JSON.stringify([library, state.filter, state.view, window.SoundBotI18n.language]);
+        if (key === dockControlsKey) return;
+        dockFilterRequest?.abort();
+        const request = dockFilterRequest = new AbortController();
+        const options = { signal: request.signal };
+        const folder = state.filter.folder;
+        const folderSelect = $('miniFolder');
+        const categorySelect = $('miniCategory');
+        const option = (value, label) => {
+            const node = el('option', label); node.value = value; return node;
+        };
+        const cached = dockFilters?.library === library ? dockFilters : {};
+        const [roots, facets, children] = await Promise.all([
+            cached.roots || api.get(route('/catalog/folders', library), options),
+            cached.facets || api.get(route('/catalog/facets', library), options),
+            !folder ? [] : cached.folder === folder ? cached.children : api.get(
+                route(`/catalog/folders?${new URLSearchParams({ folder })}`, library), options)
+        ]);
+        if (request.signal.aborted || library !== state.library?.id || folder !== state.filter.folder) return;
+        dockFilters = { library, roots, facets, children, folder };
+        const folderChoices = [option('', t('所有文件夹'))];
+        if (folder) {
+            folderChoices.push(option(folder, folderLabel(folder)));
+            const path = slashPath(folder);
+            const parent = path.slice(0, path.lastIndexOf('/')) || '/';
+            const boundary = `${ui.folderKey(parent)}/`;
+            if (roots.some(root => boundary.startsWith(`${ui.folderKey(root.path)}/`))) {
+                const parentPath = roots.find(root => ui.folderKey(root.path) === ui.folderKey(parent))?.path || parent;
+                folderChoices.push(option(parentPath, `‹ ${folderLabel(parentPath)}`));
+            }
+            folderChoices.push(...children.map(child => option(child.path, `↳ ${folderLabel(child.path)}`)));
+        }
+        folderChoices.push(...roots.filter(root => !folderChoices.some(choice => choice.value === root.path))
+            .map(root => option(root.path, folderLabel(root.path))));
+        folderSelect.replaceChildren(...folderChoices);
+        folderSelect.value = folder || '';
+        folderSelect.title = folder || t('所有文件夹');
+        const categoryChoices = [option('', t('所有分类')), option('favorite', t('收藏'))];
+        let current = state.view === 'fav' ? 'favorite' : '';
+        const categoryGroups = [
+            ['tag', facets.tags, '标签'], ['ucs', facets.ucs, 'UCS'],
+            ['filename_category', facets.filename_categories, '文件名分类'], ['group', facets.groups, '分组']
+        ];
+        for (const [type, items, label] of categoryGroups) {
+            if (!items.length) continue;
+            const group = el('optgroup');
+            group.label = label === 'UCS' ? label : t(label);
+            for (const item of items) {
+                const value = type === 'group' ? item.id : item.name;
+                const key = JSON.stringify([type, value]);
+                group.append(option(key, type === 'filename_category' ? ui.filenameCategoryLabel(item.name) : item.name));
+                if (state.filter[type] === value) current = key;
+            }
+            categoryChoices.push(group);
+        }
+        categorySelect.replaceChildren(...categoryChoices);
+        categorySelect.value = current;
+        dockControlsKey = key;
     }
 
     function mixRequest(live = false) {
@@ -1239,9 +1328,11 @@
         const expectedTarget = target;
         const replace = target.delivery === 'replace';
         const parameters = { project, name: source.name, rate: target.sample_rate, channels: target.channels, bits: target.bits };
-        if (!await confirm(t(replace
+        const message = t(replace
             ? '将当前混音写回 {project} 中的「{name}」？规格 {rate} Hz、{channels} 声道、{bits} bit。原 WAV 会保留恢复备份。'
-            : '将混音交付到 {project} 的素材目录？新 WAV 为 {rate} Hz、{channels} 声道、{bits} bit，原始素材将保留。', parameters))) return;
+            : '将混音交付到 {project} 的素材目录？新 WAV 为 {rate} Hz、{channels} 声道、{bits} bit，原始素材将保留。', parameters);
+        const warning = replace && target.library_reference ? `\n\n${t('此 WAV 也被音效库引用，写回后试听会读到更新后的音频。')}` : '';
+        if (!await confirm(message + warning)) return;
         if (busy || expectedTarget !== target) return;
         pause(true);
         const previous = source;
@@ -1429,16 +1520,50 @@
             if (dockSelection) await ui.select(dockSelection);
         });
         const toggleDock = () => {
-            $('bottomStage').classList.toggle('dock-collapsed');
+            const collapsed = $('bottomStage').classList.toggle('dock-collapsed');
+            $('btnMiniClose').setAttribute('aria-expanded', String(!collapsed));
+            $('btnMiniClose').textContent = collapsed ? '⌃' : '⌄';
+            if (collapsed) hideDock();
+            else attempt(loadDock);
             ui.scheduleMiniPeaks();
         };
         on('btnMiniClose', toggleDock);
-        on('btnMiniLibrary', toggleDock);
         on('btnMiniLibraryInline', () => {
             ui.closeDockEditor();
-            $('bottomStage').classList.remove('dock-collapsed');
-            ui.scheduleMiniPeaks();
+            if ($('bottomStage').classList.contains('dock-collapsed')) toggleDock();
         });
+        const dockRows = $('miniRows');
+        dockRows.addEventListener('wheel', event => {
+            const { deltaMode, deltaX, deltaY } = event;
+            if (event.ctrlKey || event.metaKey || Math.abs(deltaX) >= Math.abs(deltaY) ||
+                dockRows.scrollWidth <= dockRows.clientWidth) return;
+            const scale = deltaMode === WheelEvent.DOM_DELTA_LINE ? 16
+                : deltaMode === WheelEvent.DOM_DELTA_PAGE ? dockRows.clientWidth : 1;
+            event.preventDefault();
+            dockRows.scrollLeft += deltaY * scale;
+        }, { passive: false });
+        on('btnMiniPrev', () => dockPrevious.length && loadDock(false, 'previous'));
+        on('btnMiniNext', () => dockNextCursor && loadDock(false, 'next'));
+        $('miniFolder').onchange = event => {
+            const { folder, ...category } = state.filter;
+            const path = event.currentTarget.value;
+            attempt(() => ui.setFilter(path ? { ...category, folder: path } : category));
+        };
+        $('miniCategory').onchange = event => {
+            const value = event.currentTarget.value;
+            const folder = state.filter.folder ? { folder: state.filter.folder } : {};
+            if (value === 'favorite') {
+                state.view = 'fav';
+                attempt(() => ui.setFilter(folder));
+            } else if (value) {
+                const [type, tag] = JSON.parse(value);
+                state.view = type === 'group' ? 'group' : 'tag';
+                attempt(() => ui.setFilter({ ...folder, [type]: tag }));
+            } else {
+                state.view = 'folder';
+                attempt(() => ui.setFilter(folder));
+            }
+        };
         $('wwiseFilter').oninput = event => {
             if (event.isComposing) return;
             if (state.workspace === 'wwise') $('searchInput').value = event.target.value;
@@ -1450,6 +1575,7 @@
         $('miniSearch').oninput = event => {
             clearTimeout(searchTimer);
             if (event.isComposing) return;
+            state.search = event.target.value;
             searchTimer = setTimeout(() => attempt(loadDock), 160);
         };
         $('gridPrecision').onchange = () => { grid = Number($('gridPrecision').value); render(); };
@@ -1473,14 +1599,17 @@
     }
 
     window.SoundBotTimeline = {
-        show: async () => { renderTree(); render(); await loadDock(); }, duration, auditionEnd, renderTree, loadDock,
-        hasLibraryClips, discard, stageClip, stageWholeAsset, play, playhead,
+        show: async () => { renderTree(); render(); await loadDock(); }, duration, auditionEnd, renderTree, loadDock, hideDock,
+        hasLibraryClips, discard, stageClip, play, playhead, audioDropLane, dropAudio,
+        refreshDockRows: () => { if (dockRowsDirty) renderDock(); },
+        refreshDockResults: () => { dockQueryKey = null; return loadDock(); },
         isBusy: () => busy,
         refreshLabels: () => {
             renderHostLabels();
             renderTree();
             render();
             renderDock();
+            if (!$('bottomStage').classList.contains('dock-collapsed')) attempt(loadDockFilters);
             dirtyState(dirty);
         },
         stepDock: direction => {

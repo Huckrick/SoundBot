@@ -31,11 +31,15 @@ SoundBot は、ゲームオーディオ制作向けの無料のオープンソ�
 
 ライブラリを作り、ファイルやフォルダを追加します。ライブラリが空のときは、取り込み時に新しいライブラリに名前を付けられます。元ファイルはその場所に残り、ファイル名、説明、タグ、UCS 分類からキーワードで検索できます。取り込み中でも検索でき、波形は表示に必要なときに生成されます。詳細欄ではサンプルレートやチャンネル数、ファイル内のタグ、埋め込みアートワークを確認できます。ソースフォルダーを右クリックすると、変更の確認、参照先の更新、ライブラリからの削除ができます。フォルダーをライブラリから削除しても、ディスク上の元ファイルは保持されます。
 
+**タグ → ファイル名による分類** では、足音、ドア、天候などを元のファイル名から自動で分類します。曖昧な名前は未分類のままです。手動で付けたタグと UCS 分類はそのまま使えます。
+
+タグ画面では、見出しをクリックして各分類を折りたたみ、右側の矢印メニューで分類の順番や項目の並べ方を変更できます。**タグフォルダー** の **＋** でフォルダーを作り、タグの右クリックメニューから移動できます。フォルダーを削除すると、タグはカスタムタグに戻ります。
+
 #### 試聴と波形編集
 
 下部の波形で範囲を選択し、フェードやゲインを調整できます。マウスホイールでポインターを中心に拡大・縮小し、Shift を押しながら回すと横に移動します。スペースキーで再生・一時停止できます。テキスト入力欄では通常どおり空白を入力できます。
 
-選択範囲の上端からドラッグすると DAW に渡せます。素材全体を使う場合は、一覧の波形サムネイルを Alt（Mac では Option）を押しながらドラッグします。初回は DAW プロジェクトのメディアフォルダを指定し、WAV の準備ができたらもう一度ドラッグします。
+一覧やワークスペース下部の波形サムネイルをドラッグすると、素材全体を WAV として DAW に渡せます。選択範囲だけを渡す場合は波形エディターの選択範囲の上端をドラッグします。初回は DAW プロジェクトのメディアフォルダを指定し、WAV の準備ができたらもう一度ドラッグします。ミドルウェアのタイムラインに直接ドロップすると、編集可能なクリップを追加できます。ライブラリと下部パネルには同じフォルダー、カテゴリ、検索条件が反映されます。
 
 #### ミドルウェアワークスペース
 
@@ -101,7 +105,7 @@ SoundBot 把音效查找、剪辑和交付放在同一个桌面应用里。素�
 
 ### 下载和安装
 
-当前源码版本为 **v1.0.8（稳定版）**。安装包的发布状态以 GitHub Releases 为准。旧版保留在发行记录中，供查阅和回退。 [发行页](https://github.com/Huckrick/SoundBot/releases) · [更新日志](CHANGELOG.md)
+当前源码版本为 **v1.0.9（稳定版）**。安装包的发布状态以 GitHub Releases 为准。旧版保留在发行记录中，供查阅和回退。 [发行页](https://github.com/Huckrick/SoundBot/releases) · [更新日志](CHANGELOG.md)
 
 | 平台 | 发行文件 | 安装方式 |
 | --- | --- | --- |
@@ -118,7 +122,11 @@ SoundBot 把音效查找、剪辑和交付放在同一个桌面应用里。素�
 2. 选择素材，试听并在底部波形框选。第一次拖到 DAW 时，选择工程媒体目录。成品就绪后从选区上沿拖出，交付的 WAV 留在该目录。
 3. 在中间件工作台编辑多轨。Wwise 通过本机 WAAPI 连接，可写回符合条件的 PCM WAV 并留存备份。FMOD Studio 和 CRI Atom Craft 接收渲染到工程素材目录的新 WAV，随后在宿主中导入或注册。 [宿主操作指南](docs/middleware.md)
 
-在底部波形上滚动鼠标滚轮，以光标位置为中心缩放。按住 Shift 滚动可横移。从列表的缩略波形拖动整条素材到「中间件工作台」标签或时间线。拖到 DAW 时按住 Alt（Mac 上是 Option）。初次交付时选择工程媒体目录，文件准备好后再拖一次。
+「标签 → 文件名分类」会根据素材原文件名识别脚步、门、天气等常见类别。名称含糊时保持未分类。手动标签和 UCS 分类继续保留。
+
+点击分类标题可收起或展开，右侧「↕」可调整分类顺序，或在分类内按名称和数量排序。在「标签夹」右侧点击「＋」新建，再右键标签选择要移入的标签夹。删除标签夹后，里面的标签会回到「自定义标签」。
+
+在底部波形上滚动鼠标滚轮，以光标位置为中心缩放。按住 Shift 滚动可横移。直接拖动主库或工作台底部的缩略波形，将整条素材交付为 WAV。拖动编辑器选区上沿可只交付选区。初次交付时选择 DAW 工程媒体目录，文件准备好后再拖一次。直接拖到「中间件工作台」或时间线，可继续编辑。已经拖出窗口的音频送回 SoundBot 时会取消交付。主库和底部音效库共享文件夹、分类和搜索条件。
 
 Wwise 工程浏览器可浏览和搜索整个已读取的工程树。拖动标尺可定位播放头，拖动剪辑两侧下半部可裁剪。在剪辑上拖动淡化手柄，右键选择曲线。在立体声目标上开启「声像曲线」，直接在波形上添加、拖动或右键移除控制点。同轨相邻剪辑部分重叠时自动交叉淡化，可在交叉区单独选择曲线。
 
@@ -161,7 +169,7 @@ SoundBot supports **Simplified Chinese, Traditional Chinese, Japanese, English, 
 
 ### Download and install
 
-The current source version is **v1.0.8 (stable)**. GitHub Releases shows which installers have been published. Older releases remain in the archive for reference and rollback. [Releases](https://github.com/Huckrick/SoundBot/releases) · [Changelog](CHANGELOG.md)
+The current source version is **v1.0.9 (stable)**. GitHub Releases shows which installers have been published. Older releases remain in the archive for reference and rollback. [Releases](https://github.com/Huckrick/SoundBot/releases) · [Changelog](CHANGELOG.md)
 
 | Platform | Release file | Installation |
 | --- | --- | --- |
@@ -178,7 +186,11 @@ Press Space to play or pause in the workspace. In text fields, Space types a spa
 2. Select a sound and mark a range in the bottom waveform. For the first DAW delivery, choose the project's media folder. Once the file is ready, drag from the top of the selection. The rendered WAV stays in the selected folder.
 3. Edit tracks in the middleware workspace. Wwise connects over local WAAPI and can write back eligible PCM WAV sources with a recovery backup. FMOD Studio and CRI Atom Craft receive a new WAV in their asset folder. Import or register it in the host. [Middleware guide](docs/middleware.md)
 
-Scroll over the waveform editor to zoom around the pointer. Hold Shift while scrolling to pan. Drag a thumbnail waveform to send the whole sound to the middleware tab or timeline. Hold Alt (Option on Mac) to drag it to a DAW. On the first delivery, choose the project's media folder and drag again once the WAV is ready.
+Open **Tags → Filename categories** to browse common groups such as footsteps, doors, and weather. SoundBot uses the original filename and leaves ambiguous names uncategorized. Manual tags and UCS categories are preserved.
+
+Click a tag section heading to collapse or expand it. Use its arrow menu to move the section or sort its entries by name or count. Create a tag folder with **＋**, then right-click a tag to move it. Deleting the folder returns its tags to **Custom tags**.
+
+Scroll over the waveform editor to zoom around the pointer. Hold Shift while scrolling to pan. Drag a thumbnail waveform from either library view to deliver the entire sound as a WAV. Drag the upper edge of a selection to deliver just that range. On the first delivery, choose the DAW project's media folder and drag again once the WAV is ready. Drop directly on the middleware tab or timeline to keep editing the source as a clip. Returning an external drag to SoundBot cancels the handoff. The main library and the dock share folders, categories, and search filters.
 
 Browse or search the full hierarchy loaded from Wwise. Drag the ruler to seek and the lower clip edges to trim. Drag a fade handle on the clip and right-click it to choose a curve. For stereo targets, turn on Pan curve to add, drag, or remove points on the waveform. Partial overlaps between adjacent clips on the same track crossfade automatically. Choose a curve for an individual overlap from its menu.
 

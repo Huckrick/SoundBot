@@ -17,6 +17,7 @@ from typing import NamedTuple
 from uuid import uuid4
 
 from core.database import canonicalize_path, canonical_path_is_within
+from core.filename_categories import filename_category
 
 BATCH_SIZE = 256
 _WRITE_LOCK = threading.RLock()
@@ -102,6 +103,31 @@ def configure_connection(connection):
     connection.create_function("soundbot_terms", 1, search_terms, deterministic=True)
     connection.create_function("soundbot_extension", 1, lambda value: Path(value).suffix[1:].casefold(), deterministic=True)
     connection.create_function("soundbot_parent", 1, lambda value: value.rsplit("/", 1)[0] or "/", deterministic=True)
+    connection.create_function("soundbot_filename_category", 1, filename_category, deterministic=True)
+
+
+def migrate_filename_categories(cursor):
+    cursor.execute("""CREATE INDEX idx_files_library_filename_category
+        ON files(project_id, soundbot_filename_category(filename))""")
+
+
+def migrate_tag_folders(cursor):
+    cursor.execute("""CREATE TABLE library_tag_folders (
+        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        name_key TEXT NOT NULL,
+        PRIMARY KEY(project_id, id),
+        UNIQUE(project_id, name_key)
+    )""")
+    cursor.execute("""CREATE TABLE library_tag_folder_tags (
+        project_id TEXT NOT NULL,
+        tag TEXT NOT NULL,
+        folder_id TEXT NOT NULL,
+        PRIMARY KEY(project_id, tag),
+        FOREIGN KEY(project_id, folder_id) REFERENCES library_tag_folders(project_id, id) ON DELETE CASCADE
+    )""")
+    cursor.execute("CREATE INDEX idx_library_tag_folder ON library_tag_folder_tags(project_id, folder_id)")
 
 
 def migrate(cursor):
@@ -187,6 +213,12 @@ def path_bounds(path):
     return prefix, prefix[:-1] + "0"
 
 
+def is_indexed_path(cursor, path):
+    return bool(cursor.execute("""SELECT EXISTS (SELECT 1 FROM projects p WHERE EXISTS (
+        SELECT 1 FROM files f WHERE f.project_id=p.id AND f.canonical_path=?
+    ))""", (canonicalize_path(path),)).fetchone()[0])
+
+
 @lru_cache(maxsize=1)
 def _ucs_processor():
     from core.ucs_keywords import UCSKeywordProcessor
@@ -210,7 +242,7 @@ def _search_expression(query):
     return " OR ".join(f"({item})" for item in expressions)
 
 
-def list_items(db, project_id, *, query="", folder=None, group=None, tag=None, ucs=None,
+def list_items(db, project_id, *, query="", folder=None, group=None, tag=None, ucs=None, filename_category=None,
                favorite=False, audio_format=None, channels=None, sample_rate=None,
                min_duration=None, max_duration=None, sort="newest", limit=100, cursor=None,
                offset=0, count=False, file_id=None):
@@ -235,6 +267,9 @@ def list_items(db, project_id, *, query="", folder=None, group=None, tag=None, u
     if tag:
         expressions.append("EXISTS (SELECT 1 FROM json_each(f.tags) WHERE value=?)")
         params.append(tag)
+    if filename_category:
+        expressions.append("soundbot_filename_category(f.filename)=?")
+        params.append(filename_category)
     if favorite:
         expressions.append("f.favorite=1")
     for field, operator, value in (
@@ -631,12 +666,54 @@ def remove_source(db, project_id, source_id):
 
 def facets(db, project_id):
     with db.get_cursor() as cur:
-        tags = [dict(row) for row in cur.execute("""SELECT t.value AS name,COUNT(*) AS count
-            FROM files f,json_each(f.tags) t WHERE f.project_id=?
-            GROUP BY t.value ORDER BY count DESC,name LIMIT 1000""", (project_id,))]
+        tags = [dict(row) for row in cur.execute("""WITH tags AS (
+                SELECT t.value AS name,COUNT(*) AS count
+                FROM files f,json_each(f.tags) t WHERE f.project_id=? GROUP BY t.value
+            ), placed AS (
+                SELECT tags.name,tags.count,a.folder_id FROM tags
+                LEFT JOIN library_tag_folder_tags a ON a.project_id=? AND a.tag=tags.name
+            )
+            SELECT * FROM (SELECT * FROM placed WHERE folder_id IS NULL ORDER BY count DESC,name LIMIT 1000)
+            UNION ALL SELECT * FROM placed WHERE folder_id IS NOT NULL""", (project_id, project_id))]
+        tag_folders = [dict(row) for row in cur.execute(
+            "SELECT id,name FROM library_tag_folders WHERE project_id=? ORDER BY name_key", (project_id,)
+        )]
         ucs = [dict(row) for row in cur.execute("""SELECT ucs AS name,COUNT(*) AS count
             FROM files WHERE project_id=? AND ucs<>'' GROUP BY ucs ORDER BY ucs""", (project_id,))]
-    return {"tags": tags, "ucs": ucs, "groups": db.get_user_folders(project_id)}
+        filename_categories = [dict(row) for row in cur.execute("""SELECT soundbot_filename_category(filename) AS name,
+            COUNT(*) AS count FROM files WHERE project_id=? AND soundbot_filename_category(filename)>''
+            GROUP BY soundbot_filename_category(filename) ORDER BY name""", (project_id,))]
+    return {"tags": tags, "tag_folders": tag_folders, "ucs": ucs, "filename_categories": filename_categories,
+            "groups": db.get_user_folders(project_id)}
+
+
+def create_tag_folder(db, project_id, name):
+    name = unicodedata.normalize("NFC", name.strip())
+    if not name or len(name) > 100 or any(unicodedata.category(char) == "Cc" for char in name):
+        raise ValueError("请输入 1 至 100 个字符的标签夹名称")
+    folder_id = uuid4().hex
+    with _WRITE_LOCK, db.get_cursor() as cur:
+        created = cur.execute("""INSERT INTO library_tag_folders(project_id,id,name,name_key)
+            SELECT id,?,?,? FROM projects WHERE id=?
+            ON CONFLICT(project_id,name_key) DO NOTHING""", (folder_id, name, name.casefold(), project_id))
+        return {"id": folder_id, "name": name} if created.rowcount else None
+
+
+def delete_tag_folder(db, project_id, folder_id):
+    with _WRITE_LOCK, db.get_cursor() as cur:
+        return bool(cur.execute("DELETE FROM library_tag_folders WHERE project_id=? AND id=?",
+                                (project_id, folder_id)).rowcount)
+
+
+def place_tag(db, project_id, tag, folder_id):
+    with _WRITE_LOCK, db.get_cursor() as cur:
+        if folder_id is None:
+            cur.execute("DELETE FROM library_tag_folder_tags WHERE project_id=? AND tag=?", (project_id, tag))
+            return True
+        return bool(cur.execute("""INSERT INTO library_tag_folder_tags(project_id,tag,folder_id)
+            SELECT project_id,?,id FROM library_tag_folders WHERE project_id=? AND id=?
+            ON CONFLICT(project_id,tag) DO UPDATE SET folder_id=excluded.folder_id
+            """, (tag, project_id, folder_id)).rowcount)
 
 
 def asset_groups(db, project_id, file_id):

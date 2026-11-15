@@ -73,7 +73,7 @@ from fastapi import FastAPI, HTTPException, Query, Path as PathParam, Background
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, StreamingResponse, Response, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import uvicorn
 
 import config
@@ -96,6 +96,7 @@ from utils.logger import logger
 _executor = ThreadPoolExecutor(max_workers=4)
 _thumbnail_executor = ThreadPoolExecutor(max_workers=2)
 _artwork_executor = ThreadPoolExecutor(max_workers=2)
+_waveform_requests: dict[tuple, asyncio.Task] = {}
 _project_index_locks: Dict[str, asyncio.Lock] = {}
 _projects_deleting: set[str] = set()
 
@@ -557,10 +558,11 @@ async def retry_background_job(job_id: str, background_tasks: BackgroundTasks):
 @app.get("/api/v1/projects/{project_id}/catalog")
 async def list_library_items(project_id: str, q: str = Query("", max_length=300),
                              folder: str = None, group: str = None, tag: str = None,
-                             ucs: str = None, favorite: bool = False, format: str = None,
+                             ucs: str = None, filename_category: str = Query(None, max_length=32),
+                             favorite: bool = False, format: str = None,
                              channels: int = None, min_duration: float = None, max_duration: float = None,
                              sort: str = "newest", limit: int = Query(100, ge=1, le=200),
-                             cursor: str = None):
+                             cursor: str = None, include_total: bool = True):
     db = _require_library(project_id)
     decoded = None
     if cursor is not None:
@@ -573,8 +575,9 @@ async def list_library_items(project_id: str, q: str = Query("", max_length=300)
             raise SoundBotAPIError("invalid_cursor", "无效的分页位置")
     return await asyncio.to_thread(
         catalog.list_items, db, project_id, query=q, folder=folder, group=group, tag=tag,
-        ucs=ucs, favorite=favorite, audio_format=format, channels=channels, min_duration=min_duration,
-        max_duration=max_duration, sort=sort, limit=limit, cursor=decoded, count=not cursor
+        ucs=ucs, filename_category=filename_category, favorite=favorite,
+        audio_format=format, channels=channels, min_duration=min_duration,
+        max_duration=max_duration, sort=sort, limit=limit, cursor=decoded, count=include_total and not cursor
     )
 
 
@@ -595,6 +598,43 @@ async def get_library_item(project_id: str, file_id: str):
 @app.get("/api/v1/projects/{project_id}/catalog/facets")
 async def get_library_facets(project_id: str):
     return await asyncio.to_thread(catalog.facets, _require_library(project_id), project_id)
+
+
+class TagFolderCreate(BaseModel):
+    name: str = Field(max_length=100)
+
+
+class TagFolderAssignment(BaseModel):
+    tag: str = Field(min_length=1, max_length=200)
+    folder_id: str | None = Field(max_length=32)
+
+
+@app.post("/api/v1/projects/{project_id}/catalog/tag-folders", status_code=201)
+async def create_library_tag_folder(project_id: str, request: TagFolderCreate):
+    db = _require_library(project_id)
+    try:
+        folder = await asyncio.to_thread(catalog.create_tag_folder, db, project_id, request.name)
+    except ValueError as exc:
+        raise SoundBotAPIError("invalid_tag_folder_name", str(exc)) from exc
+    if folder is None:
+        _require_library(project_id)
+        raise SoundBotAPIError("tag_folder_name_exists", "同名标签夹已存在", status_code=409)
+    return folder
+
+
+@app.delete("/api/v1/projects/{project_id}/catalog/tag-folders/{folder_id}", status_code=204)
+async def delete_library_tag_folder(project_id: str, folder_id: str):
+    removed = await asyncio.to_thread(catalog.delete_tag_folder, _require_library(project_id), project_id, folder_id)
+    if not removed:
+        raise SoundBotAPIError("tag_folder_not_found", "标签夹不存在", status_code=404)
+
+
+@app.put("/api/v1/projects/{project_id}/catalog/tag-folder-assignment", status_code=204)
+async def set_library_tag_folder(project_id: str, request: TagFolderAssignment):
+    assigned = await asyncio.to_thread(catalog.place_tag, _require_library(project_id), project_id,
+                                       request.tag, request.folder_id)
+    if not assigned:
+        raise SoundBotAPIError("tag_folder_not_found", "标签夹不存在", status_code=404)
 
 
 @app.get("/api/v1/projects/{project_id}/catalog/items/{file_id}/groups")
@@ -898,36 +938,53 @@ async def _waveform_payload(file_path: str, project_id: str, *, cached_only: boo
 
         if cached_only:
             raise SoundBotAPIError("waveform_not_cached", "波形尚未生成", status_code=404)
-        waveform = await work(service.waveform, file_path)
-        metadata = (
-            None if record else await _run_audio_work(service.probe, file_path)
-        )
-        if record:
-            updated = db_manager.update_peaks(
-                file_path,
-                waveform.peaks,
-                project_id,
-                source_fingerprint=waveform.fingerprint.source_key,
-                waveform_fingerprint=waveform.fingerprint.key,
-                waveform_version=int(waveform.fingerprint.waveform_version),
-            )
-            if not updated:
-                raise SoundBotAPIError(
-                    "waveform_cache_update_failed",
-                    "波形已计算，但缓存状态更新失败",
-                    status_code=503,
-                    retryable=True,
+        key = (project_id, record.file_uuid if record else file_path, fingerprint.key)
+        pending = _waveform_requests.get(key)
+        if pending is None:
+            async def generate():
+                waveform = await work(service.waveform, file_path)
+                metadata = (
+                    None if record else await _run_audio_work(service.probe, file_path)
                 )
-        return {
-            "file_id": record.file_uuid if record else None,
-            "peaks": waveform.peaks,
-            "duration": waveform.duration,
-            "sample_rate": waveform.sample_rate,
-            "channels": record.channels if record else metadata.channels,
-            "cached": False,
-            "source_fingerprint": waveform.fingerprint.source_key,
-            "waveform_version": waveform.fingerprint.waveform_version,
-        }
+                if record:
+                    updated = db_manager.update_peaks(
+                        file_path,
+                        waveform.peaks,
+                        project_id,
+                        source_fingerprint=waveform.fingerprint.source_key,
+                        waveform_fingerprint=waveform.fingerprint.key,
+                        waveform_version=int(waveform.fingerprint.waveform_version),
+                    )
+                    if not updated:
+                        raise SoundBotAPIError(
+                            "waveform_cache_update_failed",
+                            "波形已计算，但缓存状态更新失败",
+                            status_code=503,
+                            retryable=True,
+                        )
+                return {
+                    "file_id": record.file_uuid if record else None,
+                    "peaks": waveform.peaks,
+                    "duration": waveform.duration,
+                    "sample_rate": waveform.sample_rate,
+                    "channels": record.channels if record else metadata.channels,
+                    "cached": False,
+                    "source_fingerprint": waveform.fingerprint.source_key,
+                    "waveform_version": waveform.fingerprint.waveform_version,
+                }
+
+            pending = asyncio.create_task(generate())
+            _waveform_requests[key] = pending
+
+            def release(finished):
+                if _waveform_requests.get(key) is finished:
+                    _waveform_requests.pop(key)
+                if not finished.cancelled():
+                    finished.exception()
+
+            pending.add_done_callback(release)
+        payload = await asyncio.shield(pending)
+        return payload.copy()
     except AudioServiceError as exc:
         if record:
             db_manager.set_artifact_state(

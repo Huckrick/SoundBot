@@ -4,15 +4,15 @@
 
 An open-source sound library manager for game audio. Search and edit your local sounds, then deliver them to middleware projects.
 
-The current source version is **v1.0.8 (stable)**. Published installers and their checksums are listed together in each release. [GitHub Releases](https://github.com/Huckrick/SoundBot/releases)
+The current source version is **v1.0.9 (stable)**. Published installers and their checksums are listed together in each release. [GitHub Releases](https://github.com/Huckrick/SoundBot/releases)
 
 SoundBot is a local sound library, waveform editor, and middleware workspace for macOS Apple Silicon and Windows x64. The main README covers installation, workflow, permissions, and troubleshooting in English. [English user guide](README.md#english) · [Changelog](CHANGELOG.md)
 
 The interface supports Simplified Chinese, Traditional Chinese, Japanese, English, Brazilian Portuguese, and Spanish. Change the language in **Settings → General → Language**. [Interface language details](README.md#interface-languages)
 
-## What’s new in v1.0.8
+## What’s new in v1.0.9
 
-You can remove a source folder from the library by right-clicking it. The original audio stays on disk. After removing the last library, you can create another or start an import and name the new library when prompted. WAV files with legacy metadata encodings can now be imported and previewed. Use **Retry failed items** in the task history for previous failures. [Release history](CHANGELOG.md)
+Browse common sound categories inferred from filenames, reorder and collapse tag sections, and organize custom tags in folders. The docked library shares your filters with the main library and scrolls horizontally with the mouse wheel. Drag whole sounds or waveform selections directly into the middleware timeline, or deliver them as WAVs to your DAW. [Release history](CHANGELOG.md)
 
 ## Support and feedback
 

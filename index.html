@@ -223,6 +223,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
 #jobProgress{grid-column:1/-1;width:100%;height:5px;accent-color:var(--tx1)}
 .wave-drag{flex:none;min-width:0;padding:2px;border-radius:4px;cursor:grab}
 .wave-drag canvas{display:block;pointer-events:none}
+[data-audio-drag]{touch-action:none;user-select:none;cursor:grab}
+.audio-drag-ghost{position:fixed;top:0;left:0;width:20px;height:20px;background:url('assets/audio-icon.png') center/contain no-repeat;pointer-events:none;z-index:70}
 #rows{overflow-anchor:none}
 .wave-drag:is(:hover,:focus-visible){background:var(--bg3);outline:1px solid var(--line2)}
 .empty-library{display:block;width:100%}
@@ -412,16 +414,22 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
 /* ---------- 底部停靠音效库 ---------- */
 .library-dock{position:absolute;inset:0;height:100%;display:flex;flex-direction:column;background:var(--bg1);opacity:0;pointer-events:none;transform:translateY(14px);transition:opacity .2s ease,transform .24s cubic-bezier(.2,.8,.2,1)}
 .bottom-stage.wwise .library-dock{opacity:1;pointer-events:auto;transform:none}
-.dock-head{height:42px;flex:none;display:flex;align-items:center;gap:10px;padding:0 10px 0 14px;border-bottom:1px solid var(--line)}
-.dock-title{display:flex;align-items:baseline;gap:8px;white-space:nowrap}
-.dock-title b{font-size:12px;font-weight:600}
-.dock-title span{font-size:9.5px;color:var(--tx3)}
-.mini-search{flex:1;max-width:520px;margin:0 auto;display:flex}
-.mini-search input{width:100%;min-width:0;background:var(--bg2);border:1px solid var(--line);border-radius:999px;padding:6px 12px;color:var(--tx1);outline:none;font-size:11px}
+.dock-head{height:54px;flex:none;display:grid;grid-template-columns:minmax(0,1fr) clamp(180px,30%,400px) minmax(0,1fr);align-items:center;gap:clamp(12px,1.5vw,22px);padding:0 clamp(12px,1.5vw,24px);border-bottom:1px solid var(--line)}
+.dock-library-options{min-width:0;display:grid;grid-template-columns:minmax(0,175px) minmax(0,125px) minmax(0,115px);align-items:center;gap:10px}
+.dock-title{min-width:0}
+.dock-title b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:600}
+.dock-head-actions{justify-self:end;display:flex;gap:6px}
+.dock-head select,.mini-search input{width:100%;min-width:0;height:30px;background:var(--bg2);border:1px solid var(--line);border-radius:7px;padding:0 10px;color:var(--tx1);font-size:11.5px}
+.dock-head select{overflow:hidden;text-overflow:ellipsis}
+.mini-search{min-width:0;display:flex}
+.mini-search input{padding:0 12px;outline:none}
 .mini-search input:focus{border-color:var(--line2)}
 .dock-head .icon-btn{width:26px;height:26px}
 .dock-body{flex:1;min-height:0;display:flex;flex-direction:column;transition:opacity .12s}
-.bottom-stage.dock-collapsed .dock-body{opacity:0;pointer-events:none}
+.bottom-stage.dock-collapsed .dock-head{height:42px;grid-template-columns:minmax(0,1fr) auto}
+.bottom-stage.dock-collapsed .dock-library-options{display:block}
+.bottom-stage.dock-collapsed .dock-head :is(select,.mini-search){display:none}
+.bottom-stage.dock-collapsed .dock-body{visibility:hidden;pointer-events:none}
 .mini-rows{flex:1;min-height:0;overflow-x:auto;overflow-y:hidden;padding:8px 12px;display:flex;align-items:center;gap:9px}
 .mini-row{flex:0 0 210px;height:94px;display:flex;flex-direction:column;justify-content:space-between;gap:5px;padding:8px 9px;border:1px solid var(--line);border-radius:9px;background:var(--bg0);cursor:grab;transition:background .15s,border-color .15s}
 .mini-row:hover{background:var(--bg2);border-color:var(--line2)}
@@ -551,6 +559,15 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
 .tree-label{display:flex;align-items:center;gap:5px;min-width:0;padding:3px 0}
 .tree-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tree-count{flex:none;margin-left:auto;color:var(--tx3);font-size:10px;font-variant-numeric:tabular-nums}
+.tag-sections{display:flex;flex-direction:column;gap:6px}
+.tag-section-head{border-bottom:1px solid var(--line);border-radius:var(--r-sm) var(--r-sm) 0 0}
+.tag-section .tree-row{gap:6px}
+.tag-tree-toggle{width:100%;color:var(--tx2)}
+.tag-tree-toggle[aria-expanded=true] .tree-expand::before{transform:rotate(45deg) translate(-1px,-1px)}
+.tag-section-head .tag-tree-toggle{font-weight:600}
+.tag-section .tag-tree-action{flex:none;width:20px;height:20px;border-radius:5px;font-size:11px;background:none}
+.tag-entry{width:100%;text-align:left}
+#tagFolderDestination{width:100%;margin-top:10px}
 .folder-menu{position:fixed;z-index:92;min-width:146px;padding:4px;background:var(--bg2);border:1px solid var(--line2);border-radius:var(--r-md);box-shadow:0 10px 28px var(--overlay)}
 .folder-menu-item{display:block;width:100%;padding:6px 9px;border-radius:var(--r-sm);font-size:12px;color:var(--tx2);text-align:left;white-space:nowrap}
 .folder-menu-item:is(:hover,:focus){background:var(--acc-dim2);color:var(--tx1);outline:0}
@@ -564,15 +581,17 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
 @container(max-width:580px){.list-head,.row{grid-template-columns:minmax(0,1fr) 58px 50px 35px}.list-head>:nth-child(n+5),.row>:nth-child(n+5){display:none}}
 @container(max-width:365px){.list-head,.row{grid-template-columns:minmax(0,1fr) 58px}.list-head>:nth-child(n+3),.row>:nth-child(n+3){display:none}}
 .mini-row{padding:0;overflow:hidden}
-.mini-name{padding:7px 9px;height:100%;text-align:left;cursor:inherit}
+.mini-name{padding:7px 9px 0;height:auto;text-align:left;cursor:pointer}
 .mini-card-title{display:flex;align-items:center;gap:7px;width:100%;min-width:0}
 .mini-card-title .asset-cover{width:22px;height:22px}
 .mini-card-title .asset-cover svg{width:13px;height:13px}
-.mini-name .mini-preview{height:31px!important;min-height:0;flex:none}
+.mini-wave{margin:0 9px 8px;padding:0;flex:none}
+.mini-wave .mini-preview{display:block;width:100%!important;height:31px!important}
 .mini-name .mini-dur{margin-top:auto}
 .bottom-stage.wwise.dock-editing .source-editor{opacity:1;pointer-events:auto;transform:none}
 .bottom-stage.wwise.dock-editing .library-dock{opacity:0;pointer-events:none;transform:translateY(14px)}
 .bottom-stage.wwise.dock-collapsed:not(.dock-editing){height:42px}
+.bottom-stage.wwise:not(.dock-editing,.dock-collapsed){height:236px}
 .bottom-stage.dock-editing,.bottom-stage:not(.wwise){height:224px}
 .editor-rate{font-variant-numeric:tabular-nums;white-space:nowrap}
 .clip-options{margin-left:auto;position:relative;color:var(--tx2);z-index:3}
@@ -710,7 +729,6 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
       <input id="searchInput" type="text" placeholder="搜索音效、标签、UCS…" aria-label="搜索当前工作台">
           </div>
     <div class="top-actions">
-                  <button class="ghost-btn hidden" id="btnMiniLibrary">音效库小窗</button>
       <div class="menu-wrap">
         <button class="ghost-btn" id="btnFile">文件 ▾</button>
         <div class="dropdown" id="fileMenu">
@@ -968,7 +986,7 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
         </div>
         <div class="wave-wrap">
           <div class="wave-gesture">
-            <div class="wave-strip"><button class="range-handle hidden" id="dragRange" draggable="true" aria-label="拖出选区"><span id="dragRangeLabel"></span></button></div>
+            <div class="wave-strip"><button class="range-handle hidden" id="dragRange" aria-label="拖出选区"><span id="dragRangeLabel"></span></button></div>
             <div class="wave-plot"><canvas id="wave" aria-label="波形与选区" tabindex="0"></canvas><span id="waveformStatus" role="status"></span></div>
             <div class="wave-strip"><button class="range-handle hidden" id="moveRange" aria-label="移动选区" title="移动选区"><span aria-hidden="true">⠿</span></button></div>
           </div>
@@ -979,15 +997,23 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
 
     <section class="library-dock" id="miniLibrary" aria-label="中间件停靠音效库">
       <div class="dock-head">
-        <div class="dock-title"><b>当前音效库</b></div>
+        <div class="dock-library-options">
+          <div class="dock-title"><b id="miniLibraryName">当前音效库</b></div>
+          <select id="miniFolder" aria-label="文件夹"></select>
+          <select id="miniCategory" aria-label="分类"></select>
+        </div>
         <div class="mini-search"><input id="miniSearch" placeholder="搜索停靠音效库" aria-label="搜索停靠音效库"></div>
-        <button class="icon-btn" id="btnMiniExpand" aria-label="展开完整音效库" title="展开完整音效库">↗</button>
-        <button class="icon-btn" id="btnMiniClose" aria-label="收起音效库" title="收起音效库">⌄</button>
+        <div class="dock-head-actions">
+          <button class="icon-btn" id="btnMiniExpand" aria-label="展开完整音效库" title="展开完整音效库">↗</button>
+          <button class="icon-btn" id="btnMiniClose" aria-label="收起音效库" title="收起音效库" aria-expanded="true">⌄</button>
+        </div>
       </div>
       <div class="dock-body">
         <div class="mini-rows" id="miniRows"></div>
         <div class="mini-foot">
           <div class="mini-target" id="miniTarget">选择音频源后添加轨道</div>
+          <button class="icon-btn" id="btnMiniPrev" aria-label="上一页" title="上一页">‹</button>
+          <button class="icon-btn" id="btnMiniNext" aria-label="下一页" title="下一页">›</button>
           <button class="pill-btn" id="btnMiniInsert">插入所选轨道</button>
           <button class="pill-btn solid" id="btnMiniSend">＋ 添加为新轨道</button>
         </div>
@@ -1185,6 +1211,14 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
     <label id="textPrompt" for="textValue"></label>
     <input id="textValue" type="text" required>
     <div class="modal-foot"><button class="ghost-btn" value="cancel" formnovalidate>取消</button>
+      <button class="pill-btn solid" value="ok">确定</button></div>
+  </form>
+</dialog>
+<dialog id="tagFolderDialog" class="modal" aria-labelledby="tagFolderPrompt">
+  <form method="dialog">
+    <label id="tagFolderPrompt" for="tagFolderDestination"></label>
+    <select id="tagFolderDestination" autofocus></select>
+    <div class="modal-foot"><button class="ghost-btn" value="cancel">取消</button>
       <button class="pill-btn solid" value="ok">确定</button></div>
   </form>
 </dialog>

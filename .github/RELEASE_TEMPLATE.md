@@ -1,12 +1,12 @@
 # SoundBot
 
-**Version / 版本:** 1.0.8<br>
+**Version / 版本:** 1.0.9<br>
 **Status / 状态:** Stable / 稳定版<br>
 
 ## 功能 / Features
 
-- 来源目录、增量导入、暂停续跑与本地关键词检索。 / Source folders, incremental imports, resumable jobs, and local keyword search.
-- 源文件试听、按需波形、音效库试听主效果链与 DAW 选区交付。 / Source playback, on-demand waveforms, a library master effects chain, and DAW selection delivery.
+- 来源目录、增量导入、本地关键词检索、文件名分类与自定义标签夹。 / Source folders, incremental imports, local keyword search, filename categories, and custom tag folders.
+- 源文件试听、按需波形、音效库试听主效果链，以及整段或选区交付。 / Source playback, on-demand waveforms, a library master effects chain, and delivery of whole sounds or selections.
 - 中间件多轨编辑和独立轨道效果链，以及 Wwise 源 WAV 写回与备份恢复。 / Middleware multitrack editing with independent track effects, plus Wwise source WAV writeback and recovery.
 
 ## 安装与迁移 / Install and migrate
@@ -16,7 +16,7 @@
 | macOS 14+ arm64 | DMG |
 | Windows 10/11 x64 | NSIS EXE |
 
-发布资产附带 `SHA256SUMS.txt`。升级时应用先备份 SQLite，再迁移到 v5。 / Releases include `SHA256SUMS.txt`. Upgrades back up SQLite before migrating to v5.
+发布资产附带 `SHA256SUMS.txt`。升级时应用先备份 SQLite，再迁移到 v7。 / Releases include `SHA256SUMS.txt`. Upgrades back up SQLite before migrating to schema v7.
 
 ## 验收 / Verification
 

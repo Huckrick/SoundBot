@@ -4,6 +4,24 @@ Release history for SoundBot. / SoundBot 版本记录。
 
 ## [Unreleased] / 未发布
 
+## [1.0.9] - 2026-11-15
+
+### Added / 新增
+
+- Browse filename categories such as footsteps, doors, and weather in Tags and the middleware library. Classification runs locally on existing and newly imported sounds and preserves manual tags and UCS metadata. / 在标签页和工作台音效库按文件名筛选脚步、门、天气等类别。现有和新导入的素材均在本机分类，保留手动标签与 UCS 元数据。
+- Reorder, sort, and collapse tag sections. Create folders for custom tags and move tags between folders. Deleting a folder returns its tags to the main tag list. / 标签页支持调整分类顺序、分类内排序及折叠。可新建标签夹和移动标签，删除标签夹后标签回到主列表。
+
+### Fixed / 修复
+
+- Drag whole sounds and edited selections directly into the timeline. DAWs receive a prepared WAV from the chosen media directory. Returning an outgoing drag to SoundBot cancels it. / 整段音效或裁剪选区可直接拖入时间线。拖到 DAW 时从所选媒体目录交付已准备的 WAV。拖出后放回 SoundBot 会取消当次拖放。
+- Keep the library filters synchronized across views. The middleware library uses one toolbar with filters on the left, search in the center, and expand and collapse controls on the right. Use the mouse wheel to browse the sound cards horizontally. / 主库和工作台音效库同步筛选。工作台底部工具栏保持一行，筛选靠左、搜索居中、展开和收起按钮靠右。可用鼠标滚轮左右浏览素材卡片。
+- Reuse in-flight waveform decoding and bound thumbnail work to the visible area. / 合并正在进行的同源波形解码，缩略图任务限定在可见区域附近。
+- Decode fallback playback in blocks to keep memory usage bounded for long sounds. / 需要转码试听时分块解码，控制长音频的内存占用。
+
+### Upgrade / 升级
+
+- The library upgrades to database schema v7 and saves a pre-upgrade snapshot. Keep this snapshot if you need to open the library in an earlier release. / 音效库会升级到数据库架构 v7，并在升级前保存快照。若要使用旧版 SoundBot 打开音效库，请保留并恢复该快照。
+
 ## [1.0.8] - 2026-11-14
 
 ### Fixed / 修复
@@ -242,7 +260,8 @@ Release history for SoundBot. / SoundBot 版本记录。
 - The Windows release gate starts the frozen backend with a clean `PATH` and no system FFmpeg, then requires the complete format matrix, exact waveforms, CLAP, Chroma, hybrid search, `win-unpacked`, and NSIS installer integrity checks to pass before publishing. / Windows 发布门禁会在干净 `PATH`、无系统 FFmpeg 下启动冻结后端，并要求全格式矩阵、精确波形、CLAP、Chroma、混合搜索、`win-unpacked` 与 NSIS 安装包完整性检查全部通过后才允许发布。
 - CI builds Windows x64 and macOS arm64 only on native runners and blocks release creation if any functional smoke test, model check, metadata check, package check, or installer check fails. / CI 仅在原生 runner 构建 Windows x64 与 macOS arm64，并在任一功能冒烟、模型、元数据、应用包或安装包检查失败时阻止创建 Release。
 
-[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.8...HEAD
+[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.9...HEAD
+[1.0.9]: https://github.com/Huckrick/SoundBot/compare/v1.0.8...v1.0.9
 [1.0.8]: https://github.com/Huckrick/SoundBot/compare/v1.0.7...v1.0.8
 [1.0.7]: https://github.com/Huckrick/SoundBot/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/Huckrick/SoundBot/compare/v1.0.5...v1.0.6

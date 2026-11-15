@@ -15,10 +15,14 @@
         view: 'folder', filter: {}, sort: 'newest', groupByFolder: false, displayRows: [],
         search: '', selected: null, selectedIds: new Set(),
         range: null, waveform: null, zoom: 1, pan: 0, position: 0, loop: false, muted: false,
-        dawDirectory: null, delivery: null, preparing: false, jobs: [], facets: null, dockEditing: false
+        dawDirectory: null, jobs: [], facets: null, dockEditing: false
     };
     let toastTimer;
     let listRequest = null;
+    let listQueryKey;
+    let listWindowStart = null;
+    const listPreviousWindows = [];
+    const listWindowLimit = 480;
     let peakRequest = null;
     let previewRevision = 0;
     let renderFrame = null;
@@ -30,13 +34,17 @@
     const auditionEnd = () => Math.max(state.range?.[1] ?? state.selected?.duration ?? 0, renderedWave?.duration || 0);
     let libraryRevision = 0;
     let directoryRevision = 0;
+    let treeView;
+    const expandedFolders = new Set();
     let groupRevision = 0;
     let libraryEditor;
     let timelinePosition = 0;
     let activeJobs = [];
-    let listDelivery;
-    let preparingListDelivery;
-    let libraryDrag;
+    const preparedDrags = new Map();
+    let preparingDrag;
+    let deliveryRevision = 0;
+    let audioPress;
+    let clipDrag;
     let refreshRowsAfterDrag = false;
     let libraryPanel = 'tabDetail';
     let wwisePanel = 'tabDetail';
@@ -85,22 +93,21 @@
     const isLibrary = () => state.workspace === 'library';
     const isSourceEditing = () => isLibrary() || state.dockEditing;
     const timeline = () => window.SoundBotTimeline;
-    const clipDragType = 'application/x-soundbot-clip';
     const color = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
     function updateDragHandle() {
         const drag = $('dragRange');
-        const label = !isLibrary() ? t('拖入中间件轨道')
-            : state.preparing ? t('正在渲染…')
-                : t('拖出到 DAW');
+        const request = rangeDrag();
+        const preparing = Boolean(request && preparingDrag?.signature === deliverySignature(request));
+        const label = preparing ? t('正在渲染…') : t('拖出到 DAW');
         $('dragRangeLabel').textContent = label;
-        drag.title = label;
-        drag.setAttribute('aria-busy', String(isLibrary() && state.preparing));
-        drag.classList.toggle('ready', Boolean(state.delivery));
+        drag.setAttribute('aria-busy', String(preparing));
+        drag.classList.toggle('ready', Boolean(request && preparedDrags.has(deliverySignature(request))));
     }
 
     function invalidateDelivery() {
-        state.delivery = null;
+        deliveryRevision++;
+        preparedDrags.clear();
         updateDragHandle();
     }
 
@@ -140,7 +147,7 @@
         if (!item || item.missing) return say(t('请选择可用的音频素材'));
         const range = state.range;
         const edits = currentClip();
-        const masterEffects = isLibrary() ? fx().enabled(libraryEffects, true) : [];
+        const masterEffects = libraryEffects ? fx().enabled(libraryEffects, true) : [];
         const processed = range || edits?.gain || edits?.fade_in || edits?.fade_out || masterEffects.length;
         const offset = processed ? Math.max(range?.[0] || 0, state.position) : state.position;
         const end = auditionEnd();
@@ -250,7 +257,7 @@
         renderedWave = null;
         showRange();
         positionRangeHandles();
-        invalidateDelivery();
+        updateDragHandle();
         syncTransport();
     }
 
@@ -533,7 +540,6 @@
         $('sourceEditor').inert = dockVisible;
         $('miniLibrary').inert = !dockVisible;
         $('btnBackDock').classList.toggle('hidden', !state.dockEditing);
-        $('btnMiniLibrary').classList.toggle('hidden', isLibrary() || state.dockEditing);
         $('clipOptions').open = false;
         showRange();
         positionRangeHandles();
@@ -572,23 +578,7 @@
             stop();
             moveBy(state.range, (event.key === 'ArrowLeft' ? -1 : 1) * (event.shiftKey ? 0.1 : 0.01));
         };
-        drag.ondragstart = event => {
-            if (!isLibrary() && editorClip()) {
-                event.dataTransfer.setData(clipDragType, state.selected.id);
-                event.dataTransfer.effectAllowed = 'copy';
-                return;
-            }
-            event.preventDefault();
-            if (!isLibrary()) return;
-            if (state.delivery) desktop.startDrag(state.delivery);
-            else attempt(prepareDrag);
-        };
-        drag.onpointerdown = event => {
-            if (event.button === 0 && isLibrary() && state.dawDirectory && !state.delivery) attempt(prepareDrag);
-        };
-        drag.onclick = event => {
-            if (event.detail === 0 && isLibrary() && !state.delivery) attempt(prepareDrag);
-        };
+        bindAudioDrag(drag, rangeDrag);
         const timeAt = (event, duration = waveDuration()) => {
             const rect = canvas.getBoundingClientRect();
             const fraction = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
@@ -687,7 +677,7 @@
             if (isSourceEditing()) drawWave(playback.active ? playback.currentTime() : state.position);
         }).observe(canvas);
         for (const id of ['fadeIn', 'fadeOut', 'clipGain', 'clipName', 'dawRate', 'dawBits', 'dawChannels']) $(id).oninput = () => {
-            invalidateDelivery();
+            updateDragHandle();
             if (['fadeIn', 'fadeOut', 'clipGain'].includes(id)) {
                 renderedWave = null;
                 refreshAudition();
@@ -731,6 +721,7 @@
         }
         const revision = ++libraryRevision;
         listRequest?.abort();
+        previewBatch?.abort();
         await select(null);
         if (!library || !state.library) {
             state.search = '';
@@ -741,15 +732,18 @@
         }
         state.library = library;
         state.filter = {};
+        expandedFolders.clear();
         $('queryEcho').textContent = '';
         state.facets = null;
         state.selectedIds.clear();
         state.jobs = [];
         state.items = [];
         state.displayRows = [];
+        listQueryKey = null;
+        listPreviousWindows.length = 0;
         state.cursor = null;
         state.total = 0;
-        listDelivery = null;
+        invalidateDelivery();
         state.dockEditing = false;
         libraryEditor = null;
         clipSessions.clear();
@@ -758,7 +752,7 @@
         else localStorage.removeItem('soundbot-library');
         renderLibraryPicker();
         renderRows();
-        await Promise.all([loadItems(true), renderTree(), refreshJobs(revision), timeline()?.loadDock()]);
+        await Promise.all([loadItems(true), renderTree(), refreshJobs(revision), timeline()?.loadDock(true)]);
     }
 
     function renderSortControls() {
@@ -770,32 +764,59 @@
         $('groupToggle').disabled = hasQuery;
     }
 
-    async function loadItems(reset = false) {
-        if (!state.library || (!reset && (listRequest || !state.cursor))) return;
-        if (reset) listRequest?.abort();
-        const request = listRequest = new AbortController();
-        renderSortControls();
-        const hasQuery = Boolean(state.search.trim());
-        const grouped = state.groupByFolder && !hasQuery;
-        const params = new URLSearchParams({ q: state.search, sort: grouped ? 'folder' : state.sort, limit: 120, ...state.filter });
+    function catalogFilters() {
+        const grouped = state.groupByFolder && !state.search.trim();
+        const params = new URLSearchParams({ q: state.search, sort: grouped ? 'folder' : state.sort, ...state.filter });
         if (state.view === 'fav') params.set('favorite', 'true');
         if ($('filterFormat').value) params.set('format', $('filterFormat').value);
         if ($('filterChannels').value) params.set('channels', $('filterChannels').value);
         const [min, max] = $('filterDuration').value.split(',');
         if (min) params.set('min_duration', min);
         if (max) params.set('max_duration', max);
-        if (!reset) params.set('cursor', JSON.stringify(state.cursor));
+        return params;
+    }
+
+    const catalogKey = () => `${state.library?.id || ''}?${catalogFilters()}`;
+
+    function browseCatalog(limit, cursor, signal, total = false) {
+        const params = catalogFilters();
+        params.set('limit', limit);
+        params.set('include_total', String(total));
+        if (cursor) params.set('cursor', JSON.stringify(cursor));
+        return api.get(route(`/catalog?${params}`), { signal });
+    }
+
+    async function loadItems(reset = false, navigation) {
+        if (!isLibrary()) {
+            if (reset) listQueryKey = null;
+            return;
+        }
+        if (!state.library || (!reset && (listRequest || (navigation !== 'previous' && !state.cursor)))) return;
+        if (reset) {
+            listRequest?.abort();
+            if (listQueryKey !== catalogKey()) previewBatch?.abort();
+        }
+        if (!reset && !navigation && state.items.length >= listWindowLimit) return;
+        const request = listRequest = new AbortController();
+        const key = catalogKey();
+        renderSortControls();
+        const cursor = navigation === 'previous' ? listPreviousWindows.at(-1) : reset ? null : state.cursor;
         try {
-            const result = await api.get(route(`/catalog?${params}`), { signal: request.signal });
-            if (request.signal.aborted) return;
-            state.items = reset ? result.files : [...state.items, ...result.files];
-            state.displayRows = grouped ? state.items.flatMap((item, index) =>
+            const result = await browseCatalog(120, cursor, request.signal, reset);
+            if (request.signal.aborted || key !== catalogKey()) return;
+            if (reset) { listPreviousWindows.length = 0; listWindowStart = null; }
+            if (navigation === 'next') listPreviousWindows.push(listWindowStart);
+            if (navigation === 'previous') listPreviousWindows.pop();
+            if (navigation) listWindowStart = cursor;
+            listQueryKey = key;
+            state.items = reset || navigation ? result.files : [...state.items, ...result.files];
+            state.displayRows = state.groupByFolder && !state.search.trim() ? state.items.flatMap((item, index) =>
                 state.items[index - 1]?.folder_key === item.folder_key ? [item] : [{ folder: item.folder_key }, item]
             ) : state.items;
             state.cursor = result.next_cursor;
             state.total = result.total ?? state.total;
-            if (reset) $('rows').scrollTop = 0;
-            renderRows(!reset);
+            if (reset || navigation) $('rows').scrollTop = 0;
+            renderRows(!reset && !navigation);
         } catch (error) {
             if (error.name !== 'AbortError') throw error;
         } finally {
@@ -810,7 +831,7 @@
     }
 
     function renderRows(scrolling = false) {
-        if (libraryDrag) { refreshRowsAfterDrag = true; return; }
+        if (clipDrag) { refreshRowsAfterDrag = true; return; }
         refreshRowsAfterDrag = false;
         $('rowCount').textContent = t('结果：{count}', { count: state.total });
         if (!scrolling) renderBulkActions();
@@ -825,6 +846,7 @@
         rowWindow = { first, last };
         const nextRows = scrolling ? rowNodes : new Map();
         const parts = [];
+        if (!first && listPreviousWindows.length) parts.push(button(t('上一页'), () => loadItems(false, 'previous'), 'more'));
         if (first) { const space = el('div'); space.style.height = `${first * ROW}px`; parts.push(space); }
         for (const item of state.displayRows.slice(first, last)) {
             const existing = scrolling && rowNodes.get(item);
@@ -860,43 +882,8 @@
             if (playable) {
                 const handle = waveHandle = el('button', null, 'wave-drag');
                 handle.type = 'button';
-                handle.title = t('拖动波形到工作台；按住 Alt 拖到 DAW');
-                handle.setAttribute('aria-label', handle.title);
-                handle.draggable = true;
                 handle.append(thumb);
-                handle.onclick = event => {
-                    if (event.detail !== 0) return;
-                    event.stopPropagation();
-                    attempt(() => prepareListDrag(item));
-                };
-                let dawIntent = false;
-                handle.onpointerdown = event => {
-                    dawIntent = event.altKey && event.button === 0;
-                    if (dawIntent && state.dawDirectory && !listDragId(item)) {
-                        attempt(() => prepareListDrag(item));
-                    }
-                };
-                handle.onpointerup = handle.onpointercancel = () => { dawIntent = false; };
-                handle.ondragstart = event => {
-                    const toDAW = dawIntent || event.altKey;
-                    dawIntent = false;
-                    if (toDAW) {
-                        event.preventDefault();
-                        const id = listDragId(item);
-                        if (id) desktop.startDrag(id);
-                        else attempt(() => prepareListDrag(item));
-                        return;
-                    }
-                    libraryDrag = item;
-                    $('mainWorkspace').classList.add('library-dragging');
-                    event.dataTransfer.setData(clipDragType, item.id);
-                    event.dataTransfer.effectAllowed = 'copy';
-                };
-                handle.ondragend = () => {
-                    libraryDrag = null;
-                    $('mainWorkspace').classList.remove('library-dragging');
-                    if (refreshRowsAfterDrag) renderRows();
-                };
+                bindAudioDrag(handle, () => wholeDrag(item));
             }
             name.append(check, assetCover(item), waveHandle, el('span', item.title || item.filename, 'file-title'));
             row.append(name, el('span', fmt(item.duration), 'meta'),
@@ -915,7 +902,10 @@
         if (state.displayRows.length > last) {
             const space = el('div'); space.style.height = `${(state.displayRows.length-last)*ROW}px`; parts.push(space);
         }
-        if (state.cursor) parts.push(button(t('加载更多'), () => loadItems(), 'more'));
+        if (state.cursor) {
+            const full = state.items.length >= listWindowLimit;
+            parts.push(button(t(full ? '下一页' : '加载更多'), () => loadItems(false, full ? 'next' : undefined), 'more'));
+        }
         if (!parts.length) parts.push(state.library
             ? el('div', state.search ? t('没有匹配的素材') : t('将音频或文件夹拖到这里'), 'empty')
             : button(t('新建音效库…'), createLibrary, 'empty empty-library'));
@@ -972,7 +962,7 @@
     }
 
     let miniFrame;
-    let loadingPeaks = false;
+    let previewBatch;
     let loadingArtwork = false;
     const failedPeaks = new Map();
     const failedArtwork = new Map();
@@ -983,11 +973,15 @@
         if (!box) return [];
         const bounds = box.getBoundingClientRect();
         if (!bounds.width || !bounds.height) return [];
-        return [...box.querySelectorAll('.mini-preview, .asset-cover')].filter(node => {
-            const rect = node.getBoundingClientRect();
-            return rect.width && rect.height && rect.bottom > bounds.top && rect.top < bounds.bottom
-                && rect.right > bounds.left && rect.left < bounds.right;
-        });
+        const previews = [];
+        for (const row of box.children) {
+            if (!row.matches('.row,.mini-row')) continue;
+            const rect = row.getBoundingClientRect();
+            if (rect.bottom > bounds.top && rect.top < bounds.bottom && rect.right > bounds.left && rect.left < bounds.right) {
+                previews.push(...row.querySelectorAll('.mini-preview,.asset-cover'));
+            }
+        }
+        return previews;
     }
 
     async function loadArtwork(item) {
@@ -1076,12 +1070,13 @@
                 else if (Date.now() - (failedArtwork.get(key) || 0) > 20000) covers.set(key, item);
             }
 
-            if (!loadingPeaks && waves.size) {
-                loadingPeaks = true;
+            if (!previewBatch && waves.size) {
+                const request = previewBatch = new AbortController();
                 const waveBatch = [...waves].slice(0, 2);
                 api.post('/api/v1/waveforms/batch', {
                     project_id: library, points: 256, file_ids: waveBatch.map(([, item]) => item.id)
-                }).then(result => {
+                }, { signal: request.signal }).then(result => {
+                    if (request.signal.aborted) return;
                     const loaded = new Map(result.items.filter(item => item.ok).map(item => [item.file_id, item]));
                     for (const [key, item] of waveBatch) {
                         const result = loaded.get(item.id);
@@ -1089,8 +1084,9 @@
                             rememberPreview(miniPeaks, key, Float32Array.from(result.peaks), miniLimit);
                         } else rememberPreview(failedPeaks, key, Date.now(), 256);
                     }
-                }).catch(() => waveBatch.forEach(([key]) => rememberPreview(failedPeaks, key, Date.now(), 256)))
-                    .finally(() => { loadingPeaks = false; scheduleMiniPeaks(); });
+                }).catch(() => {
+                    if (!request.signal.aborted) waveBatch.forEach(([key]) => rememberPreview(failedPeaks, key, Date.now(), 256));
+                }).finally(() => { previewBatch = null; scheduleMiniPeaks(); });
             }
             if (!loadingArtwork && covers.size) {
                 loadingArtwork = true;
@@ -1112,13 +1108,234 @@
     };
 
     async function setFilter(filter) {
+        previewBatch?.abort();
         state.filter = filter;
-        $('tree').querySelectorAll('[data-folder]').forEach(row => row.classList.toggle('sel', row.dataset.folder === filter.folder));
-        $('queryEcho').textContent = Object.values(filter).map(value => String(value).split(/[/\\]/).at(-1)).join(' · ');
-        return loadItems(true);
+        $('tree').querySelectorAll('[data-folder]').forEach(row => row.classList.toggle('sel',
+            Boolean(filter.folder) && folderKey(row.dataset.folder) === folderKey(filter.folder)));
+        updateTagSelection();
+        renderFilterSummary();
+        if (isLibrary()) return loadItems(true);
+        return timeline()?.loadDock();
     }
 
     const libraryViews = Object.freeze({ folder: '文件夹', tag: '标签', group: '分组', fav: '收藏' });
+    const filenameCategories = new Map(Object.entries({
+        footsteps: '脚步声', doors: '门和栅栏', ambience: '环境音', weather: '天气',
+        water: '水声', vehicles: '车辆', weapons: '武器', impacts: '撞击',
+        whooshes: '呼啸音', interface: '界面音效'
+    }));
+    const filenameCategoryLabel = id => t(filenameCategories.get(id) ?? id);
+
+    function renderFilterSummary() {
+        $('queryEcho').textContent = Object.entries(state.filter)
+            .map(([type, value]) => type === 'filename_category'
+                ? filenameCategoryLabel(value) : type === 'folder' ? String(value).split(/[/\\]/).at(-1) : value)
+            .join(' · ');
+    }
+    const folderKey = path => {
+        const normalized = path.replaceAll('\\', '/').replace(/\/$/, '');
+        return desktop.platform === 'win32' ? normalized.toLowerCase() : normalized;
+    };
+
+    const tagSectionsKey = 'soundbot-tag-sections';
+    const tagSectionNames = new Map([
+        ['folders', '标签夹'], ['filename_category', '文件名分类'], ['ucs', 'UCS'], ['tag', '自定义标签']
+    ]);
+
+    function loadTagLayout() {
+        let saved;
+        try { saved = JSON.parse(localStorage.getItem(tagSectionsKey)); } catch { /* Use the default layout. */ }
+        const keys = [...tagSectionNames.keys()];
+        const known = values => Array.isArray(values) ? values.filter(key => tagSectionNames.has(key)) : [];
+        return {
+            order: [...new Set([...known(saved?.order), ...keys])],
+            closed: new Set(known(saved?.closed)),
+            countSort: new Set(known(saved?.countSort ?? ['tag'])),
+            expandedFolders: new Set(Array.isArray(saved?.expandedFolders)
+                ? saved.expandedFolders.filter(id => typeof id === 'string' && /^[0-9a-f]{32}$/.test(id)) : [])
+        };
+    }
+    const tagLayout = loadTagLayout();
+
+    function saveTagLayout() {
+        localStorage.setItem(tagSectionsKey, JSON.stringify({
+            order: tagLayout.order, closed: [...tagLayout.closed], countSort: [...tagLayout.countSort],
+            expandedFolders: [...tagLayout.expandedFolders]
+        }));
+    }
+
+    function updateTagSelection() {
+        for (const entry of $('tree').querySelectorAll('[data-tag-type]')) {
+            const selected = state.filter[entry.dataset.tagType] === entry.dataset.tagName;
+            entry.classList.toggle('sel', selected);
+            entry.setAttribute('aria-pressed', String(selected));
+        }
+    }
+
+    function tagBranch(label, count, content, expanded, toggle) {
+        const switcher = button(null, () => {
+            content.hidden = !content.hidden;
+            switcher.setAttribute('aria-expanded', String(!content.hidden));
+            toggle(!content.hidden);
+            saveTagLayout();
+        }, 'tag-tree-toggle tree-label');
+        const arrow = el('span', null, 'tree-expand');
+        arrow.setAttribute('aria-hidden', 'true');
+        switcher.title = label;
+        switcher.setAttribute('aria-expanded', String(expanded));
+        switcher.setAttribute('aria-controls', content.id);
+        switcher.append(arrow, el('span', label, 'tree-name'), el('span', number(count), 'tree-count'));
+        content.hidden = !expanded;
+        return switcher;
+    }
+
+    function tagEntry(type, record) {
+        const name = type === 'filename_category' ? filenameCategoryLabel(record.name) : record.name;
+        const entry = button(null, () => setFilter({ [type]: record.name }), 'tree-row tag-entry');
+        entry.title = name;
+        entry.dataset.tagType = type;
+        entry.dataset.tagName = record.name;
+        entry.append(el('span', name, 'tree-name'), el('span', number(record.count), 'tree-count'));
+        if (type === 'tag' && state.facets.tag_folders.length) {
+            const label = t('移动到标签夹…');
+            entry.setAttribute('aria-haspopup', 'menu');
+            entry.setAttribute('aria-expanded', 'false');
+            bindTreeMenu(entry, entry, event => openTreeMenu(entry, [[label, () => moveTag(record)]], event, t('标签操作')));
+        }
+        return entry;
+    }
+
+    function renderTagSections(focusSection) {
+        const box = $('tagSections');
+        if (!box || !state.facets) return;
+        const facets = state.facets;
+        const unfiled = [];
+        const folderTags = new Map(facets.tag_folders.map(folder => [folder.id, []]));
+        for (const tag of facets.tags) (folderTags.get(tag.folder_id) || unfiled).push(tag);
+        const collator = new Intl.Collator(i18n.language, { numeric: true });
+        const sorted = (records, key) => {
+            const displayName = key === 'filename_category' ? record => filenameCategoryLabel(record.name) : record => record.name;
+            return [...records].sort((a, b) => (tagLayout.countSort.has(key) ? b.count - a.count : 0) ||
+                collator.compare(displayName(a), displayName(b)));
+        };
+        const groups = { tag: unfiled, ucs: facets.ucs, filename_category: facets.filename_categories,
+            folders: facets.tag_folders.map(folder => ({ ...folder, count: folderTags.get(folder.id).length })) };
+        let focus;
+        box.replaceChildren(...tagLayout.order.map((key, index) => {
+            const label = key === 'ucs' ? 'UCS' : t(tagSectionNames.get(key));
+            const records = sorted(groups[key], key);
+            const section = el('section', null, 'tag-section');
+            section.dataset.tagSection = key;
+            const header = el('div', null, 'tag-section-head tree-row');
+            const content = el('div', null, 'tree-children');
+            content.id = `tag-section-content-${key}`;
+            const open = tagBranch(label, records.length, content, !tagLayout.closed.has(key), expanded => {
+                if (expanded) tagLayout.closed.delete(key); else tagLayout.closed.add(key);
+            });
+            const update = change => { change(); saveTagLayout(); renderTagSections(key); };
+            const move = by => update(() => {
+                const order = tagLayout.order;
+                [order[index], order[index + by]] = [order[index + by], order[index]];
+            });
+            const showMenu = event => {
+                const actions = [];
+                if (index > 0) actions.push([t('上移分类'), () => move(-1)]);
+                if (index + 1 < tagLayout.order.length) actions.push([t('下移分类'), () => move(1)]);
+                if (tagLayout.countSort.has(key)) actions.push([t('按名称排序'), () => update(() => tagLayout.countSort.delete(key))]);
+                else actions.push([t(key === 'folders' ? '按标签数量排序' : '按素材数量排序'),
+                    () => update(() => tagLayout.countSort.add(key))]);
+                openTreeMenu(menu, actions, event, t('标签分类排序'));
+            };
+            const menu = button('↕', () => showMenu(), 'icon-btn tag-tree-action');
+            menu.title = t('标签分类排序');
+            menu.setAttribute('aria-label', menu.title);
+            menu.setAttribute('aria-haspopup', 'menu');
+            menu.setAttribute('aria-expanded', 'false');
+            bindTreeMenu(header, menu, showMenu);
+            header.append(open);
+            if (key === 'folders') {
+                const add = button('＋', createTagFolder, 'icon-btn tag-tree-action');
+                add.title = t('新建标签夹');
+                add.setAttribute('aria-label', add.title);
+                header.append(add);
+                content.replaceChildren(...records.map(folder => tagFolderNode(folder, sorted(folderTags.get(folder.id), key))));
+            } else content.replaceChildren(...records.map(record => tagEntry(key, record)));
+            header.append(menu);
+            section.append(header, content);
+            if (focusSection === key) focus = menu;
+            return section;
+        }));
+        updateTagSelection();
+        focus?.focus({ preventScroll: true });
+    }
+
+    function tagFolderNode(folder, tags) {
+        const node = el('div', null, 'tag-folder');
+        node.dataset.tagFolder = folder.id;
+        const head = el('div', null, 'tree-row');
+        const content = el('div', null, 'tree-children');
+        content.id = `tag-folder-content-${folder.id}`;
+        const open = tagBranch(folder.name, tags.length, content, tagLayout.expandedFolders.has(folder.id), expanded => {
+            if (expanded) tagLayout.expandedFolders.add(folder.id); else tagLayout.expandedFolders.delete(folder.id);
+        });
+        const label = t('删除标签夹…');
+        bindTreeMenu(head, open, event => openTreeMenu(open, [[label, () => removeTagFolder(folder)]], event, t('标签夹操作')));
+        head.append(open);
+        content.append(...tags.map(record => tagEntry('tag', record)));
+        node.append(head, content);
+        return node;
+    }
+
+    async function createTagFolder() {
+        const library = state.library.id;
+        const name = await promptText(t('标签夹名称'));
+        if (!name) return;
+        if ([...name].length > 100) throw new Error(t('请输入 1 至 100 个字符的标签夹名称'));
+        const folder = await api.post(route('/catalog/tag-folders', library), { name });
+        tagLayout.closed.delete('folders');
+        tagLayout.expandedFolders.add(folder.id);
+        saveTagLayout();
+        if (state.library?.id === library) await renderTree();
+    }
+
+    async function removeTagFolder(folder) {
+        const library = state.library.id;
+        if (!await actionDialog({
+            message: t('删除标签夹「{name}」？', { name: folder.name }),
+            detail: t('夹内标签会回到自定义标签，素材和原有标签会保留。'),
+            confirm: t('删除')
+        })) return;
+        await api.delete(route(`/catalog/tag-folders/${encodeURIComponent(folder.id)}`, library));
+        tagLayout.expandedFolders.delete(folder.id);
+        saveTagLayout();
+        if (state.library?.id === library) await renderTree();
+    }
+
+    async function moveTag(record) {
+        const library = state.library.id;
+        const dialog = $('tagFolderDialog');
+        const select = $('tagFolderDestination');
+        $('tagFolderPrompt').textContent = t('为「{name}」选择标签夹', { name: record.name });
+        const choices = [{ id: '', name: t('未归入标签夹') }, ...state.facets.tag_folders];
+        select.replaceChildren(...choices.map(folder => {
+            const option = el('option', folder.name);
+            option.value = folder.id;
+            return option;
+        }));
+        select.value = record.folder_id || '';
+        dialog.returnValue = 'cancel';
+        dialog.showModal();
+        await new Promise(resolve => dialog.addEventListener('close', resolve, { once: true }));
+        const folderId = select.value || null;
+        if (dialog.returnValue !== 'ok' || folderId === record.folder_id) return;
+        await api.put(route('/catalog/tag-folder-assignment', library), { tag: record.name, folder_id: folderId });
+        if (folderId) {
+            tagLayout.closed.delete('folders');
+            tagLayout.expandedFolders.add(folderId);
+            saveTagLayout();
+        }
+        if (state.library?.id === library) await renderTree();
+    }
 
     function renderViewTabs() {
         const caption = $('activeViewLabel');
@@ -1133,6 +1350,7 @@
     }
 
     async function renderTree() {
+        treeView = state.view;
         renderViewTabs();
         closeFolderMenu();
         const generation = ++directoryRevision;
@@ -1145,7 +1363,7 @@
         }
         box.replaceChildren(button(t(state.view === 'fav' ? '全部收藏' : '全部素材'), () => setFilter({}), 'view-item tree-command'));
         const section = $('treeLabel');
-        const label = { folder: '来源目录', tag: '标签与 UCS' }[state.view];
+        const label = { folder: '来源目录' }[state.view];
         section.hidden = !label;
         section.textContent = label ? t(label) : '';
         if (state.view === 'folder') {
@@ -1156,13 +1374,16 @@
             const facets = await api.get(route('/catalog/facets', library));
             if (generation !== directoryRevision) return;
             state.facets = facets;
-            if (state.view === 'group') box.append(button(t('新建分组…'), createGroup, 'view-item tree-command'));
-            for (const [type, records] of (state.view === 'tag' ? [['tag', facets.tags], ['ucs', facets.ucs]] : [['group', facets.groups]])) {
-                if (type === 'ucs' && records.length) box.append(el('div', 'UCS', 'sec-label'));
-                for (const record of records) {
-                    const entry = button(record.count == null ? record.name : `${record.name} · ${number(record.count)}`,
-                        () => setFilter({ [type]: type === 'group' ? record.id : record.name }), 'view-item');
-                    entry.title = record.name;
+            if (state.view === 'tag') {
+                const tagSections = el('div', null, 'tag-sections');
+                tagSections.id = 'tagSections';
+                box.append(tagSections);
+                renderTagSections();
+            } else {
+                box.append(button(t('新建分组…'), createGroup, 'view-item tree-command'));
+                for (const group of facets.groups) {
+                    const entry = button(group.name, () => setFilter({ group: group.id }), 'view-item');
+                    entry.title = group.name;
                     box.append(entry);
                 }
             }
@@ -1170,33 +1391,39 @@
     }
 
     function folderNode(item) {
+        const pathKey = folderKey(item.path);
+        const library = state.library.id;
         const wrapper = el('div');
         const line = el('div', null, 'tree-row');
         line.dataset.folder = item.path;
-        line.classList.toggle('sel', state.filter.folder === item.path);
+        const selected = state.filter.folder ? folderKey(state.filter.folder) : null;
+        line.classList.toggle('sel', selected === pathKey);
         const children = el('div', null, 'tree-children');
         children.hidden = true;
         let loaded = false;
-        const expand = button('', async () => {
+        const showChildren = async (open, focusLeaf = false) => {
             if (!loaded) {
                 expand.disabled = true;
                 try {
-                    const rows = await api.get(route(`/catalog/folders?${new URLSearchParams({ folder: item.path })}`));
+                    const rows = await api.get(route(`/catalog/folders?${new URLSearchParams({ folder: item.path })}`, library));
+                    if (state.library?.id !== library || !wrapper.isConnected) return;
                     children.append(...rows.map(folderNode));
                     loaded = true;
                     if (!rows.length) {
                         expand.classList.add('leaf');
-                        title.focus({ preventScroll: true });
+                        if (focusLeaf) title.focus({ preventScroll: true });
                         return;
                     }
                 } finally {
                     expand.disabled = false;
                 }
             }
-            children.hidden = !children.hidden;
-            expand.setAttribute('aria-expanded', String(!children.hidden));
-            expand.setAttribute('aria-label', children.hidden ? t('展开目录') : t('折叠目录'));
-        }, 'tree-expand');
+            children.hidden = !open;
+            if (open) expandedFolders.add(pathKey); else expandedFolders.delete(pathKey);
+            expand.setAttribute('aria-expanded', String(open));
+            expand.setAttribute('aria-label', open ? t('折叠目录') : t('展开目录'));
+        };
+        const expand = button('', () => showChildren(children.hidden, true), 'tree-expand');
         expand.setAttribute('aria-expanded', 'false');
         expand.setAttribute('aria-label', t('展开目录'));
         const name = item.path.split(/[/\\]/).filter(Boolean).at(-1) || item.path;
@@ -1205,38 +1432,50 @@
         title.title = item.path;
         title.setAttribute('aria-haspopup', 'menu');
         title.setAttribute('aria-expanded', 'false');
-        line.oncontextmenu = event => {
-            event.preventDefault();
-            openFolderMenu(item, title, event);
-        };
-        line.onkeydown = event => {
-            if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
-            event.preventDefault();
-            openFolderMenu(item, title);
-        };
+        bindTreeMenu(line, title, event => openFolderMenu(item, title, event));
         line.append(expand, title);
         wrapper.append(line, children);
+        if (expandedFolders.has(pathKey) || selected?.startsWith(`${pathKey}/`)) {
+            queueMicrotask(() => { if (wrapper.isConnected) attempt(() => showChildren(true)); });
+        }
         return wrapper;
     }
 
     let folderMenu;
     function openFolderMenu(item, anchor, event) {
-        closeFolderMenu();
-        const menu = $('folderMenu');
-        const controller = new AbortController();
-        folderMenu = { anchor, controller };
-        anchor.setAttribute('aria-expanded', 'true');
         const actions = [];
         if (item.id) {
             const library = state.library.id;
             actions.push([t('检查变更'), async () => {
                 await api.post(route(`/sources/${encodeURIComponent(item.id)}/scan`, library), {});
                 modal('ovJobs');
-                await refreshJobs();
+                await refreshJobs(libraryRevision, true);
             }], [t('重定位…'), () => relocateItem({ source_id: item.id }, true)],
             [t('从音效库移除文件夹…'), () => removeFolderSource(item, library)]);
         }
         actions.push([t('在文件管理器中显示'), () => desktop.revealFile(item.path)]);
+        openTreeMenu(anchor, actions, event, t('文件夹操作'));
+    }
+
+    function bindTreeMenu(node, anchor, show) {
+        node.oncontextmenu = event => {
+            event.preventDefault();
+            show(event);
+        };
+        anchor.onkeydown = event => {
+            if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
+            event.preventDefault();
+            show();
+        };
+    }
+
+    function openTreeMenu(anchor, actions, event, label) {
+        closeFolderMenu();
+        const menu = $('folderMenu');
+        const controller = new AbortController();
+        folderMenu = { anchor, controller };
+        if (anchor.getAttribute('aria-haspopup') === 'menu') anchor.setAttribute('aria-expanded', 'true');
+        menu.setAttribute('aria-label', label);
         const options = actions.map(([label, action]) => {
             const option = button(label, () => {
                 closeFolderMenu(true);
@@ -1284,35 +1523,56 @@
         const menu = $('folderMenu');
         menu.onkeydown = menu.onfocusout = null;
         menu.hidden = true;
-        anchor.setAttribute('aria-expanded', 'false');
+        if (anchor.getAttribute('aria-haspopup') === 'menu') anchor.setAttribute('aria-expanded', 'false');
         if (restoreFocus) anchor.focus({ preventScroll: true });
     }
 
-    let polling = false;
+    let jobsTimer;
+    let jobRequest = 0;
+    let lastImportRefresh = 0;
     let removingLibrary = null;
-    async function refreshJobs(revision = libraryRevision) {
+    const showJobs = () => $('ovJobs').classList.contains('show');
+
+    function scheduleJobPoll() {
+        clearTimeout(jobsTimer);
+        if (!activeJobs.length && !showJobs()) return;
+        jobsTimer = setTimeout(() => attempt(refreshJobs), 1600);
+    }
+
+    async function refreshJobs(revision = libraryRevision, submitted = false) {
+        clearTimeout(jobsTimer);
+        const request = ++jobRequest;
         const library = state.library?.id;
         if (library && library === removingLibrary) return;
-        const [jobs, running] = await Promise.all([
-            library ? api.get(route('/jobs', library)).catch(error => {
-                if (revision !== libraryRevision || library === removingLibrary) return [];
-                throw error;
-            }) : [], api.get('/api/v1/jobs/active')
-        ]);
-        if (revision !== libraryRevision || library && library === removingLibrary) return;
-        const updates = jobs.some(job => {
-            const prior = state.jobs.find(item => item.id === job.id);
-            return job.imported && (!prior || job.imported > prior.imported);
-        });
-        const finished = jobs.some(job => job.kind === 'catalog_import' && job.state === 'completed' &&
-            !state.jobs.some(previous => previous.id === job.id && previous.state === 'completed'));
-        state.jobs = jobs;
-        activeJobs = running;
-        renderJobTray();
-        if ($('ovJobs').classList.contains('show')) renderJobs();
-        if ((updates || finished) && $('rows').scrollTop < ROW && !listRequest) await loadItems(true);
-        if (finished && revision === libraryRevision) {
-            await Promise.all([renderTree(), loadLibraries(library, revision), timeline()?.loadDock()]);
+        try {
+            const [running, history] = await Promise.all([
+                api.get('/api/v1/jobs/active'),
+                library && showJobs() ? api.get(route('/jobs', library)) : null
+            ]);
+            if (request !== jobRequest || revision !== libraryRevision || library === removingLibrary) return;
+            const currentImports = running.filter(job => job.kind === 'catalog_import' && job.project_id === library);
+            const earlierImports = activeJobs.filter(job => job.kind === 'catalog_import' && job.project_id === library);
+            const finished = submitted || earlierImports.some(job => !currentImports.some(item => item.id === job.id));
+            const now = performance.now();
+            const progressing = now - lastImportRefresh > 3000 && currentImports.some(job =>
+                job.imported > (earlierImports.find(previous => previous.id === job.id)?.imported || 0));
+            activeJobs = running;
+            if (history) state.jobs = history;
+            renderJobTray();
+            if (showJobs()) renderJobs();
+            if (library && (finished || progressing)) {
+                lastImportRefresh = now;
+                if ($('rows').scrollTop < ROW && !listRequest || !isLibrary()) await loadItems(true);
+                if (finished && revision === libraryRevision) {
+                    await Promise.all([renderTree(), loadLibraries(library, revision), timeline()?.loadDock(true)]);
+                } else if (!isLibrary()) {
+                    await timeline()?.refreshDockResults();
+                }
+            }
+        } catch (error) {
+            if (request === jobRequest && revision === libraryRevision && library !== removingLibrary) throw error;
+        } finally {
+            if (request === jobRequest) scheduleJobPoll();
         }
     }
 
@@ -1358,10 +1618,10 @@
                 node.append(button(t('暂停'), async () => { await api.delete(`/api/v1/jobs/${job.id}`); await refreshJobs(); }));
             }
             if (job.kind === 'catalog_import' && ['cancelled', 'failed'].includes(job.state)) {
-                node.append(button(t('继续'), async () => { await api.post(`/api/v1/jobs/${job.id}/resume`, {}); await refreshJobs(); }));
+                node.append(button(t('继续'), async () => { await api.post(`/api/v1/jobs/${job.id}/resume`, {}); await refreshJobs(libraryRevision, true); }));
             }
             if (job.kind === 'catalog_import' && job.state === 'completed' && job.failed_items?.length) {
-                node.append(button(t('重试失败项'), async () => { await api.post(`/api/v1/jobs/${job.id}/retry`, {}); await refreshJobs(); }));
+                node.append(button(t('重试失败项'), async () => { await api.post(`/api/v1/jobs/${job.id}/retry`, {}); await refreshJobs(libraryRevision, true); }));
             }
             return node;
         });
@@ -1393,7 +1653,7 @@
             const result = await api.post(route('/imports', libraryId), { file_paths: paths.slice(i, i+1000) });
             if (result.rejected?.length) say(t('跳过 {count} 个不支持的文件', { count: result.rejected.length }));
         }
-        await refreshJobs();
+        await refreshJobs(libraryRevision, true);
     }
 
     async function importFiles(folder) {
@@ -1423,7 +1683,7 @@
         if (state.library?.id !== library) return;
         state.selectedIds.clear();
         await Promise.all([state.filter.folder ? setFilter({}) : loadItems(true),
-            renderTree(), loadLibraries(library), refreshJobs(), timeline()?.loadDock()]);
+            renderTree(), loadLibraries(library), refreshJobs(), timeline()?.loadDock(true)]);
         say(t('已移除来源文件夹'));
     }
 
@@ -1550,66 +1810,183 @@
         say(t('已更新 {count} 条记录', { count: result.updated }));
     }
 
+    function wholeDrag(item) {
+        if (!item?.duration || item.missing) return null;
+        return {
+            item: { ...item, peaks: miniFor(item) },
+            clip: { file_id: item.id, offset: 0, duration: item.duration, gain: 0, fade_in: 0, fade_out: 0 }
+        };
+    }
+
+    function rangeDrag() {
+        const edit = state.range && editorClip();
+        return edit ? { ...edit, name: $('clipName').value.trim() || null } : null;
+    }
+
+    function deliverySignature({ item, clip, name }) {
+        return JSON.stringify([deliveryRevision, state.dawDirectory, previewKey(item), clip,
+            $('dawRate').value, $('dawChannels').value, $('dawBits').value, name]);
+    }
+
     async function chooseDaw() {
         const directory = await desktop.chooseDawDirectory();
         if (!directory) return null;
         state.dawDirectory = directory;
-        listDelivery = null;
         $('btnDawDirectory').textContent = directory.split(/[/\\]/).filter(Boolean).at(-1) || directory;
         $('btnDawDirectory').title = directory;
         invalidateDelivery();
         return directory;
     }
 
-    function listDragId(item) {
-        return listDelivery?.key === previewKey(item) && listDelivery.directory === state.dawDirectory ? listDelivery.id : null;
+    function finishClipDrag() {
+        audioPress = null;
+        const drag = clipDrag;
+        if (!drag) return;
+        clipDrag = null;
+        clearTimeout(drag.tabHover);
+        drag.ghost.remove();
+        drag.lane?.classList.remove('drop-target');
+        if (document.body.hasPointerCapture(drag.pointer)) document.body.releasePointerCapture(drag.pointer);
+        $('mainWorkspace').classList.remove('library-dragging');
+        if (refreshRowsAfterDrag) renderRows();
+        timeline()?.refreshDockRows();
     }
 
-    async function prepareListDrag(item) {
-        if (preparingListDelivery || state.preparing || !state.library || listDragId(item)) return;
-        const library = state.library.id;
-        const key = previewKey(item);
-        preparingListDelivery = true;
-        try {
-            const directory = state.dawDirectory || await chooseDaw();
-            if (!directory || library !== state.library?.id) return;
-            const clip = { file_id: item.id, duration: item.duration };
-            const result = await desktop.desktopMedia('prepare', { project_id: library, clip });
-            if (directory !== state.dawDirectory || library !== state.library?.id) return;
-            listDelivery = { key, directory, id: result.id };
-            say(t('整条音效已就绪，请再次拖到 DAW'));
-        } finally { preparingListDelivery = false; }
+    const outsideWindow = event => event.clientX < 0 || event.clientY < 0 ||
+        event.clientX >= innerWidth || event.clientY >= innerHeight;
+
+    function leaveWithAudio(drag) {
+        drag.leftWindow = true;
+        const delivery = preparedDrags.get(deliverySignature(drag.edit));
+        if (!delivery) {
+            drag.ghost.hidden = true;
+            drag.lane?.classList.remove('drop-target');
+            drag.lane = null;
+            return false;
+        }
+        finishClipDrag();
+        desktop.startDrag(delivery);
+        return true;
     }
 
-    async function prepareDrag() {
-        if (state.preparing || preparingListDelivery) return;
-        if (!isLibrary() || !currentClip() || !state.range) return;
-        const projectId = state.library.id;
-        const specs = () => ({ rate: Number($('dawRate').value) || null,
-            channels: Number($('dawChannels').value) || null, bits: Number($('dawBits').value),
-            name: $('clipName').value.trim() || null });
-        state.preparing = true;
+    function bindAudioDrag(handle, editForDrag, openEditor) {
+        handle.dataset.audioDrag = '';
+        handle.title = t('拖动音频到 DAW 或工作台');
+        handle.setAttribute('aria-label', handle.title);
+        handle.ondragstart = event => event.preventDefault();
+        handle.onpointerdown = event => {
+            if (event.button !== 0 || !event.isPrimary || clipDrag) return;
+            const edit = editForDrag();
+            if (edit && state.library) audioPress = {
+                edit, editForDrag, library: state.library.id, pointer: event.pointerId,
+                x: event.clientX, y: event.clientY
+            };
+        };
+        handle.onclick = event => {
+            if (openEditor) return attempt(openEditor);
+            if (event.detail !== 0) return;
+            event.stopPropagation();
+            attempt(() => prepareAudioDrag(editForDrag));
+        };
+    }
+
+    function bindAudioGesture() {
+        const tab = document.querySelector('#workspaceSwitch [data-ws="wwise"]');
+        const overTab = node => node?.closest('#workspaceSwitch [data-ws="wwise"]') === tab;
+        const hit = event => document.elementFromPoint(event.clientX, event.clientY);
+        document.addEventListener('pointermove', event => {
+            if (audioPress?.pointer !== event.pointerId) return;
+            if (!(event.buttons & 1) || audioPress.library !== state.library?.id) { finishClipDrag(); return; }
+            if (!clipDrag) {
+                if (Math.hypot(event.clientX - audioPress.x, event.clientY - audioPress.y) < 5) return;
+                const ghost = el('div', null, 'audio-drag-ghost');
+                ghost.setAttribute('aria-hidden', 'true');
+                document.body.append(ghost);
+                clipDrag = { ...audioPress, ghost, leftWindow: false, lane: null };
+                $('mainWorkspace').classList.add('library-dragging');
+            }
+            if (!document.body.hasPointerCapture(event.pointerId)) document.body.setPointerCapture(event.pointerId);
+            const drag = clipDrag;
+            if (outsideWindow(event) && leaveWithAudio(drag)) return;
+            const node = drag.leftWindow ? null : hit(event);
+            if (node) drag.ghost.style.transform = `translate(${event.clientX - 10}px,${event.clientY - 10}px)`;
+            if (isLibrary() && overTab(node)) {
+                drag.tabHover ??= setTimeout(() => {
+                    if (clipDrag === drag) attempt(() => switchWorkspace('wwise'));
+                }, 160);
+            } else {
+                clearTimeout(drag.tabHover);
+                drag.tabHover = null;
+            }
+            const lane = timeline()?.audioDropLane(node);
+            if (drag.lane !== lane) {
+                drag.lane?.classList.remove('drop-target');
+                lane?.classList.add('drop-target');
+                drag.lane = lane;
+            }
+        });
+        document.addEventListener('pointerup', event => {
+            if (audioPress?.pointer !== event.pointerId) return;
+            const drag = clipDrag;
+            const node = drag && !drag.leftWindow && !outsideWindow(event) ? hit(event) : null;
+            finishClipDrag();
+            if (!drag || drag.library !== state.library?.id) return;
+            if (drag.leftWindow) {
+                if (outsideWindow(event)) attempt(() => prepareAudioDrag(drag.editForDrag));
+                return;
+            }
+            if (overTab(node)) {
+                attempt(async () => { await switchWorkspace('wwise'); timeline()?.stageClip(drag.edit.clip, drag.edit.item); });
+            } else {
+                attempt(() => timeline()?.dropAudio(drag.edit, node, event.clientX));
+            }
+        });
+        const cancel = event => { if (audioPress?.pointer === event.pointerId) finishClipDrag(); };
+        document.addEventListener('pointercancel', cancel);
+        document.body.addEventListener('lostpointercapture', event => {
+            if (!event.buttons) cancel(event);
+            else if (clipDrag?.pointer === event.pointerId && outsideWindow(event)) leaveWithAudio(clipDrag);
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key !== 'Escape' || !audioPress) return;
+            if (clipDrag) { event.preventDefault(); event.stopPropagation(); }
+            finishClipDrag();
+        }, { capture: true });
+        window.addEventListener('blur', event => { if (event.target === window) finishClipDrag(); });
+    }
+
+    async function prepareAudioDrag(editForDrag) {
+        if (preparingDrag) return;
+        const edit = editForDrag();
+        const library = state.library?.id;
+        if (!edit || !library || preparedDrags.has(deliverySignature(edit))) return;
+        const pending = preparingDrag = { signature: deliverySignature(edit) };
         updateDragHandle();
+        say(t('正在准备 DAW 音频…'));
         try {
-            const selection = JSON.stringify(currentClip());
+            const selection = JSON.stringify(edit.clip);
             const directory = state.dawDirectory || await chooseDaw();
-            if (!directory || !isLibrary() || projectId !== state.library?.id || !state.range ||
-                selection !== JSON.stringify(currentClip())) return;
-            await fx().finishEditing([libraryEffects]);
-            if (!isLibrary() || projectId !== state.library?.id || !state.range ||
-                selection !== JSON.stringify(currentClip())) return;
-            const exportClip = () => ({ ...currentClip(), effects: fx().enabled(libraryEffects) });
-            const clip = exportClip();
-            const requestedSpecs = specs();
-            const signature = JSON.stringify([clip, requestedSpecs]);
-            const stillSelected = () => isLibrary() && state.range && projectId === state.library?.id &&
-                signature === JSON.stringify([exportClip(), specs()]);
-            const result = await desktop.desktopMedia('prepare', { project_id: projectId, clip, ...requestedSpecs });
-            if (directory !== state.dawDirectory || !stillSelected()) return;
-            state.delivery = result.id;
-            say(t('已就绪，拖动选区上沿到 DAW'));
+            const stillValid = () => library === state.library?.id && directory === state.dawDirectory &&
+                selection === JSON.stringify(editForDrag()?.clip);
+            if (!directory || !stillValid()) return;
+            await fx().finishEditing([libraryEffects || []]);
+            if (!stillValid()) return;
+            const signature = pending.signature = deliverySignature(editForDrag());
+            updateDragHandle();
+            const result = await desktop.desktopMedia('prepare', {
+                project_id: library,
+                source_fingerprint: edit.item.source_fingerprint || null,
+                clip: { ...edit.clip, effects: libraryEffects ? fx().enabled(libraryEffects) : [] },
+                rate: Number($('dawRate').value) || null,
+                channels: Number($('dawChannels').value) || null,
+                bits: Number($('dawBits').value),
+                name: editForDrag()?.name || null
+            });
+            if (!stillValid() || signature !== deliverySignature(editForDrag())) return;
+            rememberPreview(preparedDrags, signature, result.id, 24);
+            say(t('音频已就绪，请再次拖到 DAW'));
         } finally {
-            state.preparing = false;
+            preparingDrag = null;
             updateDragHandle();
         }
     }
@@ -1650,6 +2027,8 @@
             timelinePosition = playback.active ? playback.currentTime() : state.position;
         }
         peakRequest?.abort();
+        previewBatch?.abort();
+        listRequest?.abort();
         playback.stop();
         state.selected = state.range = state.waveform = renderedWave = null;
         state.workspace = which;
@@ -1672,9 +2051,12 @@
         $('searchInput').value = isLibrary() ? state.search : $('wwiseFilter').value;
         $('searchInput').placeholder = t(isLibrary() ? '搜索音效、标签、UCS…' : '筛选工程素材…');
         if (isLibrary()) {
+            timeline()?.hideDock();
             const item = libraryEditor;
             libraryEditor = null;
             attempt(() => select(item));
+            if (listQueryKey !== catalogKey()) await Promise.all([loadItems(true), renderTree()]);
+            else if (treeView !== state.view) await renderTree();
         } else {
             state.position = timelinePosition;
             await timeline()?.show();
@@ -1971,19 +2353,7 @@
             });
         });
         document.querySelectorAll('#workspaceSwitch button').forEach(node => node.onclick = () => attempt(() => switchWorkspace(node.dataset.ws)));
-        const middlewareTab = document.querySelector('#workspaceSwitch [data-ws="wwise"]');
-        middlewareTab.ondragover = event => {
-            if (libraryDrag && event.dataTransfer.types.includes(clipDragType)) {
-                event.preventDefault();
-                attempt(() => switchWorkspace('wwise'));
-            }
-        };
-        middlewareTab.ondrop = event => {
-            if (!libraryDrag || !event.dataTransfer.types.includes(clipDragType)) return;
-            event.preventDefault();
-            const item = libraryDrag;
-            attempt(async () => { await switchWorkspace('wwise'); timeline()?.stageWholeAsset(item); });
-        };
+        bindAudioGesture();
         document.querySelectorAll('[data-close]').forEach(node => node.onclick = () => modal(node.dataset.close, false));
         document.querySelectorAll('.overlay').forEach(node => node.addEventListener('click', event => {
             if (event.target === node) modal(node.id, false);
@@ -2041,7 +2411,7 @@
         on('btnDawDirectory', chooseDaw);
         on('btnBackDock', closeDockEditor);
         on('btnCreateGroup', createGroup);
-        desktop.onDeliveryError(message => { listDelivery = null; invalidateDelivery(); say(describeError(message)); });
+        desktop.onDeliveryError(message => { invalidateDelivery(); say(describeError(message)); });
         $('actionDialog').onclose = event => {
             const resolve = resolveAction;
             resolveAction = null;
@@ -2083,6 +2453,7 @@
             renderLibraryPicker();
             $('editorSourceBadge').textContent = libraryName(state.library);
             renderSortControls();
+            renderFilterSummary();
             $('sampleRateInfo').textContent = state.selected?.sample_rate ? `${number(state.selected.sample_rate)} Hz` : '';
             updateDragHandle();
             showRange();
@@ -2165,8 +2536,10 @@
 
     window.SoundBotWorkspace = { $, state, api, desktop, playback, route, say, fmt, attempt, el, button, modal,
         confirm, syncTransport, stop, togglePlay, refreshAudition, switchWorkspace, select, locateLibraryItem, openDockEditor, closeDockEditor,
-        editorClip, miniCanvas, assetCover, scheduleMiniPeaks, cachedPeaks, clipDragType,
-        get libraryDrag() { return libraryDrag; } };
+        editorClip, miniCanvas, assetCover, scheduleMiniPeaks, cachedPeaks,
+        catalogKey, browseCatalog, setFilter, libraryName, folderKey, filenameCategoryLabel,
+        bindAudioDrag, wholeDrag,
+        get draggingAudio() { return Boolean(clipDrag); } };
     document.addEventListener('DOMContentLoaded', () => attempt(async () => {
         if (!desktop) throw new Error('请在 SoundBot 桌面应用中打开');
         bind();
@@ -2177,11 +2550,6 @@
             const option = el('option', format.name); option.value = ext.slice(1); $('filterFormat').append(option);
         }
         await loadLibraries(localStorage.getItem('soundbot-library') || 'default');
-        setInterval(async () => {
-            if (polling) return;
-            polling = true;
-            try { await attempt(refreshJobs); } finally { polling = false; }
-        }, 1600);
         setInterval(() => {
             if (playback.active) syncTransport();
             fx()?.meters(playback.levels());

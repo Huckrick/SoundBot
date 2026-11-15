@@ -14,6 +14,10 @@ Default data directories are `~/Library/Application Support/SoundBot` on macOS a
 
 macOS 默认数据目录为 `~/Library/Application Support/SoundBot`，Windows 为 `%APPDATA%\SoundBot`。更换版本前备份音效库数据库及其备份。音频原件、交付给 DAW 的媒体和 Wwise 源文件备份应按各自工程的要求留存。
 
+Filename categories and tag folders upgrade the library to schema v7. To return to v1.0.8 after a schema v5 upgrade, quit SoundBot, preserve the current database, and restore `db/soundbot.db.pre-v5-to-v7.bak` as `db/soundbot.db` before opening the older app. The snapshot contains the catalog as it was before the upgrade. An upgrade from the schema v6 test build generates a `pre-v6-to-v7.bak` snapshot.
+
+文件名分类和标签夹会将音效库升级到数据库架构 v7。若从 v5 升级后要退回 v1.0.8，先退出 SoundBot，保留当前数据库，再将 `db/soundbot.db.pre-v5-to-v7.bak` 恢复为 `db/soundbot.db`，之后打开旧版。快照记录的是升级前的音效库状态。从 v6 测试版升级会生成 `pre-v6-to-v7.bak` 快照。
+
 ## Advisory triage / 依赖告警
 
 The v1.0.1 runtime lock updates AnyIO, certifi, IDNA, and Starlette. ChromaDB and the legacy model stack are absent from the runtime lock and frozen package. Old alerts should be reassessed against the current default branch as GitHub refreshes its dependency graph. The npm audit checks the full build lock, including the packaging tools. Its remaining moderate alerts come from the build-time minimatch dependency chain. Installer inputs are the reviewed source and fixed build configuration.

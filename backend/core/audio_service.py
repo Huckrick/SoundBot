@@ -12,6 +12,7 @@ unrelated libsndfile codec matrix.
 
 from __future__ import annotations
 
+from concurrent.futures import Future
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from hashlib import sha256
@@ -180,6 +181,7 @@ class AudioService:
         self.playback_cache_max_files = playback_cache_max_files
         self._cache_lock = threading.RLock()
         self._active_cache: dict[Path, int] = {}
+        self._transcodes: dict[Path, Future[Path]] = {}
         self._manage_temporary = manage_temporary
 
     @staticmethod
@@ -439,36 +441,60 @@ class AudioService:
                     self._prune_playback_cache(protected=target)
                     return target
                 target.unlink(missing_ok=True)
+            existing = self._transcodes.get(target)
+            if existing is None:
+                pending = self._transcodes[target] = Future()
+        if existing is not None:
+            return existing.result()
 
-            decoded = self.decode(source, mono=False)
-            try:
-                with self._temporary(self.playback_cache_dir, "wav") as temp_path:
-                    self._write_wav(temp_path, decoded.samples, decoded.sample_rate)
+        try:
+            with self._temporary(self.playback_cache_dir, "wav") as stage:
+                self._write_playback_wav(source, stage)
+                if self._cache_path(source) != target:
+                    raise AudioServiceError('audio_source_changed', '源文件在渲染期间发生变化')
+                with self._cache_lock:
                     self._register_cache(target)
-                    os.replace(temp_path, target)
-            except AudioServiceError:
-                raise
-            except Exception as exc:
-                raise AudioServiceError(
-                    'playback_transcode_failed',
-                    f'Unable to create playback WAV: {source.name}',
-                    details={'path': str(source), 'reason': self._safe_error(exc)},
-                ) from exc
-            self._touch(target)
-            self._prune_playback_cache(protected=target)
-            if target.stat().st_size > self.playback_cache_max_bytes:
-                size = target.stat().st_size
-                target.unlink(missing_ok=True)
-                raise AudioServiceError(
-                    'playback_cache_limit_exceeded',
-                    'Playback WAV is larger than the configured cache limit',
-                    details={
-                        'path': str(source),
-                        'wav_size': size,
-                        'cache_limit': self.playback_cache_max_bytes,
-                    },
-                )
+                    os.replace(stage, target)
+                    self._touch(target)
+                    self._prune_playback_cache(protected=target)
+            pending.set_result(target)
             return target
+        except Exception as exc:
+            error = exc if isinstance(exc, AudioServiceError) else AudioServiceError(
+                'playback_transcode_failed',
+                f'Unable to create playback WAV: {source.name}',
+                details={'path': str(source), 'reason': self._safe_error(exc)},
+            )
+            pending.set_exception(error)
+            if error is exc:
+                raise
+            raise error from exc
+        finally:
+            with self._cache_lock:
+                self._transcodes.pop(target, None)
+
+    def _write_playback_wav(self, source: Path, stage: Path) -> None:
+        import wave
+        from itertools import chain
+
+        self._require_pyav()
+        max_bytes = min(self.playback_cache_max_bytes, 0xffffffff + 8)
+        with self._decoded_blocks(source) as (rate, blocks):
+            first = next(blocks, None)
+            if first is None:
+                raise ValueError('decoder produced an empty WAV')
+            channels = first.shape[1]
+            size = 44
+            with wave.open(str(stage), 'wb') as output:
+                output.setparams((channels, 2, rate, 0, 'NONE', 'not compressed'))
+                for block in chain((first,), blocks):
+                    size += block.size * 2
+                    if size > max_bytes:
+                        raise AudioServiceError(
+                            'playback_cache_limit_exceeded', 'Playback WAV is larger than the configured cache limit',
+                            details={'path': str(source), 'wav_size': size, 'cache_limit': max_bytes},
+                        )
+                    output.writeframesraw(self._encode_wave_samples(block))
 
     def export_wav(
         self,
@@ -582,10 +608,8 @@ class AudioService:
             )
 
     @staticmethod
-    def _decode_with_pyav(
-        source: Path, target_sample_rate: Optional[int], mono: bool
-    ) -> DecodedAudio:
-        chunks: list[np.ndarray] = []
+    @contextmanager
+    def _decoded_blocks(source: Path, target_sample_rate: Optional[int] = None, mono: bool = False):
         with _av.open(str(source), mode='r', metadata_errors='replace') as container:
             stream = next((item for item in container.streams if item.type == 'audio'), None)
             if stream is None:
@@ -605,19 +629,21 @@ class AudioService:
                 layout = 'mono' if channel_count == 1 else 'stereo'
             resampler = _av.AudioResampler(format='fltp', layout=layout, rate=output_rate)
 
-            for frame in container.decode(stream):
-                converted = resampler.resample(frame)
-                for output_frame in AudioService._iter_av_frames(converted):
-                    array = np.asarray(output_frame.to_ndarray(), dtype=np.float32)
-                    if array.ndim == 1:
-                        array = array[np.newaxis, :]
-                    chunks.append(array.T.copy())
-            for output_frame in AudioService._iter_av_frames(resampler.resample(None)):
-                array = np.asarray(output_frame.to_ndarray(), dtype=np.float32)
-                if array.ndim == 1:
-                    array = array[np.newaxis, :]
-                chunks.append(array.T.copy())
+            def blocks():
+                for frame in container.decode(stream):
+                    for converted in AudioService._iter_av_frames(resampler.resample(frame)):
+                        yield converted.to_ndarray().T
+                for converted in AudioService._iter_av_frames(resampler.resample(None)):
+                    yield converted.to_ndarray().T
 
+            yield output_rate, blocks()
+
+    @staticmethod
+    def _decode_with_pyav(
+        source: Path, target_sample_rate: Optional[int], mono: bool
+    ) -> DecodedAudio:
+        with AudioService._decoded_blocks(source, target_sample_rate, mono) as (output_rate, blocks):
+            chunks = [block.copy() for block in blocks]
         samples = (
             np.concatenate(chunks, axis=0)
             if chunks
@@ -696,16 +722,19 @@ class AudioService:
     def _write_wav(path: Path, samples: np.ndarray, sample_rate: int) -> None:
         import wave
 
-        values = AudioService._sanitise_samples(samples)
-        pcm = np.clip(values, -1.0, 1.0)
-        pcm = np.rint(pcm * 32767.0).astype('<i2', copy=False)
         with wave.open(str(path), 'wb') as output:
-            output.setnchannels(int(values.shape[1]))
+            output.setnchannels(int(samples.shape[1]))
             output.setsampwidth(2)
             output.setframerate(int(sample_rate))
-            output.writeframes(pcm.tobytes(order='C'))
+            output.writeframes(AudioService._encode_wave_samples(samples))
         if not path.is_file() or path.stat().st_size <= 44:
             raise OSError('decoder produced an empty WAV')
+
+    @staticmethod
+    def _encode_wave_samples(samples: np.ndarray) -> bytes:
+        values = AudioService._sanitise_samples(samples)
+        pcm = np.rint(np.clip(values, -1.0, 1.0) * 32767.0).astype('<i2', copy=False)
+        return pcm.tobytes(order='C')
 
     @staticmethod
     def _touch(path: Path) -> None:

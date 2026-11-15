@@ -587,6 +587,8 @@ def _renderer_smoke_expression(
     throw new Error('Space must play once without activating a focused control');
   }}
   if (space(focusedTab) || workspace.playback.active) throw new Error('Space did not pause playback');
+  const folderFilter = {folder_path};
+  await workspace.setFilter({{ folder: folderFilter }});
   const wwiseTab = document.querySelector('[data-ws="wwise"]');
   wwiseTab.click();
   await until(() => wwiseTab.getAttribute('aria-selected') === 'true', 'middleware workspace');
@@ -606,6 +608,14 @@ def _renderer_smoke_expression(
     }}
   }}
   const dock = document.getElementById('miniRows');
+  await until(() => dock.querySelectorAll('.mini-row').length === 1 &&
+    dock.querySelector('.mini-row').title.endsWith(expectedNames[1]), 'docked library inherits main folder');
+  const dockFolder = document.getElementById('miniFolder');
+  await until(() => dockFolder.value === folderFilter, 'shared folder selector');
+  dockFolder.value = '';
+  dockFolder.dispatchEvent(new Event('change', {{ bubbles: true }}));
+  await until(() => dock.querySelectorAll('.mini-row').length === records.length && !workspace.state.filter.folder,
+    'dock folder selection updates the shared filter');
   await until(() => thumbnailReady(dock.querySelector('canvas')), 'docked waveform previews');
   if (!document.getElementById('tabAi').classList.contains('hidden') ||
       document.getElementById('tabVst').classList.contains('hidden')) {{

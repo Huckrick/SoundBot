@@ -175,7 +175,8 @@ class AudioServiceTests(unittest.TestCase):
         if audio_service_module._av is None:
             self.skipTest("PyAV is not installed")
         first_cached = service.prepare_playback_wav(self.source)
-        second_cached = service.prepare_playback_wav(second_source)
+        with mock.patch.object(service, 'decode', side_effect=AssertionError('cache must transcode in blocks')):
+            second_cached = service.prepare_playback_wav(second_source)
 
         self.assertFalse(first_cached.exists())
         self.assertTrue(second_cached.exists())

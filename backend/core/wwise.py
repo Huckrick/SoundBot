@@ -17,6 +17,8 @@ from uuid import uuid4
 from websockets.asyncio.client import connect as open_websocket
 
 from core import delivery
+from core.catalog import is_indexed_path
+from core.database import get_db_manager
 from core.editing import write_wave
 
 
@@ -253,6 +255,11 @@ async def _binding(client, source_id, *, writing=False):
     return project, source, target
 
 
+def _referenced_by_library(path):
+    with get_db_manager().get_cursor() as cur:
+        return is_indexed_path(cur, path)
+
+
 async def select(source_id):
     global _selected
     async with _lock:
@@ -264,11 +271,13 @@ async def select(source_id):
             raise ValueError("Wwise 工程已切换，请刷新工程")
         rate, channels, bits, duration = await asyncio.to_thread(_inspect, target)
         digest = await asyncio.to_thread(delivery.sha256, target)
+        library_reference = await asyncio.to_thread(_referenced_by_library, target)
         token = uuid4().hex
         _selected = token, Selection(project["path"], project["id"], source_id, _parent(source), target,
                                      digest, rate, channels, bits, duration)
         return {"token": token, "name": source["name"], "duration": duration,
-                "sample_rate": rate, "channels": channels, "bits": bits, "project": project}
+                "sample_rate": rate, "channels": channels, "bits": bits, "project": project,
+                "library_reference": library_reference}
 
 
 def selection(token):

@@ -22,6 +22,8 @@
 // particular, requiring local JSON/CommonJS files here prevents the entire
 // contextBridge from being installed in packaged builds.
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
+let nativeAudioDrag;
+window.addEventListener('pointerdown', () => { nativeAudioDrag = null; }, { capture: true });
 
 const BACKEND_ERROR_SENTINEL = '__soundbotBackendError';
 
@@ -76,18 +78,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
     selectFolder: (options = {}) => ipcRenderer.invoke('file-import', 'select-folder', options),
     onLibraryDrop: (callback) => {
       window.addEventListener('drop', async (event) => {
-        if (!event.isTrusted || !event.target?.closest?.('#libraryView') || !event.dataTransfer?.files.length) return;
+        if (!event.isTrusted || !event.dataTransfer?.files.length) return;
+        const deliveryId = nativeAudioDrag;
+        nativeAudioDrag = null;
+        if (!event.target?.closest?.('#libraryView')) {
+          if (deliveryId) event.preventDefault();
+          return;
+        }
         event.preventDefault();
         const paths = Array.from(event.dataTransfer.files, file => webUtils.getPathForFile(file)).filter(Boolean);
         if (!paths.length) return;
         let result;
         try {
-          result = await ipcRenderer.invoke('file-import', 'handle-drop', paths);
+          result = await ipcRenderer.invoke('file-import', 'handle-drop', { paths, deliveryId });
         } catch (error) {
           result = { success: false, error: error.message };
         }
         callback(result);
-      });
+      }, { capture: true });
     },
     // 获取文件信息
     getFileInfo: (filePath) => ipcRenderer.invoke('file-import', 'get-info', filePath),
@@ -106,9 +114,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   respondToConfirmation: (id, accepted) => ipcRenderer.send('app-confirmation-result', id, accepted),
 
   // 原生拖拽导出（用于拖拽文件到 DAW）
-  startDrag: (deliveryId) => ipcRenderer.send('start-drag', deliveryId),
+  startDrag: (deliveryId) => {
+    nativeAudioDrag = deliveryId;
+    ipcRenderer.send('start-drag', deliveryId);
+  },
   chooseDawDirectory: () => ipcRenderer.invoke('choose-daw-directory'),
-  onDeliveryError: (callback) => ipcRenderer.on('delivery-error', (_event, message) => callback(message)),
+  onDeliveryError: (callback) => ipcRenderer.on('delivery-error', (_event, message) => {
+    nativeAudioDrag = null;
+    callback(message);
+  }),
   editingDirty: (dirty) => ipcRenderer.send('editing-dirty', dirty),
   setLanguage: (language) => ipcRenderer.send('interface-language', language),
   revealFile: (file) => ipcRenderer.invoke('reveal-file', file),

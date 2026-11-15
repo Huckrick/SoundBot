@@ -11,6 +11,7 @@ import sqlite3
 import struct
 import sys
 import tempfile
+import time
 import unittest
 import wave
 from concurrent.futures import ThreadPoolExecutor
@@ -25,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 
 import main
 from core import catalog, delivery, editing, vst, wwise
-from core.database import DatabaseManager, get_db_manager, reset_db_manager
+from core.database import SCHEMA_VERSION, DatabaseManager, get_db_manager, reset_db_manager
 from core.effects import EQBand, Effect
 from core.media_api import ClipRequest
 
@@ -100,6 +101,30 @@ class CoreDeliveryTests(unittest.TestCase):
         response = self.client.get("/api/v1/projects/default/catalog", params=params)
         self.assertEqual(response.status_code, 200, response.text)
         return response.json()
+
+    def test_thumbnail_and_editor_share_decode_but_keep_their_payloads(self):
+        from core.audio_service import get_audio_service
+
+        source = audio_file(self.root / "shared-preview.wav")
+        self.import_folder(self.root)
+        service = get_audio_service()
+        real_waveform = service.waveform
+
+        def decode(path):
+            time.sleep(0.05)
+            return real_waveform(path)
+
+        async def load_both():
+            return await asyncio.gather(
+                main._waveform_payload(str(source), "default", background=True),
+                main._waveform_payload(str(source), "default"),
+            )
+
+        with patch.object(service, "waveform", side_effect=decode) as waveform:
+            thumbnail, editor = asyncio.run(load_both())
+        self.assertEqual(waveform.call_count, 1)
+        thumbnail["peaks"] = thumbnail["peaks"][::8]
+        self.assertEqual(len(editor["peaks"]), 2000)
 
     def test_remove_last_library_keeps_sources_and_stays_empty_after_reopen(self):
         source = audio_file(self.root / "source.wav")
@@ -386,6 +411,86 @@ class CoreDeliveryTests(unittest.TestCase):
             self.assertEqual(self.client.get(memberships).json(), [{"id": group, "name": "Foley", "member": expected}])
             self.assertEqual(self.items(group=group)["total"], expected)
 
+    def test_filename_categories_keep_tags_and_follow_source_renames(self):
+        names = ("BootFootstep02.wav", "现场脚步_01.wav", "floodwater.wav", "Door_Impact.wav")
+        paths = [audio_file(self.root / name) for name in names]
+        self.client.post("/api/v1/projects/default/imports",
+                         json={"file_paths": list(map(str, paths))}).raise_for_status()
+
+        def categories():
+            response = self.client.get("/api/v1/projects/default/catalog/facets")
+            response.raise_for_status()
+            return {row["name"]: row["count"] for row in response.json()["filename_categories"]}
+
+        self.assertEqual(categories(), {"footsteps": 2})
+        self.assertEqual(self.items(filename_category="footsteps", folder=str(self.root))["total"], 2)
+        asset, = self.items(q="Boot", filename_category="footsteps")["files"]
+        self.client.post("/api/v1/projects/default/catalog/update", json={
+            "ids": [asset["id"]], "action": "tags", "value": ["Foley"],
+        }).raise_for_status()
+        self.assertEqual(self.items(tag="Foley", filename_category="footsteps")["total"], 1)
+
+        destination = self.root / "Car_Start.wav"
+        paths[0].rename(destination)
+        self.client.post("/api/v1/projects/default/catalog/relocate", json={
+            "file_id": asset["id"], "destination": str(destination),
+        }).raise_for_status()
+        self.assertEqual(categories(), {"footsteps": 1, "vehicles": 1})
+        moved, = self.items(tag="Foley", filename_category="vehicles")["files"]
+        self.assertEqual(moved["id"], asset["id"])
+
+    def test_filename_categories_index_existing_library_during_migration(self):
+        path = self.root / "prior-version.db"
+        with (
+            patch("core.database.SCHEMA_VERSION", 5),
+            patch.object(catalog, "migrate_filename_categories"),
+            patch.object(catalog, "migrate_tag_folders"),
+        ):
+            previous = DatabaseManager(str(path))
+            with previous.get_cursor() as cur:
+                cur.execute("""INSERT INTO files(file_uuid,project_id,path,canonical_path,filename,tags)
+                    VALUES ('previous','default','Rain.wav','Rain.wav','Rain.wav','["Storm"]')""")
+
+        migrated = DatabaseManager(str(path))
+        found, = catalog.list_items(migrated, "default", filename_category="weather", tag="Storm")["files"]
+        self.assertEqual(found["id"], "previous")
+        self.assertTrue(Path(f"{path}.pre-v5-to-v{SCHEMA_VERSION}.bak").is_file())
+
+    def test_tag_folders_scope_membership_and_delete_without_changing_tags(self):
+        source = audio_file(self.root / "Door_Open.wav")
+        self.client.post("/api/v1/projects/default/imports",
+                         json={"file_paths": [str(source)]}).raise_for_status()
+        asset, = self.items()["files"]
+        root = "/api/v1/projects/default/catalog"
+        self.client.post(root + "/update", json={
+            "ids": [asset["id"]], "action": "tags", "value": ["Foley"],
+        }).raise_for_status()
+        first = self.client.post(root + "/tag-folders", json={"name": " SFX "}).raise_for_status().json()
+        second = self.client.post(root + "/tag-folders", json={"name": "Outdoor"}).raise_for_status().json()
+        self.assertEqual(first["name"], "SFX")
+        self.assertEqual(self.client.post(root + "/tag-folders", json={"name": "sfx"}).status_code, 409)
+        other = self.client.post("/api/v1/projects", json={"name": "Other"}).json()["project_id"]
+        other_root = f"/api/v1/projects/{other}/catalog"
+        other_folder = self.client.post(other_root + "/tag-folders", json={"name": "SFX"}).raise_for_status().json()
+
+        def assign(folder_id):
+            return self.client.put(root + "/tag-folder-assignment", json={"tag": "Foley", "folder_id": folder_id})
+
+        def folder_for_tag():
+            tag, = self.client.get(root + "/facets").raise_for_status().json()["tags"]
+            self.assertEqual((tag["name"], tag["count"]), ("Foley", 1))
+            return tag["folder_id"]
+
+        self.assertEqual(assign(other_folder["id"]).status_code, 404)
+        self.assertEqual(self.client.delete(f"{other_root}/tag-folders/{first['id']}").status_code, 404)
+        for folder_id in (first["id"], second["id"], None, first["id"]):
+            assign(folder_id).raise_for_status()
+            self.assertEqual(folder_for_tag(), folder_id)
+        self.client.delete(f"{root}/tag-folders/{first['id']}").raise_for_status()
+        self.assertIsNone(folder_for_tag())
+        self.assertEqual(self.items(q="Foley", tag="Foley")["files"][0]["id"], asset["id"])
+        self.assertTrue(source.is_file())
+
     def test_missing_file_and_relocation_preserve_identity(self):
         folder = self.root / "input"
         folder.mkdir()
@@ -600,6 +705,14 @@ class CoreDeliveryTests(unittest.TestCase):
             self.assertEqual((output.getsampwidth(), output.getnframes()), (3, 24000))
         self.assertEqual(list(media.resolve().iterdir()), [path])
         self.assertEqual(delivery.sha256(source), original)
+        self.client.post("/api/v1/projects/default/imports", json={"file_paths": [str(path)]}).raise_for_status()
+        third = self.client.post("/api/v1/delivery", headers=self.headers, json=request).raise_for_status().json()
+        self.assertNotEqual(third["path"], str(path))
+        self.assertEqual(delivery.sha256(third["path"]), delivery.sha256(path))
+        outdated = self.client.post("/api/v1/delivery", headers=self.headers,
+                                    json={**request, "source_fingerprint": "outdated"})
+        self.assertEqual(outdated.status_code, 422)
+        self.assertEqual(len(list(media.iterdir())), 2)
 
     def test_middleware_folder_workflow_renders_without_mutating_source_or_project(self):
         clip = audio_file(self.root / "Library effect.wav", 540)

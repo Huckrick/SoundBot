@@ -32,6 +32,7 @@ def fixture_probe(candidate):
 
 def ingest_fixture(db, count, timings):
     job = catalog.create_import(db, "default")
+    db.update_job(job, state="running", stage="importing")
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool, patch.object(catalog, "_probe", fixture_probe):
         for first in range(0, count, catalog.BATCH_SIZE):
             items = []
@@ -39,8 +40,9 @@ def ingest_fixture(db, count, timings):
                 path = f"/benchmark/volumes/{index // 1000}/tone_{index:07d}.wav"
                 items.append(catalog.Candidate(path, path, 96044, index + 1))
             catalog._commit_batch(db, job, "default", None, items, pool, False, timings=timings)
-            if first == 0:
+            if first == 0 and catalog.list_items(db, "default", limit=1)["files"]:
                 first_visible = time.monotonic()
+    db.update_job(job, state="completed", stage="done")
     return job, first_visible
 
 
@@ -93,6 +95,8 @@ def main():
         )
         elapsed = time.monotonic() - start
         job = catalog.import_status(db, job_id)
+        if args.rows and job["imported"] != args.rows:
+            raise RuntimeError(f"Fixture expected {args.rows} rows, imported {job['imported']}")
         if args.source and job["state"] != "completed":
             raise RuntimeError(job["error_message"] or "Import benchmark failed")
         queries = args.query or (["tone_000", "door", "DOORWood"] if args.rows else ["door", "impact", "ambience"])

@@ -5,7 +5,7 @@
  * 前后端一体化打包，无需单独安装 Python 环境
  */
 
-const { app, BrowserWindow, Menu, ipcMain, dialog, protocol, shell, safeStorage, session } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, protocol, shell, safeStorage, session, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -80,6 +80,7 @@ const middlewareProjects = Object.freeze({
   cri: { extension: 'atmcproject', name: 'CRI Atom Craft', folder: 'Materials' }
 });
 const dragDeliveries = new Map();
+let dragIcon;
 let backendProcess = null;
 let backendStartupPromise = null;
 let ipcHandlersInitialized = false;
@@ -1525,13 +1526,19 @@ function setupIpcHandlers() {
             folder
           };
         }
-        case 'handle-drop':
+        case 'handle-drop': {
+          const returning = dragDeliveries.get(payload?.deliveryId)?.path;
+          const samePath = file => returning && (process.platform === 'win32'
+            ? path.normalize(file).toLowerCase() === path.normalize(returning).toLowerCase()
+            : path.normalize(file) === path.normalize(returning));
+          const paths = Array.isArray(payload?.paths) ? payload.paths : [];
           return {
             success: true,
-            files: (payload || [])
-              .filter((filePath) => typeof filePath === 'string' && fs.existsSync(filePath))
+            files: paths
+              .filter(file => typeof file === 'string' && !samePath(file) && fs.existsSync(file))
               .map(toImportFileInfo)
           };
+        }
         case 'get-info': {
           if (!payload || !fs.existsSync(payload)) {
             return { success: false, error: '文件不存在' };
@@ -1711,7 +1718,16 @@ function setupIpcHandlers() {
       if (!stat?.isFile() || stat.size !== delivery.size || stat.mtimeMs !== delivery.modified) {
         throw new Error('成品已移动或改变，请重新准备拖出');
       }
-      event.sender.startDrag({ file, icon: path.join(__dirname, 'assets', 'audio-icon.png') });
+      if (!dragIcon) {
+        const capsule = nativeImage.createFromPath(path.join(__dirname, 'assets', 'audio-icon.png'));
+        const image = nativeImage.createEmpty();
+        for (const scaleFactor of [1, 2, 3]) {
+          const width = 20 * scaleFactor;
+          image.addRepresentation({ scaleFactor, buffer: capsule.resize({ width, quality: 'best' }).toPNG() });
+        }
+        dragIcon = image;
+      }
+      event.sender.startDrag({ file, icon: dragIcon });
     } catch (error) {
       event.sender.send('delivery-error', error.message);
     }

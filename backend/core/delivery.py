@@ -16,6 +16,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import config
+from core.catalog import is_indexed_path
 from core.database import get_db_manager
 from core.editing import write_wave
 
@@ -97,8 +98,8 @@ def _install_new(stage, target):
         os.link(stage, target)
 
 
-def publish_daw(directory, name, tracks, rate, channels, duration, bits):
-    return publish_wave(directory, name, tracks, rate, channels, duration, bits)
+def publish_daw(directory, name, tracks, rate, channels, duration, bits, *, validate=None):
+    return publish_wave(directory, name, tracks, rate, channels, duration, bits, validate=validate)
 
 
 def publish_wave(directory, name, tracks, rate, channels, duration, bits, *, kind="clip", validate=None):
@@ -119,14 +120,16 @@ def publish_wave(directory, name, tracks, rate, channels, duration, bits, *, kin
                                    (str(directory), digest)).fetchone()
             if previous:
                 path = Path(previous["path"])
-                if path.parent == directory and path.is_file() and not path.is_symlink() and sha256(path) == digest:
+                if (path.parent == directory and path.is_file() and not path.is_symlink()
+                        and (kind != "clip" or not is_indexed_path(cur, path)) and sha256(path) == digest):
                     return path
             for suffix in (digest[:12], digest[:24], uuid4().hex):
                 target = directory / f"{stem}_{kind}_{suffix}.wav"
                 try:
                     _install_new(stage, target)
                 except FileExistsError:
-                    if not target.is_file() or target.is_symlink() or sha256(target) != digest:
+                    if (not target.is_file() or target.is_symlink()
+                            or (kind == "clip" and is_indexed_path(cur, target)) or sha256(target) != digest):
                         continue
                 _sync_directory(directory)
                 cur.execute("""INSERT INTO daw_deliveries(directory,digest,path) VALUES(?,?,?)

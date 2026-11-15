@@ -50,7 +50,7 @@ from datetime import datetime
 
 logger = None  # 延迟初始化
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 7
 ARTIFACT_KINDS = ("waveform", "audio_vector", "text_vector")
 ARTIFACT_STATES = ("pending", "processing", "ready", "failed", "stale")
 SAFE_PROJECT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
@@ -486,9 +486,11 @@ class DatabaseManager:
                 # 全新数据库，直接创建所有表
                 cursor.execute("BEGIN IMMEDIATE")
                 _execute_sql_statements(cursor, CREATE_TABLE_SQL)
-                from core.catalog import migrate, migrate_source_ownership
+                from core.catalog import migrate, migrate_filename_categories, migrate_source_ownership, migrate_tag_folders
                 migrate(cursor)
                 migrate_source_ownership(cursor)
+                migrate_filename_categories(cursor)
+                migrate_tag_folders(cursor)
                 integrity = cursor.execute("PRAGMA quick_check").fetchone()
                 if not integrity or integrity[0] != "ok":
                     raise sqlite3.DatabaseError(
@@ -536,6 +538,16 @@ class DatabaseManager:
                         if not cursor.connection.in_transaction:
                             cursor.execute("BEGIN IMMEDIATE")
                         migrate_source_ownership(cursor)
+                    if current_version < 6:
+                        from core.catalog import migrate_filename_categories
+                        if not cursor.connection.in_transaction:
+                            cursor.execute("BEGIN IMMEDIATE")
+                        migrate_filename_categories(cursor)
+                    if current_version < 7:
+                        from core.catalog import migrate_tag_folders
+                        if not cursor.connection.in_transaction:
+                            cursor.execute("BEGIN IMMEDIATE")
+                        migrate_tag_folders(cursor)
                     schema_version_pending = True
 
             # A process can stop between claiming an artifact/job and recording
