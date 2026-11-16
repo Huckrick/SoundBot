@@ -24,6 +24,8 @@ if __name__ == "__main__":
         from core.vst import worker_entry
 
         raise SystemExit(worker_entry(sys.argv[2:]))
+    if sys.executable.rsplit("/", 1)[-1] == "soundbot-vst-worker":
+        raise SystemExit(2)
 
 import os
 import re

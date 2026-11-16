@@ -16,32 +16,50 @@
     let muted = false;
     let nodes = new Set();
 
-    function renderedPeaks(nominalEnd) {
-        // Fixed time buckets keep samples aligned while bounding long previews.
-        const step = Math.max(0.01, (nominalEnd + 30) / 12000);
-        const peaks = new Float32Array(12002).fill(-1);
+    function renderedPeaks(nominalEnd, nominalStart = 0) {
+        // Reserve the tail separately. A short clip needs the same detail as
+        // its source waveform even if an effect can add 30 seconds of silence.
+        const sourceBins = 12000;
+        const tailStep = 0.001;
+        const step = Math.max(1 / 192000, (nominalEnd - nominalStart) / sourceBins);
+        const peaks = new Float32Array(sourceBins + 30002).fill(-1);
+        const indexAt = time => time >= nominalEnd
+            ? sourceBins + Math.floor((time - nominalEnd) / tailStep + 1e-7)
+            : Math.max(0, Math.min(sourceBins - 1, Math.floor((time - nominalStart) / step + 1e-7)));
+        const bucketEnd = index => index < sourceBins
+            ? Math.min(nominalEnd, nominalStart + (index + 1) * step)
+            : nominalEnd + (index - sourceBins + 1) * tailStep;
         let duration = 0;
+        let revision = 0;
         return {
             get duration() { return duration; },
+            get revision() { return revision; },
+            truncate(time) {
+                peaks.fill(-1, Math.min(peaks.length, indexAt(time)));
+                duration = Math.min(duration, time);
+                revision++;
+            },
             append(buffer, offset) {
-                const bins = Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer.getChannelData(index));
-                let bin = Math.floor(offset / step + 1e-7);
-                let end = Math.ceil(((bin + 1) * step - offset) * buffer.sampleRate);
-                let peak = Math.max(0, peaks[bin]);
-                for (let i = 0; i < buffer.length; i++) {
-                    if (i >= end) {
-                        peaks[bin++] = peak;
-                        end = Math.ceil(((bin + 1) * step - offset) * buffer.sampleRate);
-                        peak = Math.max(0, peaks[bin]);
+                const channels = Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer.getChannelData(index));
+                for (let frame = 0; frame < buffer.length;) {
+                    const index = indexAt(offset + frame / buffer.sampleRate);
+                    if (index >= peaks.length) break;
+                    const boundary = Math.ceil((bucketEnd(index) - offset) * buffer.sampleRate - 1e-7);
+                    const end = Math.min(buffer.length, Math.max(frame + 1, boundary));
+                    let peak = Math.max(0, peaks[index]);
+                    for (const channel of channels) {
+                        for (let i = frame; i < end; i++) peak = Math.max(peak, Math.abs(channel[i]));
                     }
-                    for (const channel of bins) peak = Math.max(peak, Math.abs(channel[i]));
+                    peaks[index] = peak;
+                    frame = end;
                 }
-                peaks[bin] = peak;
                 duration = offset + buffer.duration;
+                revision++;
             },
             peakBetween(start, end) {
-                const first = Math.floor(start / step + 1e-7);
-                const last = Math.max(first, Math.ceil(end / step - 1e-7) - 1);
+                if (end <= nominalStart || start >= duration) return -1;
+                const first = indexAt(start);
+                const last = indexAt(Math.max(start, Math.min(duration, end) - 1e-9));
                 let peak = -1;
                 for (let i = first; i <= Math.min(last, peaks.length - 1); i++) peak = Math.max(peak, peaks[i]);
                 return peak;

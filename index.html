@@ -503,8 +503,16 @@ select,#textValue,#llmKey{font:inherit;background:var(--bg2);color:var(--tx1);bo
 .clip-menu-label{color:var(--tx3);font-size:10px;padding:7px 9px 3px;border-top:1px solid var(--line);margin-top:4px}
 .clip-menu-danger:enabled{color:var(--err,#df7674)}
 #clipMenu .eq-menu-item:disabled{opacity:.4}
-#pluginFilter{width:100%;margin:10px 0;padding:6px 8px;border:1px solid var(--line2);border-radius:5px;background:var(--bg2);color:var(--tx1);font:inherit}
+.plugin-tools{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin:12px 0}
+.plugin-tools input,.plugin-tools select{min-width:0;padding:6px 8px;border:1px solid var(--line2);border-radius:6px;background:var(--bg2);color:var(--tx1);font:inherit}
 #pluginChoices{max-height:48vh;overflow:auto}
+.plugin-group{min-width:0;margin-bottom:4px}
+.plugin-group h4,.plugin-group summary{color:var(--tx2);font-size:11px;font-weight:600;margin:6px 0;padding:4px 2px}
+.plugin-group summary{cursor:pointer}
+.plugin-catalog-meta{color:var(--tx3);font-size:11px}
+.plugin-choice{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-width:0;margin-bottom:4px;padding:7px 8px;text-align:left}
+.plugin-catalog-name{min-width:0;overflow-wrap:anywhere}
+.plugin-catalog-name span{display:block}
 .track-lane{background-image:linear-gradient(to right,var(--line) 1px,transparent 1px)}
 .host-select{width:100%;min-width:0;margin-bottom:8px;padding:5px 7px;border:1px solid var(--line2);border-radius:6px;background:var(--bg2);color:var(--tx1);font-size:11.5px}
 .daw-log #middlewareLogText{min-width:0;flex:1;white-space:normal;overflow-wrap:anywhere;color:var(--tx2)}
@@ -935,7 +943,7 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
           </details>
         </div>
         <div class="insp-sec">
-          <div class="fx-header"><span class="sec-label" id="fxChainLabel">效果器</span><div class="fx-toolbar"><button class="ghost-btn" id="btnResetEffects">复位全部</button><button class="ghost-btn" id="btnAddEffect">添加 VST3</button></div></div>
+          <div class="fx-header"><span class="sec-label" id="fxChainLabel">效果器</span><div class="fx-toolbar"><button class="ghost-btn" id="btnResetEffects">复位全部</button><button class="ghost-btn" id="btnAddEffect">添加插件</button></div></div>
           <div class="rack" id="rack"></div>
         </div>
       </div>
@@ -1074,7 +1082,7 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
         <button type="button" data-settings="library" aria-pressed="false">音效库管理</button>
         <button type="button" class="" data-settings="daw" aria-pressed="false">DAW</button>
         <button type="button" class="" data-settings="wwise" aria-pressed="false">中间件</button>
-        <button type="button" class="" data-settings="vst" aria-pressed="false">VST3</button>
+        <button type="button" class="" data-settings="vst" aria-pressed="false">第三方效果器</button>
         <button type="button" class="" data-settings="ai" aria-pressed="false">AI 助手</button>
         <button type="button" class="" data-settings="about" aria-pressed="false">诊断与关于</button>
       </nav>
@@ -1136,9 +1144,9 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
         </section>
         <section class="settings-page hidden" id="settings-vst">
           <fieldset class="settings-group">
-            <legend>VST3</legend>
+            <legend>第三方效果器</legend>
             <div class="set-row">
-              <button class="ghost-btn" id="btnScanPlugins">重新扫描 VST3</button>
+              <button class="ghost-btn" id="btnScanPlugins">重新扫描插件</button>
             </div>
             <div class="plugin-list" id="settingsPlugins"></div>
           </fieldset>
@@ -1223,8 +1231,14 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
 </dialog>
 <dialog id="pluginDialog" class="modal">
   <button class="modal-close" id="btnClosePlugins" aria-label="关闭">✕</button>
-  <h3>添加 VST3 效果器</h3>
-  <input id="pluginFilter" type="search" aria-label="筛选插件" placeholder="筛选插件">
+  <h3>添加第三方效果器</h3>
+  <div class="plugin-tools">
+    <input id="pluginFilter" type="search" aria-label="筛选插件" placeholder="筛选插件">
+    <select id="pluginGrouping" aria-label="插件分组">
+      <option value="type">按效果类型</option>
+      <option value="vendor">按厂商</option>
+    </select>
+  </div>
   <div class="plugin-list" id="pluginChoices" aria-live="polite"></div>
 </dialog>
 

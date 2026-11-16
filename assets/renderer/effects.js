@@ -183,7 +183,7 @@
     async function openPlugin(effect, context, payload, candidate = false) {
         if (openingPlugin) return;
         const notice = el('dialog', null, 'plugin-loading');
-        const label = el('div', t('正在加载 VST3：{name}', { name: effect.name }));
+        const label = el('div', t('正在加载插件：{name}', { name: effect.name }));
         notice.setAttribute('aria-label', label.textContent);
         notice.append(label, el('progress'));
         document.body.append(notice);
@@ -219,6 +219,7 @@
                 if (!ready && status?.ready) {
                     add(status.plugin);
                     clear();
+                    if (!candidate && effect.on && context.chain.includes(effect)) context.changed();
                     if (current?.chain === context.chain) render();
                     return;
                 }
@@ -231,6 +232,7 @@
             ready = true;
             clear();
             editingPlugins.delete(effect);
+            if (candidate) pluginCatalog = undefined;
             if (current?.chain === context.chain) render();
         }
     }
@@ -454,6 +456,13 @@
     }
 
     let pluginCatalog;
+    let pluginGrouping = 'type';
+    const effectTypes = {
+        analyzer: '分析', delay: '延迟', distortion: '失真', dynamics: '动态', eq: '均衡',
+        filter: '滤波', modulation: '调制', pitch: '移调', restoration: '音频修复',
+        reverb: '混响', spatial: '空间处理', utility: '音频工具', mastering: '母带处理'
+    };
+    const nonEffectTypes = { instrument: '乐器', sampler: '采样器', synth: '合成器', generator: '信号发生器' };
 
     function discover(refresh = false) {
         if (refresh || !pluginCatalog) {
@@ -467,17 +476,70 @@
     }
 
     function emptyCatalog(available) {
-        return el('p', t(available ? '标准安装目录中未找到 VST3 插件。' : 'VST3 宿主组件不可用。'));
+        return el('p', t(available ? '标准安装目录中未找到可添加的效果器。' : 'VST3 宿主组件不可用。'));
+    }
+
+    function renderPluginList(root, { available, plugins, excluded = [] }, query = '', choose) {
+        const needle = query.trim().toLocaleLowerCase();
+        const typeNames = plugin => plugin.types?.map(type => t(effectTypes[type])).filter(Boolean) || [];
+        const matches = plugins.filter(plugin => [plugin.name, plugin.vendor, ...typeNames(plugin)]
+            .some(text => text?.toLocaleLowerCase().includes(needle)));
+        const groups = new Map();
+        const pending = [];
+        const row = plugin => {
+            const node = choose ? button(null, () => choose(plugin), 'ghost-btn plugin-choice')
+                : el('div', null, 'plugin-choice');
+            const name = el('span', null, 'plugin-catalog-name');
+            const description = [plugin.vendor, ...typeNames(plugin)].filter(Boolean).join(' · ');
+            name.append(el('span', plugin.name));
+            if (description) name.append(el('span', description, 'plugin-catalog-meta'));
+            node.append(name);
+            return node;
+        };
+        for (const plugin of matches) {
+            if (plugin.kind === 'unknown') {
+                pending.push(plugin);
+                continue;
+            }
+            const title = pluginGrouping === 'vendor' ? plugin.vendor || t('未知厂商')
+                : typeNames(plugin)[0] || t('其他效果器');
+            if (!groups.has(title)) groups.set(title, []);
+            groups.get(title).push(plugin);
+        }
+        const collator = new Intl.Collator(window.SoundBotI18n.language, { numeric: true });
+        const groupNodes = [...groups].sort(([a], [b]) => collator.compare(a, b)).map(([title, entries]) => {
+            const section = el('section', null, 'plugin-group');
+            section.append(el('h4', title), ...entries.map(row));
+            return section;
+        });
+        if (pending.length) {
+            const details = el('details', null, 'plugin-group plugin-pending');
+            details.open = Boolean(needle || root.querySelector('.plugin-pending')?.open);
+            details.append(el('summary', t('待识别插件（{count}）', { count: pending.length })),
+                el('p', t('这些插件未声明类型。选中后会核实是否为效果器。'), 'plugin-catalog-meta'),
+                ...pending.map(row));
+            groupNodes.push(details);
+        }
+        if (!matches.length) groupNodes.push(needle ? el('p', t('没有匹配的插件。')) : emptyCatalog(available));
+        if (!choose && excluded.length) {
+            const details = el('details', null, 'plugin-group');
+            details.append(el('summary', t('已跳过的乐器和发生器（{count}）', { count: excluded.length })));
+            for (const plugin of excluded) {
+                const types = [plugin.vendor, t(nonEffectTypes[plugin.kind])].filter(Boolean).join(' · ');
+                details.append(el('div', plugin.name, 'plugin-catalog-name'), el('div', types, 'plugin-catalog-meta'));
+            }
+            groupNodes.push(details);
+        }
+        root.replaceChildren(...groupNodes);
     }
 
     async function settings(refresh = false) {
         const results = $('settingsPlugins');
         const scan = $('btnScanPlugins');
         scan.disabled = true;
-        results.replaceChildren(el('p', t('正在扫描 VST3…')));
+        results.replaceChildren(el('p', t('正在扫描插件…')));
         try {
-            const { available, plugins } = await discover(refresh);
-            results.replaceChildren(...(plugins.length ? plugins.map(plugin => el('div', plugin.name)) : [emptyCatalog(available)]));
+            renderPluginList(results, await discover(refresh));
         } catch (error) {
             results.replaceChildren();
             throw error;
@@ -493,11 +555,14 @@
         const dialog = $('pluginDialog');
         const choices = $('pluginChoices');
         const query = $('pluginFilter');
+        const group = $('pluginGrouping');
         if (dialog.open) return;
         query.value = '';
-        query.disabled = true;
+        group.value = pluginGrouping;
+        query.disabled = group.disabled = true;
         query.oninput = null;
-        choices.replaceChildren(el('p', t('正在扫描 VST3…')));
+        group.onchange = null;
+        choices.replaceChildren(el('p', t('正在扫描插件…')));
         dialog.showModal();
         let catalog;
         try {
@@ -507,29 +572,17 @@
             throw error;
         }
         if (!dialog.open || current?.chain !== context.chain) return;
-        const { available, plugins } = catalog;
-        const show = () => {
-            const needle = query.value.trim().toLowerCase();
-            const matches = plugins.filter(plugin => plugin.name.toLowerCase().includes(needle));
-            choices.replaceChildren(...matches.map(plugin => button(plugin.name, () => attempt(async () => {
-                choices.inert = true;
-                query.disabled = true;
-                try {
-                    if (current?.chain !== context.chain) return;
-                    const effect = { kind: 'vst3', name: plugin.name, values: {}, on: true,
-                        instance: crypto.randomUUID().replaceAll('-', '') };
-                    dialog.close();
-                    await openPlugin(effect, context, { ...plugin, instance: effect.instance }, true);
-                } finally {
-                    choices.inert = false;
-                    query.disabled = false;
-                }
-            }), 'ghost-btn')));
-            if (!matches.length) choices.append(plugins.length
-                ? el('p', t('没有匹配的插件。')) : emptyCatalog(available));
+        const choose = plugin => {
+            if (current?.chain !== context.chain || !dialog.open) return;
+            const effect = { kind: 'vst3', name: plugin.name, values: {}, on: true,
+                instance: crypto.randomUUID().replaceAll('-', '') };
+            dialog.close();
+            return openPlugin(effect, context, { ...plugin, instance: effect.instance }, true);
         };
-        query.disabled = !plugins.length;
+        const show = () => renderPluginList(choices, catalog, query.value, choose);
+        query.disabled = group.disabled = !catalog.plugins.length;
         query.oninput = show;
+        group.onchange = () => { pluginGrouping = group.value; show(); };
         show();
     }
 

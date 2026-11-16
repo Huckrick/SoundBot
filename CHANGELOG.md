@@ -4,6 +4,23 @@ Release history for SoundBot. Download current Windows and macOS installers from
 
 ## [Unreleased] / 未发布
 
+## [1.0.14] - 2026-11-16
+
+### Added / 新增
+
+- Group third-party effects by developer or effect type. Skip declared instruments and generators, and keep plug-ins with missing type metadata under a collapsed section. / 第三方效果器可按厂商或效果类型分组。自动跳过声明为乐器或发生器的插件，缺少类型声明的插件集中在折叠区。
+
+### Fixed / 修复
+
+- Route audition through the VST3 instance that owns the open editor. Closing its window saves the effect state and lets the current audition finish on the same processor. / 试听直接经过打开小窗的 VST3 实例。关闭窗口时保存效果状态，正在播放的试听继续使用同一实例。
+- Skip unused VST3 parameter range probing during load. Preserve the source channel layout in library audition and keep short rendered transients distinct from effect tails. / 加载时跳过用不到的 VST3 参数范围探测。音效库试听保持原素材声道布局，效果波形保留短瞬态和独立的尾音细节。
+- On macOS, recreate the ValhallaFreqEcho VST3 processor after the host's reset probe and use a fixed 48 kHz processing rate. Audition and delivery retain their requested output rate. / macOS 上的 ValhallaFreqEcho VST3 在宿主重置探测后使用新实例，并固定在 48 kHz 处理。试听和交付仍按各自请求的采样率输出。
+- Fix macOS loading for VST3 plug-ins that require the legacy executable-memory exception, including Dehumaniser Simple Monsters. A separately signed VST3 worker holds that exception. / 修复 Dehumaniser Simple Monsters 等需要旧版可执行内存机制的 VST3 在 macOS 上加载失败的问题。该签名例外仅授予独立的 VST3 工作进程。
+
+### Host verification / 宿主验证
+
+- On Apple Silicon, the packaged app opened the Dehumaniser Simple Monsters 1.3.0 editor and auditioned mono and stereo audio. The ValhallaFreqEcho check covered 44.1 and 48 kHz audition, saving settings and exporting a 24-bit WAV with the effect tail. / 在 Apple Silicon 打包版实测 Dehumaniser Simple Monsters 1.3.0 小窗和单声道、立体声试听。ValhallaFreqEcho 实测覆盖 44.1 和 48 kHz 试听、参数保存及带效果尾音的 24-bit WAV 导出。
+
 ## [1.0.13] - 2026-11-16
 
 ### Changed / 变更
@@ -303,7 +320,8 @@ This historical prerelease is available as a source tag. The public release list
 - The Windows release gate starts the frozen backend with a clean `PATH` and no system FFmpeg, then requires the complete format matrix, exact waveforms, CLAP, Chroma, hybrid search, `win-unpacked`, and NSIS installer integrity checks to pass before publishing. / Windows 发布门禁会在干净 `PATH`、无系统 FFmpeg 下启动冻结后端，并要求全格式矩阵、精确波形、CLAP、Chroma、混合搜索、`win-unpacked` 与 NSIS 安装包完整性检查全部通过后才允许发布。
 - CI builds Windows x64 and macOS arm64 only on native runners and blocks release creation if any functional smoke test, model check, metadata check, package check, or installer check fails. / CI 仅在原生 runner 构建 Windows x64 与 macOS arm64，并在任一功能冒烟、模型、元数据、应用包或安装包检查失败时阻止创建 Release。
 
-[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.13...HEAD
+[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.14...HEAD
+[1.0.14]: https://github.com/Huckrick/SoundBot/compare/v1.0.13...v1.0.14
 [1.0.13]: https://github.com/Huckrick/SoundBot/compare/v1.0.12...v1.0.13
 [1.0.12]: https://github.com/Huckrick/SoundBot/compare/v1.0.11...v1.0.12
 [1.0.11]: https://github.com/Huckrick/SoundBot/compare/v1.0.10...v1.0.11

@@ -1655,7 +1655,7 @@ function setupIpcHandlers() {
         if (typeof data.id !== 'string' || !/^[a-f0-9]{64}$/.test(data.id)) throw new Error('未知媒体操作');
         const name = String(data.name || 'VST3').replace(/[\p{C}]/gu, '').slice(0, 200);
         const approved = await confirmInApp(mainWindow, 'plugin', {
-          message: t('加载 VST3 插件「{name}」？', { name }),
+          message: t('加载插件「{name}」？', { name }),
           detail: t('插件将在本机执行代码。请只加载你信任的来源提供的插件。'),
           cancel: t('取消'),
           confirm: t('加载插件')

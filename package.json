@@ -1,6 +1,6 @@
 {
   "name": "soundbot",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "SoundBot - local-first sound effects library and middleware workspace",
   "main": "main.js",
   "scripts": {
@@ -74,6 +74,7 @@
       "icon": "build/icon.icns",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
+      "sign": "./scripts/sign_macos.cjs",
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist"
     },

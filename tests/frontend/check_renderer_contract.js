@@ -69,6 +69,22 @@ async function main() {
     'library history and global active job polling are missing');
   assert(workspace.includes('state.cursor = result.next_cursor'), 'cursor continuation is missing');
   assert(workspace.includes('waveform.renderMain(canvas'), 'main waveform is not wired to the canvas');
+  const previewContext = { window: {}, Audio: class {}, document: { currentScript: { src: 'file:///playback.js' } } };
+  vm.runInNewContext(read('assets/renderer/playback.js'), previewContext);
+  const wetPeaks = previewContext.window.SoundBotPlayback.renderedPeaks(1.04, 1);
+  const samples = new Float32Array(2400);
+  samples[48] = 0.8;
+  samples[1992] = 0.4;
+  const buffer = {
+    numberOfChannels: 1, length: samples.length, sampleRate: 48000,
+    duration: 0.05, getChannelData: () => samples
+  };
+  wetPeaks.append(buffer, 1);
+  assert(wetPeaks.peakBetween(1.0009, 1.0011) > 0.79, 'wet waveform lost a short transient');
+  assert.strictEqual(wetPeaks.peakBetween(1.003, 1.004), 0, 'wet peak bled into quiet source samples');
+  assert(wetPeaks.peakBetween(1.041, 1.042) > 0.39, 'wet tail lost its alignment');
+  wetPeaks.truncate(1.04);
+  assert.strictEqual(wetPeaks.peakBetween(1.041, 1.042), -1, 'waveform retained stale tail data after seeking');
   assert(workspace.includes('visiblePreviews()') && workspace.includes('[...waves].slice(0, 2)'),
     'thumbnail generation is not bounded to visible assets');
   assert(timeline.includes('ui.openDockEditor(item)') && timeline.includes('ui.miniCanvas(item)'),

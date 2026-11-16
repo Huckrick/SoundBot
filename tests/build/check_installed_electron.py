@@ -16,6 +16,7 @@ import json
 import math
 import os
 from pathlib import Path
+import plistlib
 import shutil
 import socket
 import struct
@@ -856,10 +857,17 @@ def _exercise_vst(client: _DevToolsClient, root_pid: int, fixture: Path) -> dict
   const wet = await pcm([{ kind: 'vst3', plugin_id: job.id, plugin_instance: job.instance, values: job.values }]);
   if (!(wet > 0 && wet < dry * 0.85)) throw Error(`Expected processed gain, got dry=${dry} wet=${wet}`);
   if (window.vstSmoke.error || window.vstSmoke.result) throw Error('Editor closed while auditioning');
-  return { dry, wet };
+  await window.electronAPI.desktopMedia('close-plugin-editor', { instance: job.instance });
+  for (let i = 0; i < 100 && !window.vstSmoke.result && !window.vstSmoke.error; i++) {
+    await new Promise(r => setTimeout(r, 50));
+  }
+  const editor = window.vstSmoke.result;
+  if (!editor?.changed || !editor.state) throw Error(window.vstSmoke.error || 'Live gain did not reach the editor instance');
+  const saved = await pcm([{ kind: 'vst3', plugin_id: job.id, plugin_state: editor.state, values: {} }]);
+  if (Math.abs(saved - wet) > 1) throw Error(`Saved plug-in state diverged from audition: wet=${wet} saved=${saved}`);
+  return { dry, wet, saved };
 })()
 """)
-        assert any(window["handle"] == editor["handle"] for window in _enumerate_native_windows(root_pid))
         return result
     finally:
         client.evaluate(r"""
@@ -944,6 +952,32 @@ def _stop_process_tree(process: subprocess.Popen) -> None:
         process.kill()
 
 
+def _check_macos_vst_worker(executable: Path, backend: Path) -> None:
+    worker = backend.with_name("soundbot-vst-worker")
+    if not os.access(worker, os.X_OK):
+        raise FileNotFoundError("packaged VST3 worker is missing or not executable")
+
+    def entitlements(binary: Path) -> dict:
+        payload = subprocess.check_output(
+            ["/usr/bin/codesign", "--display", "--entitlements", "-", "--xml", str(binary)],
+            stderr=subprocess.DEVNULL,
+            timeout=10,
+        )
+        return plistlib.loads(payload)
+
+    memory_exception = "com.apple.security.cs.allow-unsigned-executable-memory"
+    for binary in (executable, backend, worker):
+        rights = entitlements(binary)
+        if bool(rights.get(memory_exception)) != (binary == worker):
+            raise ValueError(f"wrong executable-memory entitlement scope: {binary.name}")
+        if rights.get("com.apple.security.cs.disable-executable-page-protection"):
+            raise ValueError(f"executable page protection is disabled: {binary.name}")
+
+    standalone = subprocess.run([str(worker)], capture_output=True, timeout=10)
+    if standalone.returncode != 2:
+        raise ValueError(f"VST3 worker accepted an unscoped startup: {standalone.returncode}")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--executable", required=True, type=Path)
@@ -974,6 +1008,8 @@ def main() -> int:
     )
     if not backend_executable.is_file():
         raise FileNotFoundError(f"installed backend is missing: {backend_executable}")
+    if sys.platform == "darwin":
+        _check_macos_vst_worker(executable, backend_executable)
     if (resources / "models").exists():
         raise ValueError("core installer contains a model directory")
 

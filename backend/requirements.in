@@ -6,6 +6,7 @@ av==18.0.0
 fastapi==0.162.5
 httpx==0.28.1
 jieba==0.42.1
+json5==0.14.0
 mutagen==1.47.0
 numpy==2.4.3
 pedalboard==0.9.22

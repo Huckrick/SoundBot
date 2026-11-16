@@ -410,20 +410,90 @@ class CoreDeliveryTests(unittest.TestCase):
         binary.parent.mkdir(parents=True)
         binary.touch()
         (bundle / "Contents" / "MacOS").mkdir()
+        resources = bundle / "Contents" / "Resources"
+        resources.mkdir()
+        (resources / "moduleinfo.json").write_text("""{
+          "Factory Info": {"Vendor": "Fixture Audio",},
+          "Classes": [
+            // A single package can contain an insert and a virtual instrument.
+            {"Name": "Room", "Category": "Audio Module Class", "Sub Categories": ["Fx", "Reverb",],},
+            {"Name": "Tape", "Category": "Audio Module Class", "Sub Categories": "Fx|Distortion"},
+            {"Name": "RoomSynth", "Category": "Audio Module Class", "Sub Categories": ["Instrument", "Synth"]},
+            {"Name": "Controller", "Category": "Component Controller Class"},
+          ],
+        }""", encoding="utf-8")
+        sampler = base / "Kontakt 8.vst3"
+        sampler_binary = sampler / "Contents/x86_64-win/Kontakt 8.vst3"
+        sampler_binary.parent.mkdir(parents=True)
+        sampler_binary.touch()
+        (sampler / "Contents/MacOS").mkdir()
         candidate = "Not a plug-in.txt"
         (base / candidate).touch()
         with patch.object(vst, "_plugin_roots", return_value=(base, base)), \
+                patch.object(vst.plugin_catalog, "_audio_units", return_value=()), \
                 patch.object(vst, "available", return_value=True), patch.object(vst, "register") as register:
             catalog = self.client.get("/api/v1/effects/plugins").raise_for_status().json()
-            (plugin,) = catalog["plugins"]
+            plugin, tape = catalog["plugins"]
             self.assertEqual(plugin["name"], "Room")
+            self.assertEqual(plugin["kind"], "effect")
+            self.assertEqual(plugin["vendor"], "Fixture Audio")
+            self.assertEqual(plugin["types"], ["reverb"])
+            self.assertNotEqual(plugin["id"], tape["id"])
+            self.assertEqual({item["name"]: item["kind"] for item in catalog["excluded"]},
+                             {"Kontakt 8": "sampler", "RoomSynth": "synth"})
             url = f"/api/v1/effects/plugins/{plugin['id']}/load"
             self.assertEqual(self.client.post(url).status_code, 403)
             register.assert_not_called()
             register.return_value = {"id": "registered", "name": "Room", "parameters": []}
             self.assertEqual(self.client.post(url, headers=self.headers).raise_for_status().json()["id"], "registered")
-            register.assert_called_once_with(bundle.resolve())
+            register.assert_called_once()
+            self.assertEqual(register.call_args.args, (bundle.resolve(),))
+            self.assertEqual(register.call_args.kwargs["candidate"].class_name, "Room")
             self.assertEqual(self.client.post("/api/v1/effects/plugins/invalid/load", headers=self.headers).status_code, 422)
+            register.side_effect = vst._NonEffect("sampler")
+            failed = self.client.post(f"/api/v1/effects/plugins/{tape['id']}/load", headers=self.headers)
+            self.assertEqual(failed.status_code, 422)
+            updated = vst.discover()
+            self.assertEqual([item["name"] for item in updated["plugins"]], ["Room"])
+            self.assertIn({"name": "Tape", "vendor": "Fixture Audio", "kind": "sampler"}, updated["excluded"])
+
+    def test_mac_catalog_uses_audio_unit_metadata_without_loading_it(self):
+        import plistlib
+
+        root = self.root / "VST3"
+        vst3 = root / "Dub Delay.vst3"
+        component = self.root / "Dub Delay.component"
+        bundle_id = "com.Fixture.DubDelay"
+        (vst3 / "Contents/MacOS").mkdir(parents=True)
+        (vst3 / "Contents/x86_64-win").mkdir()
+        (vst3 / "Contents/x86_64-win/Dub Delay.vst3").touch()
+        (component / "Contents/MacOS").mkdir(parents=True)
+        (vst3 / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundleIdentifier": bundle_id}))
+        (component / "Contents/Info.plist").write_bytes(plistlib.dumps({
+            "CFBundleIdentifier": bundle_id,
+            "AudioComponents": [{"name": "Fixture Audio: Dub Delay", "type": "aufx", "tags": ["Delay"]}],
+        }))
+        with patch.object(vst.sys, "platform", "darwin"), \
+                patch.object(vst, "_plugin_roots", return_value=(root,)), \
+                patch.object(vst.plugin_catalog, "_audio_units", return_value=(component.resolve(),)), \
+                patch.object(vst, "_host") as host:
+            only, = vst.discover()["plugins"]
+            self.assertEqual((only["kind"], only["vendor"], only["types"]), ("effect", "Fixture Audio", ("delay",)))
+            self.assertEqual(vst._candidate(only["id"]).path, vst3.resolve())
+            host.assert_not_called()
+
+    def test_registration_keeps_legacy_effect_id_and_supports_multiple_classes(self):
+        bundle = self.root / "Effects.vst3"
+        legacy_id = "a" * 32
+        with vst.get_db_manager().get_cursor() as cursor:
+            vst.initialize(cursor)
+            cursor.execute("INSERT INTO vst_plugins VALUES(?,?,?,?)", (legacy_id, str(bundle), "Room", "[]"))
+        room = vst._save_plugin(bundle, {"name": "Room", "parameters": [], "types": ["reverb"]})
+        tape = vst._save_plugin(bundle, {"name": "Tape", "parameters": [], "types": ["distortion"]})
+        self.assertEqual(room["id"], legacy_id)
+        self.assertNotEqual(room["id"], tape["id"])
+        self.assertEqual(vst._registered_plugin(room["id"]), (str(bundle), "Room"))
+        self.assertEqual(vst._registered_plugin(tape["id"]), (str(bundle), "Tape"))
 
     def test_native_editor_state_is_bound_to_registered_plugin(self):
         from contextlib import contextmanager
@@ -478,6 +548,50 @@ class CoreDeliveryTests(unittest.TestCase):
         expected[:5] *= 2
         np.testing.assert_array_equal(np.concatenate(rendered), expected)
         self.assertEqual(warnings, [("plugin", "invalid plug-in samples")])
+
+    def test_vst_latency_compensation_preserves_tiny_stereo_block_boundaries(self):
+        source = np.arange(28, dtype=np.float32).reshape(14, 2)
+        latency = 5
+        pending = np.empty((0, 2), dtype=np.float32)
+
+        def render(block):
+            nonlocal pending
+            self.assertGreaterEqual(len(block), 3)
+            pending = np.concatenate((pending, block))
+            count = max(0, len(pending) - latency)
+            output, pending = pending[:count], pending[count:]
+            return output
+
+        blocks = (source[:1], source[1:3], source[3:13], source[13:])
+        result = np.concatenate(list(vst._render_blocks(iter(blocks), 2, render)))
+        np.testing.assert_array_equal(result, source)
+
+    def test_fixed_rate_vst_preserves_delivery_rate_and_frame_count(self):
+        from pedalboard import ExternalPluginReloadType
+
+        class StereoEffect:
+            _reload_type = ExternalPluginReloadType.ClearsAudioOnReset
+
+            def reset(self):
+                pass
+
+            def process(self, audio, rate, **_):
+                self.calls.append((rate, audio.shape[0]))
+                return audio * 0.5
+
+        plugin = StereoEffect()
+        plugin.calls = []
+        with patch.object(vst, "_freq_echo_on_mac", return_value=True):
+            dsp = vst._PluginAudio(plugin)
+        for rate, channels in [(44100, 1), (48000, 2), (96000, 2)]:
+            with self.subTest(rate=rate, channels=channels):
+                dsp.begin(rate, channels, {})
+                source = np.full((3001, channels), 0.25, dtype=np.float32)
+                blocks = (source[:1024], source[1024:2048], source[2048:3000], source[3000:])
+                rendered = np.concatenate(list(vst._render_blocks(iter(blocks), channels, dsp.render)))
+                self.assertEqual(rendered.shape, source.shape)
+                np.testing.assert_allclose(rendered[100:-100], 0.125, atol=0.001)
+        self.assertEqual(set(plugin.calls), {(48000, 2)})
 
     def test_library_master_effects_and_track_effects_use_different_buses(self):
         first = audio_file(self.root / "sine.wav")

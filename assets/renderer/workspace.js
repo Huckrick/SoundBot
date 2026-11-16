@@ -172,10 +172,15 @@
         };
         if (processed && edits) {
             const startRelative = start - edits.offset;
-            const rendered = (start > 0 && renderedWave) || playback.renderedPeaks(item.duration);
+            const sourceChannels = item.channels || 2;
+            const channels = sourceChannels > 2 && masterEffects.some(effect => effect.kind === 'vst3')
+                ? 2 : sourceChannels;
+            const rendered = (start > edits.offset && renderedWave) ||
+                playback.renderedPeaks(range?.[1] ?? item.duration, edits.offset);
+            rendered.truncate(start);
             return fx().preview({
                 project_id: state.library.id, tracks: [{ clips: [edits] }], master_effects: masterEffects,
-                rate: item.sample_rate || 48000, channels: masterEffects.some(effect => effect.kind === 'vst3') ? 2 : item.channels || 2,
+                rate: item.sample_rate || 48000, channels,
                 start: startRelative
             }, start, onEnd, (buffer, time) => {
                 if (playbackId !== previewRevision) return;
@@ -232,7 +237,7 @@
             canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
             return;
         }
-        if (renderedWave && (!renderedWave.data || renderedWave.dirty !== renderedWave.duration)) {
+        if (renderedWave && renderedWave.painted !== renderedWave.revision) {
             const original = item.duration;
             const useRendered = time => !state.range || (time >= state.range[0] && time < renderedWave.duration);
             renderedWave.data = Float32Array.from({ length: 2000 }, (_, index) => {
@@ -241,7 +246,7 @@
                 if (wet >= 0) return wet;
                 return time < original ? state.waveform[Math.floor(time / original * state.waveform.length)] || 0 : 0;
             });
-            renderedWave.dirty = renderedWave.duration;
+            renderedWave.painted = renderedWave.revision;
             positionRangeHandles();
             showRange();
         }

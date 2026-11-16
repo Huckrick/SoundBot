@@ -1310,6 +1310,7 @@
         const start = state.position < Math.max(nominalEnd, renderedMix?.duration || 0) ? state.position : 0;
         const token = ++previewGeneration;
         const rendered = (start > 0 && renderedMix) || playback.renderedPeaks(nominalEnd);
+        rendered.truncate(start);
         return fx.preview({ ...mixRequest(true), start }, start, () => {
             state.position = 0;
             if (state.loop && token === previewGeneration && state.workspace === 'wwise') attempt(play);
@@ -1372,10 +1373,10 @@
     function playhead(time) {
         if (renderedMix) {
             const total = Math.max(duration(), renderedMix.duration);
-            if (renderedMix.painted !== renderedMix.duration) {
+            if (renderedMix.painted !== renderedMix.revision) {
                 renderedMix.data = Float32Array.from({ length: 1200 }, (_, i) =>
                     Math.max(0, renderedMix.peakBetween(i * total / 1200, (i + 1) * total / 1200)));
-                renderedMix.painted = renderedMix.duration;
+                renderedMix.painted = renderedMix.revision;
             }
             const css = getComputedStyle(document.documentElement);
             waveform.renderMain($('dawRenderedWave'), { waveformData: renderedMix.data, duration: total,

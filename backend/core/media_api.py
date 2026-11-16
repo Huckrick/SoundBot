@@ -11,9 +11,11 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Annotated, Literal
 
+from anyio import CancelScope
 from fastapi import APIRouter, Header, HTTPException, Path as PathParameter, Query
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
+from starlette.concurrency import run_in_threadpool
 
 from config import AUDIO_FORMAT_CAPABILITIES
 from core import delivery, middleware, vst, wwise
@@ -248,6 +250,28 @@ _preview_lock = threading.Lock()
 _preview_warnings = OrderedDict()
 
 
+class _PreviewResponse(StreamingResponse):
+    def __init__(self, stream, blocks, **kwargs):
+        super().__init__(stream, **kwargs)
+        self._stream = stream
+        self._blocks = blocks
+
+    async def stream_response(self, send):
+        try:
+            await super().stream_response(send)
+        finally:
+            # A stopped preview must release its VST3 rack slot even when
+            # delivery was cancelled between HTTP blocks.
+            def close():
+                try:
+                    self._stream.close()
+                finally:
+                    self._blocks.close()
+
+            with CancelScope(shield=True):
+                await run_in_threadpool(close)
+
+
 @router.get("/preview/{request_id}/warnings")
 def preview_warnings(request_id: str):
     with _preview_lock:
@@ -296,7 +320,7 @@ def preview(request: PreviewRequest):
                         yield from blocks
                         return
                     while budget or emitted < frames:
-                        delay = started + emitted / request.rate - 0.25 - time.monotonic()
+                        delay = started + emitted / request.rate - 0.1 - time.monotonic()
                         if delay > 0:
                             time.sleep(delay)
                         block = next(blocks, None)
@@ -318,8 +342,11 @@ def preview(request: PreviewRequest):
                 finally:
                     source.close()
 
-            return StreamingResponse(pcm(), media_type="application/octet-stream", headers={
+            return _PreviewResponse(pcm(), blocks, media_type="application/octet-stream", headers={
                 "Cache-Control": "no-store", "X-SoundBot-PCM": f"{request.rate}/{request.channels}"})
+        if live:
+            return _PreviewResponse(wave_stream(source, request.rate, request.channels, frames), blocks,
+                                    media_type="audio/wav", headers={"Cache-Control": "no-store"})
         return _stream(source, request.rate, request.channels, frames)
     except (OSError, ValueError, AudioServiceError) as exc:
         raise HTTPException(422, str(exc)) from exc
