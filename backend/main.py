@@ -642,6 +642,11 @@ async def get_asset_groups(project_id: str, file_id: str):
     return await asyncio.to_thread(catalog.asset_groups, _require_library(project_id), project_id, file_id)
 
 
+@app.get("/api/v1/projects/{project_id}/sources")
+async def list_library_sources(project_id: str):
+    return await asyncio.to_thread(catalog.sources, _require_library(project_id), project_id)
+
+
 @app.post("/api/v1/projects/{project_id}/sources/{source_id}/scan")
 async def scan_library_source(project_id: str, source_id: str, background_tasks: BackgroundTasks):
     db = _require_library(project_id)
@@ -672,6 +677,18 @@ async def remove_catalog_folder(project_id: str, request: RemoveCatalogFolder):
     removed = await asyncio.to_thread(catalog.remove_folder_items, _require_library(project_id),
                                      project_id, request.path)
     return {"removed": removed}
+
+
+class DismissCatalogFolder(RemoveCatalogFolder):
+    remove_import: bool = False
+
+
+@app.post("/api/v1/projects/{project_id}/catalog/dismiss-folder")
+async def dismiss_catalog_folder(project_id: str, request: DismissCatalogFolder):
+    if "\x00" in request.path or not Path(request.path).is_absolute():
+        raise SoundBotAPIError("invalid_folder_path", "请选择可用的素材目录")
+    return await asyncio.to_thread(catalog.dismiss_folder, _require_library(project_id), project_id,
+                                   request.path, remove_import=request.remove_import)
 
 
 class LibraryItemUpdate(BaseModel):
@@ -1168,17 +1185,34 @@ async def get_index_status():
 @app.get("/api/v1/projects/{project_id}/index/status")
 async def get_project_index_status(project_id: str):
     db = _require_library(project_id)
-    total = db.get_file_count(project_id)
+    total, indexed, artifacts = await asyncio.gather(
+        asyncio.to_thread(db.get_file_count, project_id),
+        asyncio.to_thread(catalog.keyword_count, db, project_id),
+        asyncio.to_thread(db.get_artifact_counts, project_id),
+    )
     return {"project_id": project_id, "total_files": total,
-            "keyword": {"available": True, "indexed": total},
-            "artifacts": db.get_artifact_counts(project_id)}
+            "keyword": {"available": True, "indexed": indexed}, "artifacts": artifacts}
+
+
+async def _run_library_maintenance(project_id, work, db, job_id):
+    async with _get_project_index_lock(project_id):
+        async with app.state.catalog_slots:
+            await asyncio.to_thread(work, db, job_id)
 
 
 @app.post("/api/v1/projects/{project_id}/index/rebuild")
 async def rebuild_project_index(project_id: str, background_tasks: BackgroundTasks):
     db = _require_library(project_id)
-    job_id = db.create_job(project_id, "keyword_rebuild")
-    background_tasks.add_task(catalog.rebuild_job, db, job_id)
+    job_id = await asyncio.to_thread(db.create_job, project_id, "keyword_rebuild")
+    background_tasks.add_task(_run_library_maintenance, project_id, catalog.rebuild_job, db, job_id)
+    return {"job_id": job_id, "state": "pending"}
+
+
+@app.post("/api/v1/projects/{project_id}/catalog/refresh-metadata")
+async def refresh_library_metadata(project_id: str, background_tasks: BackgroundTasks):
+    db = _require_library(project_id)
+    job_id = await asyncio.to_thread(db.create_job, project_id, "metadata_refresh")
+    background_tasks.add_task(_run_library_maintenance, project_id, catalog.refresh_metadata_job, db, job_id)
     return {"job_id": job_id, "state": "pending"}
 
 

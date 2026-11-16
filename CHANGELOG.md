@@ -4,6 +4,13 @@ Release history for SoundBot. Download current Windows and macOS installers from
 
 ## [Unreleased] / 未发布
 
+## [1.0.13] - 2026-11-16
+
+### Changed / 变更
+
+- **Remove folder** hides the selected tree entry if another registered source covers it. For an exclusive folder, confirmation removes its catalog entries. Both actions leave the original audio files on disk. / 「移除文件夹」遇到共同来源时只隐藏点击的目录条目；无共同来源时，确认后解除导入。两种情况都保留磁盘原音频。
+- **Settings → Library management** groups source checks, relocation, and restoration of hidden entries. It can refresh metadata from library audio and rebuild the current library's keyword index. Operations show progress in the bottom-right task tray. / 「设置 → 音效库管理」集中提供来源检查、重定位、恢复隐藏条目、刷新素材元数据和重建当前库的关键词索引。操作进度显示在右下角。
+
 ## [1.0.12] - 2026-11-16
 
 ### Changed / 变更
@@ -296,7 +303,8 @@ This historical prerelease is available as a source tag. The public release list
 - The Windows release gate starts the frozen backend with a clean `PATH` and no system FFmpeg, then requires the complete format matrix, exact waveforms, CLAP, Chroma, hybrid search, `win-unpacked`, and NSIS installer integrity checks to pass before publishing. / Windows 发布门禁会在干净 `PATH`、无系统 FFmpeg 下启动冻结后端，并要求全格式矩阵、精确波形、CLAP、Chroma、混合搜索、`win-unpacked` 与 NSIS 安装包完整性检查全部通过后才允许发布。
 - CI builds Windows x64 and macOS arm64 only on native runners and blocks release creation if any functional smoke test, model check, metadata check, package check, or installer check fails. / CI 仅在原生 runner 构建 Windows x64 与 macOS arm64，并在任一功能冒烟、模型、元数据、应用包或安装包检查失败时阻止创建 Release。
 
-[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.12...HEAD
+[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.13...HEAD
+[1.0.13]: https://github.com/Huckrick/SoundBot/compare/v1.0.12...v1.0.13
 [1.0.12]: https://github.com/Huckrick/SoundBot/compare/v1.0.11...v1.0.12
 [1.0.11]: https://github.com/Huckrick/SoundBot/compare/v1.0.10...v1.0.11
 [1.0.10]: https://github.com/Huckrick/SoundBot/compare/v1.0.9...v1.0.10

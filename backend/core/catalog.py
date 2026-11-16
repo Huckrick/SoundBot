@@ -188,9 +188,15 @@ def migrate(cursor):
             )
 
 
-def rebuild_keywords(cursor):
-    cursor.execute("DELETE FROM library_search")
-    cursor.execute(f"INSERT INTO library_search({_SEARCH_COLUMNS}) SELECT {_SEARCH_VALUES} FROM files r")
+def rebuild_keywords(cursor, project_id=None):
+    if project_id is None:
+        cursor.execute("DELETE FROM library_search")
+        cursor.execute(f"INSERT INTO library_search({_SEARCH_COLUMNS}) SELECT {_SEARCH_VALUES} FROM files r")
+    else:
+        cursor.execute("DELETE FROM library_search WHERE rowid IN (SELECT id FROM files WHERE project_id=?)",
+                       (project_id,))
+        cursor.execute(f"INSERT INTO library_search({_SEARCH_COLUMNS}) SELECT {_SEARCH_VALUES} FROM files r WHERE project_id=?",
+                       (project_id,))
 
 
 def migrate_source_ownership(cursor):
@@ -415,6 +421,7 @@ def import_status(db, job_id):
             if details:
                 job.update({key: details[key] for key in ("discovered", "imported", "unchanged", "failures")})
                 job["source_id"] = details["source_id"]
+            if details or job['kind'] == 'metadata_refresh':
                 job["failed_items"] = [dict(row) for row in cur.execute(
                     "SELECT path, message FROM import_failures WHERE job_id=? ORDER BY path LIMIT 100", (job_id,)
                 )]
@@ -705,19 +712,49 @@ def remove_source(db, project_id, source_id):
     return removed
 
 
-def remove_folder_items(db, project_id, folder):
-    key = canonicalize_path(folder)
+def _remove_folder_items(cur, project_id, key):
     lo, hi = path_bounds(key)
+    cur.execute("INSERT OR IGNORE INTO library_excluded_folders(project_id,canonical_path) VALUES (?,?)",
+                (project_id, key))
+    removed = cur.execute("DELETE FROM files WHERE project_id=? AND canonical_path>=? AND canonical_path<?",
+                          (project_id, lo, hi)).rowcount
+    _delete_source_registrations(cur, project_id,
+                                 "(canonical_path=? OR (canonical_path>=? AND canonical_path<?))", (key, lo, hi))
+    return removed
+
+
+def remove_folder_items(db, project_id, folder):
     with _WRITE_LOCK, db.get_cursor() as cur:
         cur.execute("BEGIN IMMEDIATE")
-        params = (project_id, lo, hi)
-        cur.execute("INSERT OR IGNORE INTO library_excluded_folders(project_id,canonical_path) VALUES (?,?)",
-                    (project_id, key))
-        removed = cur.execute("""DELETE FROM files WHERE project_id=? AND canonical_path>=? AND canonical_path<?""",
-                              params).rowcount
-        _delete_source_registrations(cur, project_id,
-                                     "(canonical_path=? OR (canonical_path>=? AND canonical_path<?))", (key, lo, hi))
-        return removed
+        return _remove_folder_items(cur, project_id, canonicalize_path(folder))
+
+
+def _folder_is_shared(cur, project_id, key):
+    lo, hi = path_bounds(key)
+    covering = 0
+    for root, recursive in cur.execute("SELECT canonical_path,recursive FROM library_sources WHERE project_id=?",
+                                       (project_id,)):
+        if root != key and lo <= root < hi:
+            return True
+        if root == key or (recursive and key.startswith(path_bounds(root)[0])):
+            covering += 1
+            if covering > 1:
+                return True
+    return cur.execute("""SELECT 1 FROM files f WHERE f.project_id=? AND f.canonical_path>=? AND f.canonical_path<?
+        AND EXISTS(SELECT 1 FROM source_files WHERE file_id=f.id LIMIT 1 OFFSET 1) LIMIT 1""",
+                       (project_id, lo, hi)).fetchone() is not None
+
+
+def dismiss_folder(db, project_id, folder, *, remove_import=False):
+    """Plan and, if requested, remove a folder only when no other source covers it."""
+    key = canonicalize_path(folder)
+    if not remove_import:
+        with db.get_cursor() as cur:
+            return {"shared": _folder_is_shared(cur, project_id, key), "removed": 0}
+    with _WRITE_LOCK, db.get_cursor() as cur:
+        cur.execute("BEGIN IMMEDIATE")
+        shared = _folder_is_shared(cur, project_id, key)
+        return {"shared": shared, "removed": 0 if shared else _remove_folder_items(cur, project_id, key)}
 
 
 def facets(db, project_id):
@@ -947,7 +984,8 @@ def active_jobs(db):
         return [dict(row) for row in cur.execute("""
             SELECT j.id, j.project_id, j.kind, j.state, j.processed, p.name AS library_name,
                    i.discovered, i.imported, i.unchanged, i.failures,
-                   CASE WHEN i.source_id IS NULL THEN json_array_length(i.files_json) END AS expected
+                   CASE WHEN i.job_id IS NULL THEN j.total WHEN i.source_id IS NULL
+                        THEN json_array_length(i.files_json) END AS expected
             FROM jobs j JOIN projects p ON p.id=j.project_id
             LEFT JOIN catalog_imports i ON i.job_id=j.id
             WHERE j.state IN ('pending', 'running')
@@ -958,10 +996,84 @@ def active_jobs(db):
 def rebuild_job(db, job_id):
     try:
         with _WRITE_LOCK, db.get_cursor() as cur:
-            changed = cur.execute("UPDATE jobs SET state='running',stage='indexing' "
-                                  "WHERE id=? AND state='pending'", (job_id,)).rowcount
-            if changed:
-                rebuild_keywords(cur)
+            job = cur.execute("UPDATE jobs SET state='running',stage='indexing' "
+                              "WHERE id=? AND state='pending' RETURNING project_id", (job_id,)).fetchone()
+        if job:
+            with _WRITE_LOCK, db.get_cursor() as cur:
+                rebuild_keywords(cur, job['project_id'])
                 cur.execute("UPDATE jobs SET state='completed',stage='done' WHERE id=?", (job_id,))
     except sqlite3.Error as exc:
         db.update_job(job_id, state="failed", stage="indexing", error_message=str(exc))
+
+
+def keyword_count(db, project_id):
+    with db.get_cursor() as cur:
+        return cur.execute("""SELECT COUNT(*) FROM files f JOIN library_search s ON s.rowid=f.id
+            WHERE f.project_id=?""", (project_id,)).fetchone()[0]
+
+
+def _read_existing_metadata(path):
+    try:
+        return _probe(_candidate(path, os.stat(path)))
+    except OSError as exc:
+        return None, (str(exc),)
+
+
+def refresh_metadata_job(db, job_id):
+    from core.audio_service import FileFingerprint
+
+    try:
+        with _WRITE_LOCK, db.get_cursor() as cur:
+            job = cur.execute("UPDATE jobs SET state='running',stage='probing' "
+                              "WHERE id=? AND state='pending' RETURNING project_id", (job_id,)).fetchone()
+            if not job:
+                return
+            project_id = job['project_id']
+            total, high = cur.execute("SELECT COUNT(*),COALESCE(MAX(id),0) FROM files WHERE project_id=?",
+                                      (project_id,)).fetchone()
+            cur.execute("UPDATE jobs SET total=? WHERE id=?", (total, job_id))
+        last = processed = failures = 0
+        with ThreadPoolExecutor(max_workers=4, thread_name_prefix="soundbot-metadata") as pool:
+            while not _stopping(db, job_id):
+                with db.get_cursor() as cur:
+                    rows = cur.execute("""SELECT id,file_uuid,path,canonical_path FROM files
+                        WHERE project_id=? AND id>? AND id<=? ORDER BY id LIMIT ?""",
+                                       (project_id, last, high, BATCH_SIZE)).fetchall()
+                if not rows:
+                    break
+                last = rows[-1]['id']
+                updates = list(pool.map(_read_existing_metadata, (row['path'] for row in rows)))
+                with _WRITE_LOCK, db.get_cursor() as cur:
+                    job = cur.execute("SELECT state,cancel_requested FROM jobs WHERE id=?", (job_id,)).fetchone()
+                    if not job or job['state'] != 'running' or job['cancel_requested']:
+                        break
+                    for row, (item, fields) in zip(rows, updates):
+                        if fields[-1]:
+                            failures += 1
+                            _write_failure(cur, job_id, row['path'], fields[-1])
+                            continue
+                        if item.key != row['canonical_path']:
+                            failures += 1
+                            _write_failure(cur, job_id, row['path'], '源文件位置已改变，请重新定位')
+                            continue
+                        fingerprint = FileFingerprint(item.size, item.mtime).source_key
+                        changed = cur.execute("""UPDATE files SET file_size=?,mtime_ns=?,source_fingerprint=?,
+                            duration=?,sample_rate=?,channels=?,format=?,title=?,description=?,keywords=?,
+                            library_name=?,ucs=?,probe_error=?,missing=0,updated_at=CURRENT_TIMESTAMP,
+                            peaks_json=CASE WHEN source_fingerprint=? THEN peaks_json END,
+                            waveform_fingerprint=CASE WHEN source_fingerprint=? THEN waveform_fingerprint END
+                            WHERE id=? AND file_uuid=? AND path=?""",
+                                              (item.size, item.mtime, fingerprint, *fields, fingerprint, fingerprint,
+                                               row['id'], row['file_uuid'], row['path'])).rowcount
+                        if changed:
+                            cur.execute("""UPDATE file_artifacts SET state='stale',source_fingerprint=?
+                                WHERE file_uuid=? AND source_fingerprint IS NOT ?""",
+                                        (fingerprint, row['file_uuid'], fingerprint))
+                    processed += len(rows)
+                    cur.execute("UPDATE jobs SET processed=? WHERE id=?", (processed, job_id))
+        if _stopping(db, job_id):
+            db.update_job(job_id, state='cancelled', stage='paused')
+        else:
+            db.update_job(job_id, state='completed', stage='partial' if failures else 'done', total=processed)
+    except (OSError, sqlite3.Error, ValueError) as exc:
+        db.update_job(job_id, state='failed', stage='probing', error_message=str(exc))

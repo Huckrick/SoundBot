@@ -654,37 +654,70 @@ def _renderer_smoke_expression(
     const originalFetch = globalThis.fetch;
     let requestHadProgress = false;
     globalThis.fetch = (url, options) => {{
-      if (options?.method === 'DELETE' || String(url).endsWith('/catalog/remove-folder')) {{
-        requestHadProgress = document.getElementById('catalogRemovalDialog').open;
+      if (options?.method === 'DELETE' || String(url).endsWith('/catalog/dismiss-folder')) {{
+        requestHadProgress = !document.getElementById('jobTray').hidden;
       }}
       return originalFetch(url, options);
     }};
     try {{
       document.getElementById('actionConfirm').click();
-      await until(() => requestHadProgress && !document.getElementById('catalogRemovalDialog').open,
+      await until(() => requestHadProgress && document.getElementById('jobTray').hidden,
                   'visible removal progress and completion');
     }} finally {{
       globalThis.fetch = originalFetch;
     }}
   }};
-  const removeTreeEntry = async (row, action) => {{
+  const dismissTreeEntry = row => {{
     row.dispatchEvent(new MouseEvent('contextmenu', {{ bubbles: true, cancelable: true }}));
     const remove = [...document.querySelectorAll('#folderMenu [role="menuitem"]')].find(
-      node => node.textContent === SoundBotI18n.t(action)
+      node => node.textContent === SoundBotI18n.t('移除文件夹…')
     );
     if (!remove) throw new Error('Folder context menu has no remove action');
     remove.click();
-    await confirmRemoval();
   }};
   await until(() => treeEntry(parentFolder) && treeEntry(folderFilter), 'both source registrations');
   treeEntry(parentFolder).querySelector('.tree-expand').click();
   const beneathParent = () => treeEntry(parentFolder)?.parentElement.querySelector('.tree-children');
   await until(() => beneathParent() && treeEntry(folderFilter, beneathParent()), 'overlapping subfolder');
-  await removeTreeEntry(treeEntry(folderFilter, beneathParent()), '从音效库移除文件夹…');
-  await until(() => treeEntry(parentFolder) && !treeEntry(folderFilter), 'both overlapping rows removed');
-  for (const [path, action] of [[parentFolder, '撤销此来源目录的导入…'], [looseFolder, '从音效库移除文件夹…']]) {{
+  const standalone = () => [...document.querySelectorAll('#tree > div > [data-folder]')].find(row =>
+    workspace.folderKey(row.dataset.folder) === workspace.folderKey(folderFilter));
+  dismissTreeEntry(standalone());
+  await until(() => !standalone() && beneathParent() && treeEntry(folderFilter, beneathParent()),
+              'only the duplicate standalone entry is hidden');
+  if ((await workspace.browseCatalog(20)).files.length !== 3 || actionDialog.open) {{
+    throw new Error('Hiding a shared folder changed searchable files or prompted for removal');
+  }}
+  document.getElementById('btnSettings').click();
+  document.querySelector('[data-settings="library"]').click();
+  await until(() => document.querySelector('#libraryHiddenFolders button'), 'hidden folder in library settings');
+  const indexStatus = document.getElementById('libraryIndexSummary');
+  await until(() => indexStatus.textContent === SoundBotI18n.t('素材 {{total}} 条，已建立关键词索引 {{indexed}} 条', {{total: 3, indexed: 3}}), 'catalog status');
+  for (const [id, kind] of [['btnRefreshMetadata', 'metadata_refresh'], ['btnRebuild', 'keyword_rebuild']]) {{
+    document.getElementById(id).click();
+    if (document.getElementById('jobTray').hidden) throw new Error(`Missing maintenance progress for ${{id}}`);
+    await until(() => document.getElementById('jobTray').hidden, `${{id}} completion`);
+    const jobs = await requestJson('/projects/default/jobs');
+    if (!jobs.some(job => job.kind === kind && job.state === 'completed')) {{
+      throw new Error(`Maintenance job was not completed for ${{id}}`);
+    }}
+  }}
+  document.querySelector('#libraryHiddenFolders button').click();
+  await until(standalone, 'shared folder restored');
+  const detach = () => [...document.querySelectorAll('#librarySources .library-settings-entry')]
+    .find(row => workspace.folderKey(row.querySelector('.library-settings-path').title) === workspace.folderKey(folderFilter));
+  await until(detach, 'source maintenance settings');
+  [...detach().querySelectorAll('button')].find(button =>
+    button.textContent === SoundBotI18n.t('撤销此来源目录的导入…')).click();
+  await confirmRemoval();
+  document.querySelector('[data-close="ovSettings"]').click();
+  await until(() => beneathParent() && treeEntry(folderFilter, beneathParent()), 'only parent registration remains');
+  dismissTreeEntry(treeEntry(folderFilter, beneathParent()));
+  await confirmRemoval();
+  await until(() => treeEntry(parentFolder) && !treeEntry(folderFilter), 'exclusive nested folder unimported');
+  for (const path of [parentFolder, looseFolder]) {{
     await until(() => treeEntry(path), 'catalog folder row');
-    await removeTreeEntry(treeEntry(path), action);
+    dismissTreeEntry(treeEntry(path));
+    await confirmRemoval();
     await until(() => !treeEntry(path), 'catalog folder removed');
   }}
   const remaining = await workspace.browseCatalog(20);

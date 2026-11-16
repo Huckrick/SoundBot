@@ -1,11 +1,12 @@
 # SoundBot
 
-**Version / 版本:** 1.0.12<br>
+**Version / 版本:** 1.0.13<br>
 **Status / 状态:** Stable / 稳定版<br>
 
 ## 功能 / Features
 
 - 来源目录、增量导入、本地关键词检索、文件名分类与自定义标签夹。 / Source folders, incremental imports, local keyword search, filename categories, and custom tag folders.
+- 可恢复的共享目录隐藏，以及设置中的来源维护、元数据刷新和关键词索引重建。 / Reversible hiding for shared folders, plus source maintenance, metadata refresh, and keyword index rebuilding in Settings.
 - 源文件试听、按需波形、音效库试听主效果链，以及整段或选区交付。 / Source playback, on-demand waveforms, a library master effects chain, and delivery of whole sounds or selections.
 - 中间件多轨编辑和独立轨道效果链，以及 Wwise 源 WAV 写回与备份恢复。 / Middleware multitrack editing with independent track effects, plus Wwise source WAV writeback and recovery.
 - FMOD Studio 和 CRI Atom Craft 的实验性 WAV 交付尚待真实宿主测试，欢迎反馈。 / Experimental WAV export for FMOD Studio and CRI Atom Craft awaits testing in the actual hosts. Feedback is welcome.

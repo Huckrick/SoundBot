@@ -36,6 +36,7 @@
     let directoryRevision = 0;
     let treeView;
     const expandedFolders = new Set();
+    let hiddenFolderEntries = [];
     let groupRevision = 0;
     let libraryEditor;
     let timelinePosition = 0;
@@ -743,6 +744,7 @@
             renderSortControls();
         }
         state.library = library;
+        hiddenFolderEntries = library ? loadHiddenFolderEntries(library.id) : [];
         state.filter = {};
         expandedFolders.clear();
         $('queryEcho').textContent = '';
@@ -1149,6 +1151,22 @@
         return desktop.platform === 'win32' ? normalized.toLowerCase() : normalized;
     };
 
+    const hiddenFolderStorageKey = library => `soundbot-hidden-folders-${library}`;
+    const folderEntryKey = (path, root) => JSON.stringify([root === null ? null : folderKey(root), folderKey(path)]);
+
+    function loadHiddenFolderEntries(library) {
+        try {
+            const saved = JSON.parse(localStorage.getItem(hiddenFolderStorageKey(library)));
+            return Array.isArray(saved) ? saved.filter(entry => typeof entry?.path === 'string' &&
+                (entry.root === null || typeof entry.root === 'string')) : [];
+        } catch { return []; }
+    }
+
+    function saveHiddenFolderEntries(library, entries) {
+        localStorage.setItem(hiddenFolderStorageKey(library), JSON.stringify(entries));
+        if (state.library?.id === library) hiddenFolderEntries = entries;
+    }
+
     const tagSectionsKey = 'soundbot-tag-sections';
     const tagSectionNames = new Map([
         ['folders', '标签夹'], ['filename_category', '文件名分类'], ['ucs', 'UCS'], ['tag', '自定义标签']
@@ -1381,7 +1399,9 @@
         if (state.view === 'folder') {
             const folders = await api.get(route('/catalog/folders', library));
             if (generation !== directoryRevision) return;
-            for (const entry of folders) box.append(folderNode(entry));
+            for (const entry of folders) {
+                if (!isHiddenFolder(entry.path, null)) box.append(folderNode(entry));
+            }
         } else if (state.view !== 'fav') {
             const facets = await api.get(route('/catalog/facets', library));
             if (generation !== directoryRevision) return;
@@ -1402,7 +1422,12 @@
         }
     }
 
-    function folderNode(item) {
+    function isHiddenFolder(path, root) {
+        const key = folderEntryKey(path, root);
+        return hiddenFolderEntries.some(entry => folderEntryKey(entry.path, entry.root) === key);
+    }
+
+    function folderNode(item, root = null) {
         const pathKey = folderKey(item.path);
         const library = state.library.id;
         const wrapper = el('div');
@@ -1419,9 +1444,11 @@
                 try {
                     const rows = await api.get(route(`/catalog/folders?${new URLSearchParams({ folder: item.path })}`, library));
                     if (state.library?.id !== library || !wrapper.isConnected) return;
-                    children.append(...rows.map(folderNode));
+                    const origin = root ?? item.path;
+                    const visible = rows.filter(row => !isHiddenFolder(row.path, origin));
+                    children.append(...visible.map(row => folderNode(row, origin)));
                     loaded = true;
-                    if (!rows.length) {
+                    if (!visible.length) {
                         expand.classList.add('leaf');
                         if (focusLeaf) title.focus({ preventScroll: true });
                         return;
@@ -1444,7 +1471,7 @@
         title.title = item.path;
         title.setAttribute('aria-haspopup', 'menu');
         title.setAttribute('aria-expanded', 'false');
-        bindTreeMenu(line, title, event => openFolderMenu(item, title, event));
+        bindTreeMenu(line, title, event => openFolderMenu(item, root, title, event));
         line.append(expand, title);
         wrapper.append(line, children);
         if (expandedFolders.has(pathKey) || selected?.startsWith(`${pathKey}/`)) {
@@ -1454,19 +1481,10 @@
     }
 
     let folderMenu;
-    function openFolderMenu(item, anchor, event) {
+    function openFolderMenu(item, root, anchor, event) {
         const library = state.library.id;
-        const actions = [];
-        if (item.id) {
-            actions.push([t('检查变更'), async () => {
-                await api.post(route(`/sources/${encodeURIComponent(item.id)}/scan`, library), {});
-                modal('ovJobs');
-                await refreshJobs(libraryRevision, true);
-            }], [t('重定位…'), () => relocateItem({ source_id: item.id }, true)]);
-        }
-        if (item.id) actions.push([t('撤销此来源目录的导入…'), () => removeFolderSource(item, library, true)]);
-        actions.push([t('从音效库移除文件夹…'), () => removeFolderSource(item, library, false)]);
-        actions.push([t('在文件管理器中显示'), () => desktop.revealFile(item.path)]);
+        const actions = [[t('移除文件夹…'), () => dismissFolder(item, root, library)],
+            [t('在文件管理器中显示'), () => desktop.revealFile(item.path)]];
         openTreeMenu(anchor, actions, event, t('文件夹操作'));
     }
 
@@ -1543,19 +1561,18 @@
     let jobsTimer;
     let jobRequest = 0;
     let lastImportRefresh = 0;
-    let catalogRemoval = null;
+    let catalogOperation = null;
 
-    async function withRemovalProgress(library, message, remove) {
-        if (catalogRemoval || state.library?.id !== library) return;
-        catalogRemoval = library;
-        const progress = $('catalogRemovalDialog');
-        $('catalogRemovalTitle').textContent = message;
-        progress.showModal();
+    async function withCatalogProgress(library, message, operation) {
+        if (state.library?.id !== library) return;
+        if (catalogOperation) { say(t('请等待当前音效库操作完成。')); return; }
+        catalogOperation = { library, message };
+        renderJobTray();
         try {
-            await remove();
+            return await operation();
         } finally {
-            progress.close();
-            catalogRemoval = null;
+            catalogOperation = null;
+            renderJobTray();
             attempt(refreshJobs);
         }
     }
@@ -1571,13 +1588,13 @@
         clearTimeout(jobsTimer);
         const request = ++jobRequest;
         const library = state.library?.id;
-        if (catalogRemoval) return;
+        if (catalogOperation && !showJobs()) return;
         try {
             const [running, history] = await Promise.all([
                 api.get('/api/v1/jobs/active'),
                 library && showJobs() ? api.get(route('/jobs', library)) : null
             ]);
-            if (request !== jobRequest || revision !== libraryRevision || catalogRemoval) return;
+            if (request !== jobRequest || revision !== libraryRevision) return;
             const currentImports = running.filter(job => job.kind === 'catalog_import' && job.project_id === library);
             const earlierImports = activeJobs.filter(job => job.kind === 'catalog_import' && job.project_id === library);
             const finished = submitted || earlierImports.some(job => !currentImports.some(item => item.id === job.id));
@@ -1588,7 +1605,7 @@
             if (history) state.jobs = history;
             renderJobTray();
             if (showJobs()) renderJobs();
-            if (library && (finished || progressing)) {
+            if (!catalogOperation && library && (finished || progressing)) {
                 lastImportRefresh = now;
                 if ($('rows').scrollTop < ROW && !listRequest || !isLibrary()) await loadItems(true);
                 if (finished && revision === libraryRevision) {
@@ -1598,19 +1615,32 @@
                 }
             }
         } catch (error) {
-            if (request === jobRequest && revision === libraryRevision && !catalogRemoval) throw error;
+            if (request === jobRequest && revision === libraryRevision && !catalogOperation) throw error;
         } finally {
             if (request === jobRequest) scheduleJobPoll();
         }
     }
 
     function renderJobTray() {
-        $('jobTray').hidden = !activeJobs.length;
+        $('jobTray').hidden = !catalogOperation && !activeJobs.length;
+        const settingsStatus = $('libraryOperationStatus');
+        settingsStatus.hidden = !catalogOperation || catalogOperation.library !== state.library?.id;
+        const progress = $('jobProgress');
+        if (catalogOperation) {
+            $('jobName').textContent = catalogOperation.message;
+            $('jobCount').textContent = catalogOperation.total
+                ? `${number(catalogOperation.processed)} / ${number(catalogOperation.total)}` : t('处理中');
+            settingsStatus.textContent = `${catalogOperation.message} ${$('jobCount').textContent}`;
+            if (catalogOperation.total) {
+                progress.max = catalogOperation.total;
+                progress.value = catalogOperation.processed;
+            } else progress.removeAttribute('value');
+            return;
+        }
         if (!activeJobs.length) return;
         const job = activeJobs.find(item => item.state === 'running') || activeJobs[0];
-        const label = t(job.kind === 'catalog_import' ? '导入' : '关键词索引');
+        const label = jobLabel(job.kind);
         $('jobName').textContent = `${label} · ${job.library_name}${activeJobs.length > 1 ? ` (+${number(activeJobs.length - 1)})` : ''}`;
-        const progress = $('jobProgress');
         if (job.expected > 0) {
             progress.max = job.expected;
             progress.value = Math.min(job.processed, job.expected);
@@ -1620,11 +1650,13 @@
             : job.processed ? number(job.processed) : t(job.state === 'pending' ? '排队中' : '处理中');
     }
 
+    const jobLabel = kind => t({ keyword_rebuild: '关键词索引', metadata_refresh: '刷新素材元数据' }[kind] || '导入');
+
     function renderJobs() {
         const status = { pending: '排队中', running: '处理中', completed: '已完成', cancelled: '已暂停', failed: '已中断' };
         const rows = [...activeJobs.filter(job => job.project_id !== state.library?.id), ...state.jobs].map(job => {
             const node = el('div', null, 'jobs-item');
-            const title = job.kind === 'keyword_rebuild' ? t('关键词索引') : t('导入');
+            const title = jobLabel(job.kind);
             node.append(el('div', `${title} · ${t(job.stage === 'partial' ? '已完成，有失败项' : status[job.state] || '处理中，尚无状态')}${job.library_name ? ` · ${job.library_name}` : ''}`));
             if (job.discovered != null) node.append(el('div',
                 t('已发现 {discovered} · 入库 {imported} · 未变更 {unchanged} · 失败 {failed}', { discovered: job.discovered, imported: job.imported, unchanged: job.unchanged, failed: job.failures })));
@@ -1693,38 +1725,67 @@
         return addFiles(folder ? [{ path: result.folder, isDirectory: true }] : result.files, libraryId);
     }
 
-    async function removeFolderSource(item, library, detachOnly) {
+    async function dismissFolder(item, root, library) {
         const name = item.path.split(/[/\\]/).filter(Boolean).at(-1) || item.path;
-        const accepted = await actionDialog({
-            message: t(detachOnly ? '撤销「{name}」的来源目录登记？' : '从音效库移除文件夹「{name}」？', { name }),
-            detail: t(detachOnly ? '仍由其他来源收录的素材和单独导入的素材会保留。磁盘文件不会删除。'
-                : '会移除夹内的库记录和来源登记。重扫上级目录时将跳过此文件夹。磁盘文件不会删除。'),
-            confirm: t('移除')
-        });
-        if (!accepted) return;
-        await withRemovalProgress(library, t('正在移除文件夹「{name}」…', { name }), async () => {
-            if (detachOnly) await api.delete(route(`/sources/${encodeURIComponent(item.id)}`, library));
-            else await api.post(route('/catalog/remove-folder', library), { path: item.path });
-            const selected = state.selected;
-            const checkSelection = async () => {
-                if (!selected) return;
-                try { await api.get(route(`/catalog/items/${encodeURIComponent(selected.id)}`, library)); }
-                catch (error) {
-                    if (error.code !== 'file_not_found') throw error;
-                    if (state.selected === selected) await select(null);
-                    clipSessions.delete(selected.id);
-                }
-            };
-            state.selectedIds.clear();
-            const updates = await Promise.allSettled([state.filter.folder ? setFilter({}) : loadItems(true),
-                renderTree(), loadLibraries(library), timeline()?.loadDock(true), checkSelection()]);
-            const failure = updates.find(result => result.status === 'rejected');
-            if (failure) {
-                console.warn('[SoundBot] Catalog refresh after folder removal failed:', failure.reason);
-                say(t('文件夹已移除，部分视图刷新失败。'));
-                return;
+        async function hide() {
+            const entries = loadHiddenFolderEntries(library);
+            const key = folderEntryKey(item.path, root);
+            if (!entries.some(entry => folderEntryKey(entry.path, entry.root) === key)) {
+                saveHiddenFolderEntries(library, [...entries, { path: item.path, root }]);
             }
-            say(t(detachOnly ? '已移除来源文件夹' : '已从音效库移除文件夹'));
+            if (state.library?.id === library) await renderTree();
+            say(t('已隐藏目录条目，素材仍可搜索和试听。'));
+        }
+        const endpoint = route('/catalog/dismiss-folder', library);
+        const plan = await withCatalogProgress(library, t('正在检查文件夹来源…'), async () => {
+            const result = await api.post(endpoint, { path: item.path });
+            if (result.shared) await hide();
+            return result;
+        });
+        if (!plan || plan.shared || state.library?.id !== library) return;
+        if (!await actionDialog({
+            message: t('从音效库移除文件夹「{name}」？', { name }),
+            detail: t('会移除夹内的库记录和来源登记。重扫上级目录时将跳过此文件夹。磁盘文件不会删除。'),
+            confirm: t('移除')
+        })) return;
+        await withCatalogProgress(library, t('正在移除文件夹「{name}」…', { name }), async () => {
+            const result = await api.post(endpoint, { path: item.path, remove_import: true });
+            if (result.shared) { await hide(); return; }
+            await refreshAfterSourceChange(library);
+            say(t('已从音效库移除文件夹'));
+        });
+    }
+
+    async function refreshAfterSourceChange(library) {
+        if (state.library?.id !== library) return;
+        const selected = state.selected;
+        const checkSelection = async () => {
+            if (!selected) return;
+            try { await api.get(route(`/catalog/items/${encodeURIComponent(selected.id)}`, library)); }
+            catch (error) {
+                if (error.code !== 'file_not_found') throw error;
+                if (state.library?.id !== library) return;
+                if (state.selected === selected) await select(null);
+                clipSessions.delete(selected.id);
+            }
+        };
+        state.selectedIds.clear();
+        await Promise.all([state.filter.folder ? setFilter({}) : loadItems(true), renderTree(),
+            loadLibraries(library), timeline()?.loadDock(true), checkSelection()]);
+    }
+
+    async function removeFolderSource(item, library) {
+        const name = item.path.split(/[/\\]/).filter(Boolean).at(-1) || item.path;
+        if (!await actionDialog({
+            message: t('撤销「{name}」的来源目录登记？', { name }),
+            detail: t('仍由其他来源收录的素材和单独导入的素材会保留。磁盘文件不会删除。'),
+            confirm: t('移除')
+        })) return;
+        await withCatalogProgress(library, t('正在移除文件夹「{name}」…', { name }), async () => {
+            await api.delete(route(`/sources/${encodeURIComponent(item.id)}`, library));
+            await refreshAfterSourceChange(library);
+            await refreshOpenLibrarySettings();
+            say(t('已移除来源文件夹'));
         });
     }
 
@@ -1737,6 +1798,7 @@
         await api.post(route('/catalog/relocate', libraryId), { ...payload, destination: result.filePaths[0] });
         if (state.library.id !== libraryId) return;
         await Promise.all([loadItems(true), renderTree()]);
+        if (directory) await refreshOpenLibrarySettings();
         const replacement = state.items.find(item => item.id === payload.file_id);
         if (replacement) await select(replacement);
         say(t('已更新源文件位置'));
@@ -2254,6 +2316,85 @@
     }
 
     let settingsAssistantLoad;
+
+    function renderHiddenFolderSettings() {
+        const library = state.library?.id;
+        const rows = hiddenFolderEntries.map(entry => {
+            const row = el('div', null, 'library-settings-entry');
+            const label = entry.root === null ? entry.path : `${entry.root} › ${entry.path}`;
+            const path = el('span', label, 'library-settings-path');
+            path.title = label;
+            row.append(path, button(t('恢复显示'), async () => {
+                if (state.library?.id !== library) return;
+                saveHiddenFolderEntries(library, hiddenFolderEntries.filter(saved =>
+                    folderEntryKey(saved.path, saved.root) !== folderEntryKey(entry.path, entry.root)));
+                renderHiddenFolderSettings();
+                await renderTree();
+            }));
+            return row;
+        });
+        $('libraryHiddenFolders').replaceChildren(...(rows.length ? rows : [el('p', t('没有隐藏的文件夹条目。'), 'sub')]));
+    }
+
+    async function renderLibrarySettings() {
+        const library = state.library?.id;
+        renderHiddenFolderSettings();
+        const summary = $('libraryIndexSummary');
+        const directoryList = $('librarySources');
+        $('btnRefreshMetadata').disabled = $('btnRebuild').disabled = !library;
+        directoryList.replaceChildren();
+        summary.textContent = t(library ? '正在读取音效库状态…' : '暂无音效库');
+        if (!library) return;
+        const [status, sources] = await Promise.all([
+            api.get(route('/index/status', library)), api.get(route('/sources', library))
+        ]);
+        if (state.library?.id !== library) return;
+        summary.textContent = t('素材 {total} 条，已建立关键词索引 {indexed} 条', {
+            total: number(status.total_files), indexed: number(status.keyword.indexed)
+        });
+        const rows = sources.map(source => {
+            const row = el('div', null, 'library-settings-entry');
+            const path = el('span', source.path, 'library-settings-path');
+            path.title = source.path;
+            row.append(path, button(t('检查变更'), () => runLibraryMaintenance(library,
+                `/sources/${encodeURIComponent(source.id)}/scan`, '正在检查来源目录…')),
+                button(t('重定位…'), () => relocateItem({ source_id: source.id }, true)),
+                button(t('撤销此来源目录的导入…'), () => removeFolderSource(source, library)));
+            return row;
+        });
+        directoryList.replaceChildren(...(rows.length ? rows : [el('p', t('没有登记的来源目录。'), 'sub')]));
+    }
+
+    function refreshOpenLibrarySettings() {
+        if ($('ovSettings').classList.contains('show') && !$('settings-library').classList.contains('hidden')) {
+            return renderLibrarySettings();
+        }
+    }
+
+    async function runLibraryMaintenance(library, endpoint, label) {
+        if (!library) return;
+        await withCatalogProgress(library, t(label), async () => {
+            const { job_id } = await api.post(route(endpoint, library), {});
+            for (;;) {
+                const job = await api.get(`/api/v1/jobs/${encodeURIComponent(job_id)}`);
+                if (job.state === 'completed') {
+                    if (state.library?.id === library) {
+                        await Promise.all([loadItems(true), renderTree(), loadLibraries(library),
+                            timeline()?.loadDock(true), refreshOpenLibrarySettings()]);
+                    }
+                    say(t(job.stage === 'partial' ? '已完成，有失败项' : '已完成'));
+                    return;
+                }
+                if (job.state === 'cancelled') { say(t('已暂停')); return; }
+                if (job.state === 'failed') throw new Error(job.error_message || t('任务失败'));
+                catalogOperation.total = job.total || 0;
+                catalogOperation.processed = job.processed || 0;
+                renderJobTray();
+                await new Promise(resolve => setTimeout(resolve, 800));
+            }
+        });
+    }
+
     async function showSettingsPage(category) {
         for (const item of document.querySelectorAll('[data-settings]')) {
             const active = item.dataset.settings === category;
@@ -2262,6 +2403,7 @@
             $(`settings-${item.dataset.settings}`).classList.toggle('hidden', !active);
         }
         if (category === 'vst') await fx()?.settings();
+        if (category === 'library') await renderLibrarySettings();
         if (category === 'ai') {
             settingsAssistantLoad ??= desktop.aiConfig.get().then(settings => {
                 aiSettings = settings;
@@ -2477,15 +2619,15 @@
         });
         on('btnRemoveLib', async () => {
             const library = state.library;
-            if (catalogRemoval || !library || !await confirm(t('移除音效库「{name}」？原音频文件会保留。', { name: libraryName(library) }))) return;
+            if (catalogOperation || !library || !await confirm(t('移除音效库「{name}」？原音频文件会保留。', { name: libraryName(library) }))) return;
             if (timeline()?.hasLibraryClips() && !await timeline().discard()) return;
-            await withRemovalProgress(library.id, t('正在移除音效库「{name}」…', { name: libraryName(library) }), async () => {
+            await withCatalogProgress(library.id, t('正在移除音效库「{name}」…', { name: libraryName(library) }), async () => {
                 await api.delete(route('', library.id));
-                await loadLibraries();
+                await loadLibraries(state.library?.id === library.id ? undefined : state.library?.id);
+                localStorage.removeItem(hiddenFolderStorageKey(library.id));
                 say(t('已移除音效库'));
             });
         });
-        $('catalogRemovalDialog').addEventListener('cancel', event => event.preventDefault());
         on('impFile', () => importFiles(false));
         on('impFolder', () => importFiles(true));
         $('libraryView').addEventListener('dragover', event => { if (event.dataTransfer.types.includes('Files')) event.preventDefault(); });
@@ -2532,7 +2674,8 @@
         });
         on('btnJobs', async () => { modal('ovJobs'); await refreshJobs(); });
         on('btnJobHistory', async () => { modal('ovJobs'); await refreshJobs(); });
-        on('btnRebuild', async () => { await api.post(route('/index/rebuild'), {}); await refreshJobs(); });
+        on('btnRebuild', () => runLibraryMaintenance(state.library?.id, '/index/rebuild', '正在重建关键词索引…'));
+        on('btnRefreshMetadata', () => runLibraryMaintenance(state.library?.id, '/catalog/refresh-metadata', '正在刷新素材元数据…'));
         on('btnGc', () => openCleanup());
         on('btnGcRun', () => openCleanup(true));
         on('btnSettings', openSettings);
@@ -2549,6 +2692,7 @@
         $('languageSelect').onchange = event => i18n.setLanguage(event.target.value);
         window.addEventListener('soundbot-language', () => {
             renderJobTray();
+            attempt(refreshOpenLibrarySettings);
             desktop.setLanguage(i18n.language);
             $('searchInput').placeholder = t(isLibrary() ? '搜索音效、标签、UCS…' : '筛选工程素材…');
             $('btnFavorite').textContent = state.selected?.favorite ? t('取消收藏') : t('添加到收藏');

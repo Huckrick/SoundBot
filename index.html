@@ -694,7 +694,9 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
 .eq-dialog-head h3{flex:1;margin:0}
 .plugin-loading{position:fixed;inset:auto 24px 70px auto;margin:0;padding:14px 18px;max-width:380px;z-index:100;color:var(--tx1);background:var(--bg2);border:1px solid var(--line2);border-radius:var(--r-md);box-shadow:0 8px 28px var(--overlay)}
 .plugin-loading progress{display:block;width:100%;height:5px;margin-top:9px;accent-color:var(--tx1)}
-#catalogRemovalDialog progress{display:block;width:100%;height:6px;margin-top:14px;accent-color:var(--acc)}
+.library-settings-list{display:grid;gap:8px;margin-top:8px}
+.library-settings-entry{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px;border:1px solid var(--line);border-radius:6px}
+.library-settings-path{flex:1 0 100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--tx2)}
 .daw-rendered{flex:none;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:12px;padding:6px 12px;color:var(--tx2);font-size:11px;border-top:1px solid var(--line);background:var(--bg1)}
 .daw-rendered canvas{width:100%;height:40px;cursor:crosshair}
 .vst-row{display:grid;grid-template-columns:17px minmax(0,1fr) repeat(4,22px);align-items:center;gap:3px;min-height:40px;padding:5px 6px;border:1px solid var(--line2);border-radius:8px;background:var(--bg2);position:relative}
@@ -1042,7 +1044,7 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
       <input id="volRange" type="range" min="0" max="100" value="80" aria-label="音量">
       <span class="v" id="volVal">80%</span>
     </div>
-    <div class="job-tray" id="jobTray" hidden><button class="ghost-btn" id="btnJobs" aria-label="任务"><span id="jobName"></span><span id="jobCount"></span><progress id="jobProgress" aria-label="导入进度"></progress></button></div>
+    <div class="job-tray" id="jobTray" hidden><button class="ghost-btn" id="btnJobs" aria-label="任务"><span id="jobName" aria-live="polite"></span><span id="jobCount"></span><progress id="jobProgress" aria-label="任务进度"></progress></button></div>
   </footer>
 </div>
 
@@ -1069,6 +1071,7 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
     <div class="settings-layout">
       <nav class="settings-nav" aria-label="设置分类">
         <button type="button" class="on" data-settings="general" aria-pressed="true">常规</button>
+        <button type="button" data-settings="library" aria-pressed="false">音效库管理</button>
         <button type="button" class="" data-settings="daw" aria-pressed="false">DAW</button>
         <button type="button" class="" data-settings="wwise" aria-pressed="false">中间件</button>
         <button type="button" class="" data-settings="vst" aria-pressed="false">VST3</button>
@@ -1089,6 +1092,26 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
             <label for="languageSelect">语言</label>
             <select id="languageSelect"></select>
           </div>
+        </section>
+        <section class="settings-page hidden" id="settings-library">
+          <fieldset class="settings-group">
+            <legend>索引与元数据</legend>
+            <p class="sub" id="libraryIndexSummary" aria-live="polite"></p>
+            <p class="sub" id="libraryOperationStatus" aria-live="polite" hidden></p>
+            <div class="set-row">
+              <button class="ghost-btn" id="btnRefreshMetadata">刷新素材元数据</button>
+              <button class="ghost-btn" id="btnRebuild">重建关键词索引</button>
+            </div>
+            <p class="sub">元数据刷新只读取已入库的音频。重建索引只更新当前音效库的搜索数据。</p>
+          </fieldset>
+          <fieldset class="settings-group">
+            <legend>来源目录</legend>
+            <div class="library-settings-list" id="librarySources"></div>
+          </fieldset>
+          <fieldset class="settings-group">
+            <legend>隐藏的文件夹条目</legend>
+            <div class="library-settings-list" id="libraryHiddenFolders"></div>
+          </fieldset>
         </section>
         <section class="settings-page hidden" id="settings-daw">
           <div class="set-row"><label>DAW 工程媒体目录</label><button class="ghost-btn" id="btnDawDirectory">选择目录…</button></div>
@@ -1198,11 +1221,6 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
     </div>
   </form>
 </dialog>
-<dialog id="catalogRemovalDialog" class="modal" aria-labelledby="catalogRemovalTitle" aria-describedby="catalogRemovalHint">
-  <h3 id="catalogRemovalTitle" aria-live="polite"></h3>
-  <p id="catalogRemovalHint" class="modal-hint">正在更新音效库记录。磁盘上的原音频会保留。</p>
-  <progress aria-label="移除进度"></progress>
-</dialog>
 <dialog id="pluginDialog" class="modal">
   <button class="modal-close" id="btnClosePlugins" aria-label="关闭">✕</button>
   <h3>添加 VST3 效果器</h3>
@@ -1213,7 +1231,6 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
 <div class="overlay" id="ovJobs" role="dialog" aria-modal="true" aria-label="任务">
   <div class="modal"><button class="modal-close" data-close="ovJobs" aria-label="关闭">✕</button>
     <h3>任务</h3><div id="jobsList"></div>
-    <button class="ghost-btn" id="btnRebuild">重建关键词索引</button>
   </div>
 </div>
 <dialog id="textDialog" class="modal">

@@ -277,6 +277,60 @@ class CoreDeliveryTests(unittest.TestCase):
         self.assertEqual(self.items()["total"], 0)
         self.assertTrue(source.is_file())
 
+    def test_folder_dismissal_rechecks_shared_sources_before_removing_import(self):
+        parent = self.root / "source"
+        child = parent / "shared"
+        child.mkdir(parents=True)
+        path = audio_file(child / "tone.wav")
+        before = delivery.sha256(path)
+        self.import_folder(parent)
+        endpoint = "/api/v1/projects/default/catalog/dismiss-folder"
+        self.assertFalse(self.client.post(endpoint, json={"path": str(child)}).raise_for_status().json()["shared"])
+        child_job = self.import_folder(child)
+        first_id = self.items()["files"][0]["id"]
+        request = {"path": str(child), "remove_import": True}
+        self.assertEqual(self.client.post(endpoint, json=request).raise_for_status().json(),
+                         {"shared": True, "removed": 0})
+        self.assertEqual(self.items(q="tone")["files"][0]["id"], first_id)
+        self.assertEqual(len(catalog.sources(get_db_manager(), "default")), 2)
+        self.client.delete(f"/api/v1/projects/default/sources/{child_job['source_id']}").raise_for_status()
+        self.assertEqual(self.client.post(endpoint, json=request).raise_for_status().json(),
+                         {"shared": False, "removed": 1})
+        self.import_folder(parent)
+        self.assertEqual(self.items()["total"], 0)
+        self.assertEqual(delivery.sha256(path), before)
+
+    def test_library_maintenance_refreshes_metadata_and_rebuilds_only_its_index(self):
+        folder = self.root / "source"
+        folder.mkdir()
+        live = audio_file(folder / "impact.wav")
+        missing = audio_file(folder / "missing.wav")
+        self.import_folder(folder)
+        original = {item["filename"]: item for item in self.items()["files"]}
+        audio_hash = delivery.sha256(live)
+        other = self.client.post("/api/v1/projects", json={"name": "Other"}).json()["project_id"]
+        self.client.post(f"/api/v1/projects/{other}/imports", json={"file_paths": [str(live)]}).raise_for_status()
+        missing.unlink()
+        with get_db_manager().get_cursor() as cur:
+            cur.execute("UPDATE files SET sample_rate=1234,user_title='Mine' WHERE project_id='default' AND filename=?",
+                        (live.name,))
+        root = "/api/v1/projects/default"
+        job = self.client.post(root + "/catalog/refresh-metadata").raise_for_status().json()["job_id"]
+        status = self.client.get(f"/api/v1/jobs/{job}").raise_for_status().json()
+        self.assertEqual((status["state"], status["stage"], status["processed"]), ("completed", "partial", 2))
+        self.assertEqual(len(status["failed_items"]), 1)
+        refreshed = {item["filename"]: item for item in self.items()["files"]}
+        self.assertEqual(refreshed[live.name]["sample_rate"], original[live.name]["sample_rate"])
+        self.assertEqual(refreshed[live.name]["title"], "Mine")
+        self.assertEqual(refreshed[missing.name]["id"], original[missing.name]["id"])
+        self.assertEqual(delivery.sha256(live), audio_hash)
+        with get_db_manager().get_cursor() as cur:
+            cur.execute("DELETE FROM library_search")
+        self.assertEqual(self.client.get(root + "/index/status").json()["keyword"]["indexed"], 0)
+        self.client.post(root + "/index/rebuild").raise_for_status()
+        self.assertEqual(self.client.get(root + "/index/status").json()["keyword"]["indexed"], 2)
+        self.assertEqual(self.client.get(f"/api/v1/projects/{other}/index/status").json()["keyword"]["indexed"], 0)
+
     def test_active_jobs_and_ranged_native_source(self):
         source = audio_file(self.root / "source.wav")
         job_id = catalog.create_import(get_db_manager(), "default", paths=[str(source)])
