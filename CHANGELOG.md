@@ -4,6 +4,21 @@ Release history for SoundBot. Download current Windows and macOS installers from
 
 ## [Unreleased] / 未发布
 
+## [1.0.12] - 2026-11-16
+
+### Changed / 变更
+
+- Remember the clip export folder across restarts. At startup, keep the saved path or choose another folder. A disconnected drive leaves the saved preference available for later use. / 重启后记住剪辑存储目录，并提供「继续使用」和「更改目录」。外接盘暂时离线时保留原路径。
+- Show a progress dialog from confirmation through catalog refresh when removing a library or folder. / 移除音效库或文件夹时，从确认到列表刷新完成全程显示处理状态。
+
+### Fixed / 修复
+
+- Parent scans skip excluded folders even when a scan was already probing audio or the folder contains newly added files. Explicitly importing the folder restores access. Original files stay on disk. / 父目录重扫会跳过已排除的文件夹，包括后台正在探测的文件和后来新增的文件。手动重新导入可恢复该目录，磁盘上的原音频会保留。
+
+### Upgrade / 升级
+
+- The library uses database schema v8 to store directory exclusions. SoundBot creates a local database backup before migration. / 音效库升级到数据库架构 v8 以保存目录排除规则，升级前自动备份本机数据库。
+
 ## [1.0.11] - 2026-11-16
 
 ### Fixed / 修复
@@ -281,7 +296,8 @@ This historical prerelease is available as a source tag. The public release list
 - The Windows release gate starts the frozen backend with a clean `PATH` and no system FFmpeg, then requires the complete format matrix, exact waveforms, CLAP, Chroma, hybrid search, `win-unpacked`, and NSIS installer integrity checks to pass before publishing. / Windows 发布门禁会在干净 `PATH`、无系统 FFmpeg 下启动冻结后端，并要求全格式矩阵、精确波形、CLAP、Chroma、混合搜索、`win-unpacked` 与 NSIS 安装包完整性检查全部通过后才允许发布。
 - CI builds Windows x64 and macOS arm64 only on native runners and blocks release creation if any functional smoke test, model check, metadata check, package check, or installer check fails. / CI 仅在原生 runner 构建 Windows x64 与 macOS arm64，并在任一功能冒烟、模型、元数据、应用包或安装包检查失败时阻止创建 Release。
 
-[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.11...HEAD
+[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.12...HEAD
+[1.0.12]: https://github.com/Huckrick/SoundBot/compare/v1.0.11...v1.0.12
 [1.0.11]: https://github.com/Huckrick/SoundBot/compare/v1.0.10...v1.0.11
 [1.0.10]: https://github.com/Huckrick/SoundBot/compare/v1.0.9...v1.0.10
 [1.0.9]: https://github.com/Huckrick/SoundBot/compare/v1.0.8...v1.0.9

@@ -1464,8 +1464,8 @@
                 await refreshJobs(libraryRevision, true);
             }], [t('重定位…'), () => relocateItem({ source_id: item.id }, true)]);
         }
-        const removeLabel = item.id ? '撤销此来源目录的导入…' : '从音效库移除文件夹…';
-        actions.push([t(removeLabel), () => removeFolderSource(item, library)]);
+        if (item.id) actions.push([t('撤销此来源目录的导入…'), () => removeFolderSource(item, library, true)]);
+        actions.push([t('从音效库移除文件夹…'), () => removeFolderSource(item, library, false)]);
         actions.push([t('在文件管理器中显示'), () => desktop.revealFile(item.path)]);
         openTreeMenu(anchor, actions, event, t('文件夹操作'));
     }
@@ -1543,7 +1543,22 @@
     let jobsTimer;
     let jobRequest = 0;
     let lastImportRefresh = 0;
-    let removingLibrary = null;
+    let catalogRemoval = null;
+
+    async function withRemovalProgress(library, message, remove) {
+        if (catalogRemoval || state.library?.id !== library) return;
+        catalogRemoval = library;
+        const progress = $('catalogRemovalDialog');
+        $('catalogRemovalTitle').textContent = message;
+        progress.showModal();
+        try {
+            await remove();
+        } finally {
+            progress.close();
+            catalogRemoval = null;
+            attempt(refreshJobs);
+        }
+    }
     const showJobs = () => $('ovJobs').classList.contains('show');
 
     function scheduleJobPoll() {
@@ -1556,13 +1571,13 @@
         clearTimeout(jobsTimer);
         const request = ++jobRequest;
         const library = state.library?.id;
-        if (library && library === removingLibrary) return;
+        if (catalogRemoval) return;
         try {
             const [running, history] = await Promise.all([
                 api.get('/api/v1/jobs/active'),
                 library && showJobs() ? api.get(route('/jobs', library)) : null
             ]);
-            if (request !== jobRequest || revision !== libraryRevision || library === removingLibrary) return;
+            if (request !== jobRequest || revision !== libraryRevision || catalogRemoval) return;
             const currentImports = running.filter(job => job.kind === 'catalog_import' && job.project_id === library);
             const earlierImports = activeJobs.filter(job => job.kind === 'catalog_import' && job.project_id === library);
             const finished = submitted || earlierImports.some(job => !currentImports.some(item => item.id === job.id));
@@ -1583,7 +1598,7 @@
                 }
             }
         } catch (error) {
-            if (request === jobRequest && revision === libraryRevision && library !== removingLibrary) throw error;
+            if (request === jobRequest && revision === libraryRevision && !catalogRemoval) throw error;
         } finally {
             if (request === jobRequest) scheduleJobPoll();
         }
@@ -1678,32 +1693,39 @@
         return addFiles(folder ? [{ path: result.folder, isDirectory: true }] : result.files, libraryId);
     }
 
-    async function removeFolderSource(item, library) {
+    async function removeFolderSource(item, library, detachOnly) {
         const name = item.path.split(/[/\\]/).filter(Boolean).at(-1) || item.path;
         const accepted = await actionDialog({
-            message: t(item.id ? '撤销「{name}」的来源目录登记？' : '从音效库移除文件夹「{name}」？', { name }),
-            detail: t(item.id ? '仍由其他来源收录的素材和单独导入的素材会保留。磁盘文件不会删除。'
-                : '会移除夹内的库记录和来源登记。磁盘文件不会删除。'),
+            message: t(detachOnly ? '撤销「{name}」的来源目录登记？' : '从音效库移除文件夹「{name}」？', { name }),
+            detail: t(detachOnly ? '仍由其他来源收录的素材和单独导入的素材会保留。磁盘文件不会删除。'
+                : '会移除夹内的库记录和来源登记。重扫上级目录时将跳过此文件夹。磁盘文件不会删除。'),
             confirm: t('移除')
         });
-        if (!accepted || state.library?.id !== library) return;
-        if (item.id) await api.delete(route(`/sources/${encodeURIComponent(item.id)}`, library));
-        else await api.post(route('/catalog/remove-folder', library), { path: item.path });
-        if (state.library?.id !== library) return;
-        const selected = state.selected;
-        if (selected) {
-            try { await api.get(route(`/catalog/items/${encodeURIComponent(selected.id)}`, library)); }
-            catch (error) {
-                if (error.code !== 'file_not_found') throw error;
-                if (state.selected === selected) await select(null);
-                clipSessions.delete(selected.id);
+        if (!accepted) return;
+        await withRemovalProgress(library, t('正在移除文件夹「{name}」…', { name }), async () => {
+            if (detachOnly) await api.delete(route(`/sources/${encodeURIComponent(item.id)}`, library));
+            else await api.post(route('/catalog/remove-folder', library), { path: item.path });
+            const selected = state.selected;
+            const checkSelection = async () => {
+                if (!selected) return;
+                try { await api.get(route(`/catalog/items/${encodeURIComponent(selected.id)}`, library)); }
+                catch (error) {
+                    if (error.code !== 'file_not_found') throw error;
+                    if (state.selected === selected) await select(null);
+                    clipSessions.delete(selected.id);
+                }
+            };
+            state.selectedIds.clear();
+            const updates = await Promise.allSettled([state.filter.folder ? setFilter({}) : loadItems(true),
+                renderTree(), loadLibraries(library), timeline()?.loadDock(true), checkSelection()]);
+            const failure = updates.find(result => result.status === 'rejected');
+            if (failure) {
+                console.warn('[SoundBot] Catalog refresh after folder removal failed:', failure.reason);
+                say(t('文件夹已移除，部分视图刷新失败。'));
+                return;
             }
-        }
-        if (state.library?.id !== library) return;
-        state.selectedIds.clear();
-        await Promise.all([state.filter.folder ? setFilter({}) : loadItems(true),
-            renderTree(), loadLibraries(library), refreshJobs(), timeline()?.loadDock(true)]);
-        say(t(item.id ? '已移除来源文件夹' : '已从音效库移除文件夹'));
+            say(t(detachOnly ? '已移除来源文件夹' : '已从音效库移除文件夹'));
+        });
     }
 
     async function relocateItem(payload, directory) {
@@ -1855,14 +1877,33 @@
         if (!dawPicker) {
             dawPicker = desktop.chooseDawDirectory().then(directory => {
                 if (!directory) return null;
-                state.dawDirectory = directory;
-                $('btnDawDirectory').textContent = directory.split(/[/\\]/).filter(Boolean).at(-1) || directory;
-                $('btnDawDirectory').title = directory;
-                invalidateDelivery();
-                return directory;
+                setDawDirectory(directory.directory);
+                if (!directory.saved) say(t('本次已切换目录，但未能保存路径。'));
+                return directory.directory;
             }).finally(() => { dawPicker = null; });
         }
         return dawPicker;
+    }
+
+    function setDawDirectory(directory) {
+        state.dawDirectory = directory;
+        $('btnDawDirectory').textContent = directory.split(/[/\\]/).filter(Boolean).at(-1) || directory;
+        $('btnDawDirectory').title = directory;
+        invalidateDelivery();
+    }
+
+    async function askAboutDawDirectory() {
+        const { directory, previous } = await desktop.restoreDawDirectory();
+        if (dawPicker || state.dawDirectory) return;
+        if (directory) setDawDirectory(directory);
+        if (!previous) return;
+        const change = await actionDialog({
+            message: t(directory ? '是否更改上次使用的剪辑存储目录？' : '上次的剪辑存储目录当前不可用'),
+            detail: previous,
+            cancel: t(directory ? '继续使用' : '稍后设置'),
+            confirm: t('更改目录…')
+        });
+        if (change) await chooseDaw();
     }
 
     function finishClipDrag() {
@@ -2436,14 +2477,15 @@
         });
         on('btnRemoveLib', async () => {
             const library = state.library;
-            if (removingLibrary || !library || !await confirm(t('移除音效库「{name}」？原音频文件会保留。', { name: libraryName(library) }))) return;
+            if (catalogRemoval || !library || !await confirm(t('移除音效库「{name}」？原音频文件会保留。', { name: libraryName(library) }))) return;
             if (timeline()?.hasLibraryClips() && !await timeline().discard()) return;
-            removingLibrary = library.id;
-            try {
+            await withRemovalProgress(library.id, t('正在移除音效库「{name}」…', { name: libraryName(library) }), async () => {
                 await api.delete(route('', library.id));
                 await loadLibraries();
-            } finally { removingLibrary = null; }
+                say(t('已移除音效库'));
+            });
         });
+        $('catalogRemovalDialog').addEventListener('cancel', event => event.preventDefault());
         on('impFile', () => importFiles(false));
         on('impFolder', () => importFiles(true));
         $('libraryView').addEventListener('dragover', event => { if (event.dataTransfer.types.includes('Files')) event.preventDefault(); });
@@ -2611,6 +2653,7 @@
             const option = el('option', format.name); option.value = ext.slice(1); $('filterFormat').append(option);
         }
         await loadLibraries(localStorage.getItem('soundbot-library') || 'default');
+        attempt(askAboutDawDirectory);
         setInterval(() => {
             if (playback.active) syncTransport();
             fx()?.meters(playback.levels());

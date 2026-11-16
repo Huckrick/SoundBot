@@ -4,7 +4,7 @@
 
 Huckrick’s free, open-source sound library manager for game audio, with offline keyword search, waveform editing, Wwise writeback, and WAV export.
 
-The current source version is **v1.0.11 (stable)**. The latest stable release lists the published Windows and macOS installers and their SHA-256 checksums. [Download the latest stable release](https://github.com/Huckrick/SoundBot/releases/latest) · [Historical releases](docs/release-history.md)
+The current source version is **v1.0.12 (stable)**. The latest stable release lists the published Windows and macOS installers and their SHA-256 checksums. [Download the latest stable release](https://github.com/Huckrick/SoundBot/releases/latest) · [Historical releases](docs/release-history.md)
 
 SoundBot is a local sound library, waveform editor, and middleware workspace for macOS Apple Silicon and Windows x64. The main README covers installation, workflow, permissions, and troubleshooting in English. [English user guide](README.md#english) · [Changelog](CHANGELOG.md)
 
@@ -14,7 +14,7 @@ The interface supports Simplified Chinese, Traditional Chinese, Japanese, Englis
 
 Import files or source folders in place. Look up audio by filename, description, tags, or UCS category and narrow the results by folder, format, length, or channel count. Use groups and favorites for project selections, and use the inspector to check audio properties, file tags, and artwork. Right-click a source to rescan or update its location. With overlapping sources, use **Remove this source registration** on the separately registered folder to keep its sounds under the parent. Use **Remove folder from library** on a nested folder to remove its catalog entries and source registrations. The original media stays on disk. [Full library guide](README.md#manage-a-sound-library)
 
-In the waveform editor, drag **Drag to DAW** to deliver a whole sound or selection. Keep holding the mouse button if the WAV takes a moment to render. [Release history](CHANGELOG.md)
+In the waveform editor, drag **Drag to DAW** to deliver a whole sound or selection. Keep holding the mouse button if the WAV takes a moment to render. SoundBot remembers the media folder and asks whether to change it at startup. [Release history](CHANGELOG.md)
 
 ## Wwise workspace
 

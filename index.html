@@ -694,6 +694,7 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
 .eq-dialog-head h3{flex:1;margin:0}
 .plugin-loading{position:fixed;inset:auto 24px 70px auto;margin:0;padding:14px 18px;max-width:380px;z-index:100;color:var(--tx1);background:var(--bg2);border:1px solid var(--line2);border-radius:var(--r-md);box-shadow:0 8px 28px var(--overlay)}
 .plugin-loading progress{display:block;width:100%;height:5px;margin-top:9px;accent-color:var(--tx1)}
+#catalogRemovalDialog progress{display:block;width:100%;height:6px;margin-top:14px;accent-color:var(--acc)}
 .daw-rendered{flex:none;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:12px;padding:6px 12px;color:var(--tx2);font-size:11px;border-top:1px solid var(--line);background:var(--bg1)}
 .daw-rendered canvas{width:100%;height:40px;cursor:crosshair}
 .vst-row{display:grid;grid-template-columns:17px minmax(0,1fr) repeat(4,22px);align-items:center;gap:3px;min-height:40px;padding:5px 6px;border:1px solid var(--line2);border-radius:8px;background:var(--bg2);position:relative}
@@ -1196,6 +1197,11 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
       <button id="actionConfirm" class="pill-btn solid" value="ok"></button>
     </div>
   </form>
+</dialog>
+<dialog id="catalogRemovalDialog" class="modal" aria-labelledby="catalogRemovalTitle" aria-describedby="catalogRemovalHint">
+  <h3 id="catalogRemovalTitle" aria-live="polite"></h3>
+  <p id="catalogRemovalHint" class="modal-hint">正在更新音效库记录。磁盘上的原音频会保留。</p>
+  <progress aria-label="移除进度"></progress>
 </dialog>
 <dialog id="pluginDialog" class="modal">
   <button class="modal-close" id="btnClosePlugins" aria-label="关闭">✕</button>

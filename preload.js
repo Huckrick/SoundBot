@@ -119,6 +119,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.send('start-drag', deliveryId);
   },
   chooseDawDirectory: () => ipcRenderer.invoke('choose-daw-directory'),
+  restoreDawDirectory: () => ipcRenderer.invoke('restore-daw-directory'),
   onDeliveryError: (callback) => ipcRenderer.on('delivery-error', (_event, message) => {
     nativeAudioDrag = null;
     callback(message);

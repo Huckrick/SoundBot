@@ -213,6 +213,24 @@ def path_bounds(path):
     return prefix, prefix[:-1] + "0"
 
 
+def migrate_folder_exclusions(cursor):
+    cursor.execute("""CREATE TABLE IF NOT EXISTS library_excluded_folders (
+        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        canonical_path TEXT NOT NULL, PRIMARY KEY (project_id, canonical_path))""")
+
+
+def _excluded_folder_prefixes(cursor, project_id, source_root):
+    prefixes = []
+    for (excluded,) in cursor.execute("SELECT canonical_path FROM library_excluded_folders WHERE project_id=?",
+                                      (project_id,)):
+        prefix, _ = path_bounds(excluded)
+        # Explicitly registering a deeper source can opt into just that subtree.
+        if source_root != excluded and source_root.startswith(prefix):
+            continue
+        prefixes.append(prefix)
+    return tuple(prefixes)
+
+
 def is_indexed_path(cursor, path):
     return bool(cursor.execute("""SELECT EXISTS (SELECT 1 FROM projects p WHERE EXISTS (
         SELECT 1 FROM files f WHERE f.project_id=p.id AND f.canonical_path=?
@@ -363,6 +381,8 @@ def create_import(db, project_id, *, root=None, paths=(), recursive=True, source
     with _WRITE_LOCK, db.get_cursor() as cur:
         if root:
             key = canonicalize_path(root)
+            cur.execute("DELETE FROM library_excluded_folders WHERE project_id=? AND canonical_path=?",
+                        (project_id, key))
             cur.execute(
                 """INSERT INTO library_sources(id, project_id, path, canonical_path, recursive)
                 VALUES (?, ?, ?, ?, ?) ON CONFLICT(project_id, canonical_path)
@@ -416,7 +436,8 @@ def _write_failure(cur, job_id, path, message):
         (job_id, path, message))
 
 
-def _commit_batch(db, job_id, project_id, source_id, items, pool, explicit, path_failures=(), *, timings=None):
+def _commit_batch(db, job_id, project_id, source_id, items, pool, explicit, path_failures=(), *,
+                  source_root=None, timings=None):
     from core.audio_service import FileFingerprint
 
     started = perf_counter()
@@ -430,11 +451,12 @@ def _commit_batch(db, job_id, project_id, source_id, items, pool, explicit, path
         excluded = set() if explicit else {row[0] for row in cur.execute(
             f"SELECT canonical_path FROM library_exclusions WHERE project_id=? AND canonical_path IN ({slots})",
             (project_id, *keys))}
+        excluded_folders = _excluded_folder_prefixes(cur, project_id, source_root) if source_root else ()
     unchanged = {}
     pending = {}
     discovered = len(path_failures)
     for item in {item.key: item for item in items}.values():
-        if item.key in excluded:
+        if item.key in excluded or item.key.startswith(excluded_folders):
             continue
         prior = known.get(item.key)
         if prior and prior["scan_id"] == job_id:
@@ -450,6 +472,8 @@ def _commit_batch(db, job_id, project_id, source_id, items, pool, explicit, path
     with _WRITE_LOCK, db.get_cursor() as cur:
         if not cur.execute("SELECT 1 FROM jobs WHERE id=? AND state='running'", (job_id,)).fetchone():
             return
+        excluded_folders = _excluded_folder_prefixes(cur, project_id, source_root) if source_root else ()
+        unchanged = {key: file_id for key, file_id in unchanged.items() if not key.startswith(excluded_folders)}
         for path, message in path_failures:
             _write_failure(cur, job_id, path, message)
         if path_failures and source_id:
@@ -471,6 +495,8 @@ def _commit_batch(db, job_id, project_id, source_id, items, pool, explicit, path
                 results.append(_probe(item))
         for item, fields in results:
             # A user may have excluded the record while the probe ran.
+            if item.key.startswith(excluded_folders):
+                continue
             if not explicit and cur.execute(
                 "SELECT 1 FROM library_exclusions WHERE project_id=? AND canonical_path=?",
                 (project_id, item.key),
@@ -530,9 +556,16 @@ def _commit_batch(db, job_id, project_id, source_id, items, pool, explicit, path
 def _scan_directory(db, job_id, project_id, source, directory, pool, timings=None):
     import config
 
+    root = source["canonical_path"]
+    directory_prefix, _ = path_bounds(canonicalize_path(directory))
+    with db.get_cursor() as cur:
+        if directory_prefix.startswith(_excluded_folder_prefixes(cur, project_id, root)):
+            return True
+
     def flush(batch, directories, failures):
         if batch or failures:
-            _commit_batch(db, job_id, project_id, source["id"], batch, pool, False, failures, timings=timings)
+            _commit_batch(db, job_id, project_id, source["id"], batch, pool, False, failures,
+                          source_root=root, timings=timings)
             batch.clear()
             failures.clear()
         if directories:
@@ -678,9 +711,8 @@ def remove_folder_items(db, project_id, folder):
     with _WRITE_LOCK, db.get_cursor() as cur:
         cur.execute("BEGIN IMMEDIATE")
         params = (project_id, lo, hi)
-        cur.execute("""INSERT OR IGNORE INTO library_exclusions(project_id,canonical_path)
-            SELECT project_id,canonical_path FROM files WHERE project_id=? AND canonical_path>=? AND canonical_path<?""",
-                    params)
+        cur.execute("INSERT OR IGNORE INTO library_excluded_folders(project_id,canonical_path) VALUES (?,?)",
+                    (project_id, key))
         removed = cur.execute("""DELETE FROM files WHERE project_id=? AND canonical_path>=? AND canonical_path<?""",
                               params).rowcount
         _delete_source_registrations(cur, project_id,
@@ -881,6 +913,12 @@ def relocate(db, project_id, destination, *, file_id=None, source_id=None):
         cur.execute("""UPDATE library_exclusions SET canonical_path=? || SUBSTR(canonical_path,?)
             WHERE project_id=? AND canonical_path>=? AND canonical_path<?""",
             (prefix, len(lo)+1, project_id, lo, hi))
+        cur.execute("""INSERT OR IGNORE INTO library_excluded_folders(project_id,canonical_path)
+            SELECT project_id, ? || SUBSTR(canonical_path,?) FROM library_excluded_folders
+            WHERE project_id=? AND canonical_path>=? AND canonical_path<?""",
+            (prefix, len(lo)+1, project_id, lo, hi))
+        cur.execute("DELETE FROM library_excluded_folders WHERE project_id=? AND canonical_path>=? AND canonical_path<?",
+                    (project_id, lo, hi))
         cur.execute("""UPDATE library_sources SET path=? || SUBSTR(canonical_path,?),
             canonical_path=? || SUBSTR(canonical_path,?)
             WHERE project_id=? AND canonical_path>=? AND canonical_path<?""",

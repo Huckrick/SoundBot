@@ -422,11 +422,11 @@ async def scan_only(request: schemas.ScanRequest):
 # ==================== 异步导入（带进度推送） ====================
 
 def _require_library(project_id):
+    if project_id in _projects_deleting:
+        raise SoundBotAPIError("project_deleting", "音效库正在移除", status_code=409)
     db = get_db_manager()
     if not is_safe_project_id(project_id) or not db.get_project(project_id):
         raise SoundBotAPIError("project_not_found", "音效库不存在", status_code=404)
-    if project_id in _projects_deleting:
-        raise SoundBotAPIError("project_deleting", "音效库正在移除", status_code=409)
     return db
 
 
@@ -1356,12 +1356,12 @@ async def delete_project(project_id: str):
     db = _require_library(project_id)
     _projects_deleting.add(project_id)
     try:
-        db.request_project_job_cancellation(project_id)
+        await asyncio.to_thread(db.request_project_job_cancellation, project_id)
         async with _get_project_index_lock(project_id):
             if not await asyncio.to_thread(db.delete_project, project_id):
                 raise SoundBotAPIError("project_delete_failed", "移除音效库失败", status_code=503)
         if config.CURRENT_PROJECT_ID == project_id:
-            projects = db.get_all_projects()
+            projects = await asyncio.to_thread(db.get_all_projects)
             config.CURRENT_PROJECT_ID = projects[0]["id"] if projects else "default"
         return {"success": True}
     finally:

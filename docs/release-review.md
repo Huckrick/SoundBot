@@ -18,6 +18,8 @@ Filename categories and tag folders upgrade the library to schema v7. To return 
 
 文件名分类和标签夹会将音效库升级到数据库架构 v7。若从 v5 升级后要退回 v1.0.8，先退出 SoundBot，保留当前数据库，再将 `db/soundbot.db.pre-v5-to-v7.bak` 恢复为 `db/soundbot.db`，之后打开旧版。快照记录的是升级前的音效库状态。从 v6 测试版升级会生成 `pre-v6-to-v7.bak` 快照。
 
+Directory exclusions use schema v8. An upgrade from schema v7 creates `db/soundbot.db.pre-v7-to-v8.bak`. / 文件夹排除规则采用数据库架构 v8，从 v7 升级前会保存 `db/soundbot.db.pre-v7-to-v8.bak`。
+
 ## Advisory triage / 依赖告警
 
 The v1.0.1 runtime lock updates AnyIO, certifi, IDNA, and Starlette. ChromaDB and the legacy model stack are absent from the runtime lock and frozen package. Old alerts should be reassessed against the current default branch as GitHub refreshes its dependency graph. The npm audit checks the full build lock, including the packaging tools. Its remaining moderate alerts come from the build-time minimatch dependency chain. Installer inputs are the reviewed source and fixed build configuration.

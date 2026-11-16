@@ -472,6 +472,15 @@ def _renderer_smoke_expression(
   }};
   const workspace = globalThis.SoundBotWorkspace;
   await until(() => workspace?.state.library?.id === 'default', 'active library');
+  const dawDirectory = {json.dumps(str(file_fixture.parent.parent / 'DAW 工程媒体'), ensure_ascii=False)};
+  const actionDialog = document.getElementById('actionDialog');
+  await until(() => actionDialog.open && document.getElementById('actionMessage').textContent ===
+    SoundBotI18n.t('是否更改上次使用的剪辑存储目录？'), 'saved DAW folder prompt');
+  if (workspace.folderKey(workspace.state.dawDirectory) !== workspace.folderKey(dawDirectory)) {{
+    throw new Error('saved DAW folder was not restored');
+  }}
+  document.getElementById('actionCancel').click();
+  await until(() => !actionDialog.open, 'keeping saved DAW folder');
   const searchInput = document.getElementById('searchInput');
   searchInput.value = 'tone';
   searchInput.dispatchEvent(new Event('input', {{bubbles: true}}));
@@ -640,6 +649,24 @@ def _renderer_smoke_expression(
   const treeEntry = (path, scope = document.getElementById('tree')) => [...scope.querySelectorAll('[data-folder]')].find(
     row => workspace.folderKey(row.dataset.folder) === workspace.folderKey(path)
   );
+  const confirmRemoval = async () => {{
+    await until(() => actionDialog.open, 'removal confirmation');
+    const originalFetch = globalThis.fetch;
+    let requestHadProgress = false;
+    globalThis.fetch = (url, options) => {{
+      if (options?.method === 'DELETE' || String(url).endsWith('/catalog/remove-folder')) {{
+        requestHadProgress = document.getElementById('catalogRemovalDialog').open;
+      }}
+      return originalFetch(url, options);
+    }};
+    try {{
+      document.getElementById('actionConfirm').click();
+      await until(() => requestHadProgress && !document.getElementById('catalogRemovalDialog').open,
+                  'visible removal progress and completion');
+    }} finally {{
+      globalThis.fetch = originalFetch;
+    }}
+  }};
   const removeTreeEntry = async (row, action) => {{
     row.dispatchEvent(new MouseEvent('contextmenu', {{ bubbles: true, cancelable: true }}));
     const remove = [...document.querySelectorAll('#folderMenu [role="menuitem"]')].find(
@@ -647,8 +674,7 @@ def _renderer_smoke_expression(
     );
     if (!remove) throw new Error('Folder context menu has no remove action');
     remove.click();
-    await until(() => document.getElementById('actionDialog').open, 'folder removal confirmation');
-    document.getElementById('actionConfirm').click();
+    await confirmRemoval();
   }};
   await until(() => treeEntry(parentFolder) && treeEntry(folderFilter), 'both source registrations');
   treeEntry(parentFolder).querySelector('.tree-expand').click();
@@ -664,6 +690,18 @@ def _renderer_smoke_expression(
   const remaining = await workspace.browseCatalog(20);
   if (remaining.files.length !== 1 || remaining.files[0].id !== records[0].id) {{
     throw new Error('Removing folders did not preserve the unrelated item');
+  }}
+  const disposableName = 'Library removal progress fixture';
+  document.getElementById('btnNewLib').click();
+  const textDialog = document.getElementById('textDialog');
+  await until(() => textDialog.open, 'new library dialog');
+  document.getElementById('textValue').value = disposableName;
+  textDialog.querySelector('button[value="ok"]').click();
+  await until(() => workspace.state.library?.name === disposableName, 'new active library');
+  document.getElementById('btnRemoveLib').click();
+  await confirmRemoval();
+  if (workspace.state.library?.id !== 'default' || workspace.state.libraries.length !== 1) {{
+    throw new Error('Library removal did not return to the remaining library');
   }}
 
   return {{
@@ -922,6 +960,11 @@ def main() -> int:
 
     appdata = fixture_root / "AppData" / "Roaming"
     local_appdata = fixture_root / "AppData" / "Local"
+    user_data = fixture_root / "user-data"
+    daw_directory = fixture_root / "DAW 工程媒体"
+    user_data.mkdir(parents=True, exist_ok=True)
+    daw_directory.mkdir(parents=True, exist_ok=True)
+    (user_data / "daw-directory.json").write_text(json.dumps({"directory": str(daw_directory.resolve())}), encoding="utf-8")
     appdata.mkdir(parents=True, exist_ok=True)
     local_appdata.mkdir(parents=True, exist_ok=True)
     stdout_log = fixture_root / "installed-electron.stdout.log"
@@ -934,7 +977,7 @@ def main() -> int:
         {
             "APPDATA": str(appdata),
             "LOCALAPPDATA": str(local_appdata),
-            "SOUNDBOT_USER_DATA_DIR": str(fixture_root / "user-data"),
+            "SOUNDBOT_USER_DATA_DIR": str(user_data),
             "ELECTRON_ENABLE_LOGGING": "true",
             "ELECTRON_LOG_FILE": str(electron_log),
             "HF_HUB_OFFLINE": "1",

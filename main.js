@@ -74,6 +74,8 @@ function saveInterfaceLocale(value) {
 }
 const desktopToken = randomUUID();
 let dawDirectory = null;
+let dawPreferenceChecked = false;
+const dawPreferencePath = () => path.join(getUserDataDir(), 'daw-directory.json');
 const middlewareFolders = new Map();
 const middlewareProjects = Object.freeze({
   fmod: { extension: 'fspro', name: 'FMOD Studio', folder: 'Assets' },
@@ -1235,6 +1237,47 @@ async function showOwnedOpenDialog(event, options = {}) {
   }
 }
 
+async function validateDawDirectory(directory) {
+  const resolved = await fs.promises.realpath(directory);
+  if (!(await fs.promises.stat(resolved)).isDirectory()) throw new Error(t('DAW 媒体目录不可用'));
+  await fs.promises.access(resolved, fs.constants.W_OK);
+  return resolved;
+}
+
+async function restoreDawDirectory() {
+  if (dawPreferenceChecked) return { directory: dawDirectory, previous: null };
+  dawPreferenceChecked = true;
+  let previous;
+  try {
+    const stored = JSON.parse(await fs.promises.readFile(dawPreferencePath(), 'utf8'));
+    if (typeof stored.directory === 'string' && path.isAbsolute(stored.directory)) previous = stored.directory;
+  } catch (error) {
+    if (error.code !== 'ENOENT') console.warn('[DAW] Could not read media directory preference:', error.code || error.name);
+  }
+  if (!previous || dawDirectory) return { directory: dawDirectory, previous: null };
+  try {
+    const restored = await validateDawDirectory(previous);
+    dawDirectory ??= restored;
+  } catch {
+    // Keep the preference on disk if a volume is disconnected or the directory has moved.
+  }
+  return { directory: dawDirectory, previous };
+}
+
+async function saveDawDirectory(directory) {
+  const preference = dawPreferencePath();
+  const staged = `${preference}.${randomUUID()}.tmp`;
+  try {
+    await fs.promises.writeFile(staged, JSON.stringify({ directory }), { flag: 'wx', mode: 0o600 });
+    await fs.promises.rename(staged, preference);
+    return true;
+  } catch (error) {
+    console.warn('[DAW] Could not save media directory preference:', error.code || error.name);
+    await fs.promises.rm(staged, { force: true }).catch(() => {});
+    return false;
+  }
+}
+
 // ==================== IPC 处理 ====================
 
 function confirmInApp(window, purpose, options) {
@@ -1579,16 +1622,22 @@ function setupIpcHandlers() {
     }
   });
 
+  ipcMain.handle('restore-daw-directory', (event) => {
+    if (event.sender !== mainWindow?.webContents) throw new Error('窗口不可用');
+    return restoreDawDirectory();
+  });
+
   ipcMain.handle('choose-daw-directory', async (event) => {
     if (event.sender !== mainWindow?.webContents) throw new Error('窗口不可用');
     const result = await showOwnedOpenDialog(event, {
       title: t('选择 DAW 工程媒体目录'),
+      defaultPath: dawDirectory || undefined,
       properties: ['openDirectory']
     });
     if (result.canceled || !result.filePaths[0]) return null;
-    dawDirectory = fs.realpathSync(result.filePaths[0]);
+    dawDirectory = await validateDawDirectory(result.filePaths[0]);
     dragDeliveries.clear();
-    return dawDirectory;
+    return { directory: dawDirectory, saved: await saveDawDirectory(dawDirectory) };
   });
 
   ipcMain.handle('desktop-media', async (event, action, data = {}) => {

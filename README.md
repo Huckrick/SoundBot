@@ -43,7 +43,7 @@ SoundBot は、ゲームオーディオ制作向けの無料のオープンソ�
 
 下部の波形で範囲を選択し、フェードやゲインを調整できます。マウスホイールでポインターを中心に拡大・縮小し、Shift を押しながら回すと横に移動します。スペースキーで再生・一時停止できます。テキスト入力欄では通常どおり空白を入力できます。
 
-初回は DAW プロジェクトのメディアフォルダーを選択します。波形サムネイルからは素材全体を、波形エディターでは選択範囲の上端から選択部分をドラッグできます。WAV の準備中はマウスボタンを押したまま待つと、そのまま DAW にドロップできます。ミドルウェアのタイムラインに直接ドロップすると、編集可能なクリップを追加できます。ライブラリと下部パネルには同じフォルダー、カテゴリ、検索条件が反映されます。
+初回は DAW プロジェクトのメディアフォルダーを選択します。次回の起動時には前回の保存先が表示され、そのまま使うか変更するかを選べます。波形サムネイルからは素材全体を、波形エディターでは選択範囲の上端から選択部分をドラッグできます。WAV の準備中はマウスボタンを押したまま待つと、そのまま DAW にドロップできます。ミドルウェアのタイムラインに直接ドロップすると、編集可能なクリップを追加できます。ライブラリと下部パネルには同じフォルダー、カテゴリ、検索条件が反映されます。
 
 #### ミドルウェアワークスペース
 
@@ -111,7 +111,7 @@ SoundBot 把音效查找、剪辑和交付放在同一个桌面应用里。素�
 
 ### 下载和安装
 
-当前源码版本为 **v1.0.11（稳定版）**。Windows 和 macOS 安装包及 SHA-256 校验清单以最新稳定版发行页为准。 [下载最新稳定版](https://github.com/Huckrick/SoundBot/releases/latest) · [更新日志](CHANGELOG.md)
+当前源码版本为 **v1.0.12（稳定版）**。Windows 和 macOS 安装包及 SHA-256 校验清单以最新稳定版发行页为准。 [下载最新稳定版](https://github.com/Huckrick/SoundBot/releases/latest) · [更新日志](CHANGELOG.md)
 
 | 平台 | 发行文件 | 安装方式 |
 | --- | --- | --- |
@@ -127,7 +127,7 @@ SoundBot 把音效查找、剪辑和交付放在同一个桌面应用里。素�
 1. **建立音效库。** 从「导入」选择文件或文件夹，也可直接拖入。文件留在磁盘原位置，库内保存路径和检索数据。同一库按路径合并重复素材，读到的记录会随着后台导入逐步出现在检索结果里。可从任务面板查看进度、暂停和重试失败项。
 2. **维护来源目录。** 在左栏右键来源，选择「检查变更」重扫，移动过素材时可用「重定位」更新引用。重复登记了总目录中的小目录时，右键单独出现的条目，选「撤销此来源目录的导入」，素材仍由总目录收录。想把子目录内容从当前库中移除时，展开总目录后右键该子目录，选「从音效库移除文件夹」。两个入口都保留磁盘原件。
 3. **找素材。** 离线关键词检索覆盖文件名、描述、标签和 UCS，可结合目录、格式、时长和声道筛选。使用分组把不同路径的音效归到同一个项目集合，也可收藏常用素材。详情面板显示格式、时长、声道、采样率、源标签和嵌入封面。
-4. **试听和交付。** 选中音效后在波形上框选，调整淡入、淡出和增益。先选择 DAW 工程媒体目录，再从「拖出到 DAW」、缩略波形或选区上沿拖动。渲染时继续按住，看到系统拖拽图标后松手。SoundBot 将成品写入选定目录，便于 DAW 保持工程媒体引用。
+4. **试听和交付。** 选中音效后在波形上框选，调整淡入、淡出和增益。先选择 DAW 工程媒体目录，重启时可继续用上次的路径或更改目录。从「拖出到 DAW」、缩略波形或选区上沿拖动，渲染时继续按住，看到系统拖拽图标后松手。SoundBot 将成品写入选定目录，便于 DAW 保持工程媒体引用。
 
 「标签 → 文件名分类」会根据素材原文件名识别脚步、门、天气等常见类别。名称含糊时保持未分类。手动标签和 UCS 分类继续保留。
 
@@ -188,7 +188,7 @@ SoundBot supports **Simplified Chinese, Traditional Chinese, Japanese, English, 
 
 ### Download and install
 
-The current source version is **v1.0.11 (stable)**. The latest stable release lists the published Windows and macOS installers and their SHA-256 checksums. [Download the latest stable release](https://github.com/Huckrick/SoundBot/releases/latest) · [Changelog](CHANGELOG.md)
+The current source version is **v1.0.12 (stable)**. The latest stable release lists the published Windows and macOS installers and their SHA-256 checksums. [Download the latest stable release](https://github.com/Huckrick/SoundBot/releases/latest) · [Changelog](CHANGELOG.md)
 
 | Platform | Release file | Installation |
 | --- | --- | --- |
@@ -204,7 +204,7 @@ Press Space to play or pause in the workspace. In text fields, Space types a spa
 1. **Import.** Add files or folders from the Import menu or drag them into the library. SoundBot indexes the original paths and shows results as batches finish. Open the import activity to check progress, pause, or retry failures.
 2. **Maintain sources.** Right-click a registered source to check for changes or relocate it after moving media. With overlapping source folders, removing the separately registered source leaves sounds indexed by the parent in the library. Removing the nested folder from the parent tree also removes its catalog entries and registrations. Original files stay on disk.
 3. **Find and organize.** Search filenames, descriptions, tags, and UCS categories offline. Narrow the results by folder, format, duration, or channels, and collect sounds with favorites and groups. The inspector shows audio properties, embedded metadata, and cover art when the file supplies it.
-4. **Audition and deliver.** Mark a range and adjust fades or gain. Choose the DAW project's media folder on first use. Drag the **Drag to DAW** control, the top of a selection, or a thumbnail waveform. While the WAV renders, keep holding the mouse button and drop when the system drag icon appears. The rendered file is delivered to the chosen media directory.
+4. **Audition and deliver.** Mark a range and adjust fades or gain. Choose the DAW project's media folder on first use. At startup, you can keep or change the saved folder. Drag the **Drag to DAW** control, the top of a selection, or a thumbnail waveform. While the WAV renders, keep holding the mouse button and drop when the system drag icon appears. The rendered file is delivered to the chosen media directory.
 
 Open **Tags → Filename categories** to browse common groups such as footsteps, doors, and weather. SoundBot uses the original filename and leaves ambiguous names uncategorized. Manual tags and UCS categories are preserved.
 

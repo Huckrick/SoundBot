@@ -180,11 +180,15 @@ class CoreDeliveryTests(unittest.TestCase):
         path = "/api/v1/projects/default/catalog/remove-folder"
         self.assertEqual(self.client.post(path, json={"path": "relative"}).status_code, 400)
         self.assertEqual(self.client.post(path, json={"path": str(folder)}).raise_for_status().json(), {"removed": 1})
+        newly_added = audio_file(folder / "new-after-removal.wav")
         self.import_folder(root)
         self.assertEqual([Path(file["path"]) for file in self.items()["files"]], [kept.resolve()])
         self.assertTrue(removed.is_file())
         self.client.post("/api/v1/projects/default/imports", json={"file_paths": [str(removed)]}).raise_for_status()
         self.assertEqual(self.items()["total"], 2)
+        self.import_folder(folder)
+        self.assertEqual({Path(file["path"]).resolve() for file in self.items()["files"]},
+                         {kept.resolve(), removed.resolve(), newly_added.resolve()})
 
     def test_overlapping_sources_can_be_detached_or_excluded_as_a_subtree(self):
         parent = self.root / "Total"
@@ -243,6 +247,34 @@ class CoreDeliveryTests(unittest.TestCase):
             future.result(timeout=10)
         self.assertEqual(self.items()["total"], 0)
         self.assertIsNone(catalog.import_status(db, job_id))
+        self.assertTrue(source.is_file())
+
+    def test_excluding_folder_while_parent_scan_probes_an_unseen_file(self):
+        parent = self.root / "Parent"
+        child = parent / "Child"
+        child.mkdir(parents=True)
+        source = audio_file(child / "not-yet-indexed.wav")
+        db = get_db_manager()
+        job_id = catalog.create_import(db, "default", root=str(parent))
+        probing, resume = Event(), Event()
+        real_probe = catalog._probe
+
+        def wait_to_probe(item):
+            probing.set()
+            if not resume.wait(10):
+                raise TimeoutError("Timed out waiting for folder exclusion")
+            return real_probe(item)
+
+        with patch.object(catalog, "_probe", side_effect=wait_to_probe), ThreadPoolExecutor(1) as worker:
+            future = worker.submit(catalog.run_import, db, job_id)
+            try:
+                self.assertTrue(probing.wait(10))
+                response = self.client.post("/api/v1/projects/default/catalog/remove-folder", json={"path": str(child)})
+                response.raise_for_status()
+            finally:
+                resume.set()
+            future.result(timeout=10)
+        self.assertEqual(self.items()["total"], 0)
         self.assertTrue(source.is_file())
 
     def test_active_jobs_and_ranged_native_source(self):
