@@ -7,11 +7,13 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import shutil
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import wave
 from pathlib import Path
 from typing import Any, Optional
 
@@ -59,6 +61,9 @@ def request_json(
         url += "?" + urllib.parse.urlencode(query)
     data = None
     headers = {"Accept": "application/json"}
+    token = os.getenv("SOUNDBOT_IPC_TOKEN")
+    if token and urllib.parse.urlsplit(base_url).hostname in {"127.0.0.1", "::1"}:
+        headers["X-SoundBot-IPC"] = token
     if body is not None:
         data = json.dumps(body, ensure_ascii=False).encode("utf-8")
         headers["Content-Type"] = "application/json; charset=utf-8"
@@ -211,6 +216,14 @@ def run_smoke(base_url: str, fixture_root: Path, job_timeout: float) -> dict[str
     if search.get("total") != len(fixtures):
         raise AssertionError(f"keyword search missed imported fixtures: {search}")
 
+    if os.getenv("SOUNDBOT_IPC_TOKEN"):
+        check_delivery(base_url, fixture_root, files)
+    folder = fixtures[0].parent
+    removed = request_json(base_url, "POST", "/api/v1/projects/default/catalog/remove-folder",
+                           body={"path": str(folder)})
+    if removed.get("removed") != len(fixtures) or not all(path.is_file() for path in fixtures):
+        raise AssertionError("Catalog folder removal did not preserve the source files")
+
     return {
         "fixtures": len(fixtures),
         "waveforms": waveform_summary,
@@ -218,7 +231,30 @@ def run_smoke(base_url: str, fixture_root: Path, job_timeout: float) -> dict[str
         "artifacts": artifacts,
         "search_results": search.get("total"),
         "wma_playback": str(playback_path),
+        "folder_removal": removed["removed"],
     }
+
+
+def check_delivery(base_url, fixture_root, files):
+    asset = next(item for item in files if Path(item["path"]).suffix.lower() == ".wav")
+    source = Path(asset["path"])
+    before = sha256_file(source)
+    directory = (fixture_root / "DAW 工程媒体").resolve()
+    directory.mkdir(exist_ok=True)
+    duration = asset["duration"]
+    for offset, span in ((0, duration), (duration / 4, duration / 2)):
+        result = request_json(base_url, "POST", "/api/v1/delivery", body={
+            "project_id": "default", "directory": str(directory),
+            "clip": {"file_id": asset["id"], "offset": offset, "duration": span}, "bits": 24,
+        })
+        rendered = Path(result["path"])
+        if rendered.parent != directory or rendered == source or rendered.suffix.lower() != ".wav":
+            raise AssertionError(f"Unexpected DAW delivery path: {rendered}")
+        with wave.open(str(rendered), "rb") as playback:
+            if playback.getsampwidth() != 3 or abs(playback.getnframes() - span * playback.getframerate()) > 1:
+                raise AssertionError(f"Incorrect rendered DAW delivery: {rendered}")
+    if sha256_file(source) != before or list(directory.glob("*.part")):
+        raise AssertionError("DAW delivery modified the source or left a staging file")
 
 
 def parse_args() -> argparse.Namespace:

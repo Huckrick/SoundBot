@@ -594,6 +594,9 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
 .bottom-stage.wwise:not(.dock-editing,.dock-collapsed){height:236px}
 .bottom-stage.dock-editing,.bottom-stage:not(.wwise){height:224px}
 .editor-rate{font-variant-numeric:tabular-nums;white-space:nowrap}
+#btnDawDrag{flex:none;white-space:nowrap;font-size:11px;padding-inline:7px}
+#btnDawDrag.ready{cursor:grab}
+#btnDawDrag[aria-busy=true]{cursor:progress}
 .clip-options{margin-left:auto;position:relative;color:var(--tx2);z-index:3}
 .clip-options summary{padding:3px 8px;white-space:nowrap;cursor:pointer}
 .clip-option-fields{position:absolute;right:0;top:calc(100% + 5px);display:grid;gap:6px;background:var(--bg1);border:1px solid var(--line2);border-radius:8px;padding:9px 12px;box-shadow:0 6px 20px var(--overlay)}
@@ -969,6 +972,7 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
           <button id="zoomReset" aria-label="复位缩放" title="复位缩放">⟲</button>
         </div>
         <span id="sampleRateInfo" class="editor-rate"></span>
+        <button type="button" id="btnDawDrag" class="ghost-btn" draggable="true" disabled>拖出到 DAW</button>
         <details class="clip-options" id="clipOptions">
           <summary>剪辑参数</summary>
           <div class="clip-option-fields">

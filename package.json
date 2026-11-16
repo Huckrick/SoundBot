@@ -1,6 +1,6 @@
 {
   "name": "soundbot",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "SoundBot - local-first sound effects library and middleware workspace",
   "main": "main.js",
   "scripts": {
@@ -17,7 +17,8 @@
     "audio",
     "sound",
     "manager",
-    "ai",
+    "local-search",
+    "sfx-library",
     "pyinstaller"
   ],
   "author": "Huckrick",

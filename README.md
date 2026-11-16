@@ -2,7 +2,7 @@
 
 <h1 align="center">SoundBot</h1>
 
-<p align="center"><a href="#日本語">日本語</a> · <a href="#简体中文">简体中文</a> · <a href="#english">English</a> · <a href="https://github.com/Huckrick/SoundBot/releases">Releases</a></p>
+<p align="center"><a href="#日本語">日本語</a> · <a href="#简体中文">简体中文</a> · <a href="#english">English</a> · <strong><a href="https://github.com/Huckrick/SoundBot/releases/latest">最新版 · 最新稳定版 · Latest stable release</a></strong></p>
 
 <p align="center">ゲームオーディオ向けのオープンソース効果音ライブラリ管理ツール。素材の検索、波形編集、ミドルウェアへの反映を一つのアプリで。<br>面向游戏音频的开源音效库管理器。在本地查找和剪辑音效，并交付到中间件工程。<br>An open-source sound library manager for game audio. Search and edit your local sounds, then deliver them to middleware projects.</p>
 
@@ -105,7 +105,7 @@ SoundBot 把音效查找、剪辑和交付放在同一个桌面应用里。素�
 
 ### 下载和安装
 
-当前源码版本为 **v1.0.9（稳定版）**。安装包的发布状态以 GitHub Releases 为准。旧版保留在发行记录中，供查阅和回退。 [发行页](https://github.com/Huckrick/SoundBot/releases) · [更新日志](CHANGELOG.md)
+当前源码版本为 **v1.0.10（稳定版）**。安装包的发布状态以 GitHub Releases 为准。旧版保留在发行记录中，供查阅和回退。 [发行页](https://github.com/Huckrick/SoundBot/releases) · [更新日志](CHANGELOG.md)
 
 | 平台 | 发行文件 | 安装方式 |
 | --- | --- | --- |
@@ -119,7 +119,7 @@ SoundBot 把音效查找、剪辑和交付放在同一个桌面应用里。素�
 在工作区按空格播放或暂停。文本输入区中的空格照常输入。
 
 1. 新建音效库并导入文件或目录。没有音效库时，可以从「导入」直接新建。右键来源目录可检查变更、重新定位或从库中移除。移除后，磁盘上的原音频会保留。
-2. 选择素材，试听并在底部波形框选。第一次拖到 DAW 时，选择工程媒体目录。成品就绪后从选区上沿拖出，交付的 WAV 留在该目录。
+2. 选择素材，可在底部波形框选。点击编辑器的「拖出到 DAW」准备整段或选区，首次使用需选择工程媒体目录。WAV 就绪后，把按钮或选区上沿拖到 DAW。
 3. 在中间件工作台编辑多轨。Wwise 通过本机 WAAPI 连接，可写回符合条件的 PCM WAV 并留存备份。FMOD Studio 和 CRI Atom Craft 接收渲染到工程素材目录的新 WAV，随后在宿主中导入或注册。 [宿主操作指南](docs/middleware.md)
 
 「标签 → 文件名分类」会根据素材原文件名识别脚步、门、天气等常见类别。名称含糊时保持未分类。手动标签和 UCS 分类继续保留。
@@ -169,7 +169,7 @@ SoundBot supports **Simplified Chinese, Traditional Chinese, Japanese, English, 
 
 ### Download and install
 
-The current source version is **v1.0.9 (stable)**. GitHub Releases shows which installers have been published. Older releases remain in the archive for reference and rollback. [Releases](https://github.com/Huckrick/SoundBot/releases) · [Changelog](CHANGELOG.md)
+The current source version is **v1.0.10 (stable)**. GitHub Releases shows which installers have been published. Older releases remain in the archive for reference and rollback. [Releases](https://github.com/Huckrick/SoundBot/releases) · [Changelog](CHANGELOG.md)
 
 | Platform | Release file | Installation |
 | --- | --- | --- |
@@ -183,7 +183,7 @@ Download the installer and `SHA256SUMS.txt` from the same release. Run `shasum -
 Press Space to play or pause in the workspace. In text fields, Space types a space.
 
 1. Create a library and import files or folders. If there are no libraries, you can create one from the Import menu. Right-click a source folder to check for changes, update its location, or remove it from the library. Its original audio stays on disk.
-2. Select a sound and mark a range in the bottom waveform. For the first DAW delivery, choose the project's media folder. Once the file is ready, drag from the top of the selection. The rendered WAV stays in the selected folder.
+2. Select a sound and optionally mark a range in the bottom waveform. Click **Drag to DAW** in the editor to prepare the whole sound or selection. On first use, choose the project's media folder. Once the WAV is ready, drag the button or the top of the selection into your DAW.
 3. Edit tracks in the middleware workspace. Wwise connects over local WAAPI and can write back eligible PCM WAV sources with a recovery backup. FMOD Studio and CRI Atom Craft receive a new WAV in their asset folder. Import or register it in the host. [Middleware guide](docs/middleware.md)
 
 Open **Tags → Filename categories** to browse common groups such as footsteps, doors, and weather. SoundBot uses the original filename and leaves ambiguous names uncategorized. Manual tags and UCS categories are preserved.

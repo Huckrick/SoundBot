@@ -103,6 +103,14 @@
         $('dragRangeLabel').textContent = label;
         drag.setAttribute('aria-busy', String(preparing));
         drag.classList.toggle('ready', Boolean(request && preparedDrags.has(deliverySignature(request))));
+        const native = $('btnDawDrag');
+        const edit = selectedDelivery();
+        native.disabled = !edit;
+        const signature = edit && deliverySignature(edit);
+        const ready = Boolean(signature && preparedDrags.has(signature));
+        native.classList.toggle('ready', ready);
+        native.setAttribute('aria-busy', String(Boolean(signature && preparingDrag?.signature === signature)));
+        native.title = t(ready ? '音频已就绪，请拖到 DAW' : '点击准备音频，再拖到 DAW');
     }
 
     function invalidateDelivery() {
@@ -579,6 +587,16 @@
             moveBy(state.range, (event.key === 'ArrowLeft' ? -1 : 1) * (event.shiftKey ? 0.1 : 0.01));
         };
         bindAudioDrag(drag, rangeDrag);
+        const daw = $('btnDawDrag');
+        daw.onclick = () => attempt(() => prepareAudioDrag(selectedDelivery));
+        daw.ondragstart = event => {
+            event.preventDefault();
+            const edit = selectedDelivery();
+            if (!edit) return;
+            const delivery = preparedDrags.get(deliverySignature(edit));
+            if (delivery) desktop.startDrag(delivery);
+            else attempt(() => prepareAudioDrag(selectedDelivery));
+        };
         const timeAt = (event, duration = waveDuration()) => {
             const rect = canvas.getBoundingClientRect();
             const fraction = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
@@ -1443,16 +1461,16 @@
 
     let folderMenu;
     function openFolderMenu(item, anchor, event) {
+        const library = state.library.id;
         const actions = [];
         if (item.id) {
-            const library = state.library.id;
             actions.push([t('检查变更'), async () => {
                 await api.post(route(`/sources/${encodeURIComponent(item.id)}/scan`, library), {});
                 modal('ovJobs');
                 await refreshJobs(libraryRevision, true);
-            }], [t('重定位…'), () => relocateItem({ source_id: item.id }, true)],
-            [t('从音效库移除文件夹…'), () => removeFolderSource(item, library)]);
+            }], [t('重定位…'), () => relocateItem({ source_id: item.id }, true)]);
         }
+        actions.push([t('从音效库移除文件夹…'), () => removeFolderSource(item, library)]);
         actions.push([t('在文件管理器中显示'), () => desktop.revealFile(item.path)]);
         openTreeMenu(anchor, actions, event, t('文件夹操作'));
     }
@@ -1667,9 +1685,11 @@
 
     async function removeFolderSource(item, library) {
         const name = item.path.split(/[/\\]/).filter(Boolean).at(-1) || item.path;
-        const accepted = await confirm(t('移除来源文件夹「{name}」？原音频文件会保留。', { name }));
+        const accepted = await confirm(t(item.id ? '移除来源文件夹「{name}」？原音频文件会保留。'
+            : '从音效库移除「{name}」下的素材？原音频文件会保留。', { name }));
         if (!accepted || state.library?.id !== library) return;
-        await api.delete(route(`/sources/${encodeURIComponent(item.id)}`, library));
+        if (item.id) await api.delete(route(`/sources/${encodeURIComponent(item.id)}`, library));
+        else await api.post(route('/catalog/remove-folder', library), { path: item.path });
         if (state.library?.id !== library) return;
         const selected = state.selected;
         if (selected) {
@@ -1684,7 +1704,7 @@
         state.selectedIds.clear();
         await Promise.all([state.filter.folder ? setFilter({}) : loadItems(true),
             renderTree(), loadLibraries(library), refreshJobs(), timeline()?.loadDock(true)]);
-        say(t('已移除来源文件夹'));
+        say(t(item.id ? '已移除来源文件夹' : '已从音效库移除文件夹'));
     }
 
     async function relocateItem(payload, directory) {
@@ -1821,6 +1841,10 @@
     function rangeDrag() {
         const edit = state.range && editorClip();
         return edit ? { ...edit, name: $('clipName').value.trim() || null } : null;
+    }
+
+    function selectedDelivery() {
+        return rangeDrag() || wholeDrag(state.selected);
     }
 
     function deliverySignature({ item, clip, name }) {

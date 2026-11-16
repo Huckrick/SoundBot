@@ -632,6 +632,28 @@ def _renderer_smoke_expression(
     throw new Error(`installed WMA playback transcode failed: ${{JSON.stringify(wmaPlayback)}}`);
   }}
 
+  await workspace.switchWorkspace('library');
+  const looseFolder = {json.dumps(str(wma_fixture.parent.resolve()), ensure_ascii=False)};
+  const treeEntry = path => [...document.querySelectorAll('#tree [data-folder]')].find(
+    row => workspace.folderKey(row.dataset.folder) === workspace.folderKey(path)
+  );
+  for (const path of [folderFilter, looseFolder]) {{
+    await until(() => treeEntry(path), 'catalog folder row');
+    treeEntry(path).dispatchEvent(new MouseEvent('contextmenu', {{ bubbles: true, cancelable: true }}));
+    const remove = [...document.querySelectorAll('#folderMenu [role="menuitem"]')].find(
+      node => node.textContent === SoundBotI18n.t('从音效库移除文件夹…')
+    );
+    if (!remove) throw new Error('Folder context menu has no remove action');
+    remove.click();
+    await until(() => document.getElementById('actionDialog').open, 'folder removal confirmation');
+    document.getElementById('actionConfirm').click();
+    await until(() => !treeEntry(path), 'catalog folder removed');
+  }}
+  const remaining = await workspace.browseCatalog(20);
+  if (remaining.files.length !== 1 || remaining.files[0].id !== records[0].id) {{
+    throw new Error('Removing folders did not preserve the unrelated item');
+  }}
+
   return {{
     bridge: true,
     decoder: health.audio_decoder_available,
@@ -643,6 +665,7 @@ def _renderer_smoke_expression(
     searched: resultById.size,
     wmaPlayback: wmaPlayback.mode,
     auditionMs,
+    folderRemoval: true,
     languages,
     waveforms: waveformSummaries,
   }};
@@ -970,6 +993,8 @@ def main() -> int:
             or result.get("imported") != 3
             or result.get("modelLoaded") is not False
             or result.get("wmaPlayback") != "transcoded_wav"
+            or result.get("folderRemoval") is not True
+            or not all(path.is_file() for path in (file_fixture, folder_fixture, wma_fixture))
             or len(result.get("nativeDialogs") or []) != (2 if windows else 0)
             or not all(item.get("appeared") for item in result.get("nativeDialogs", []))
         ):

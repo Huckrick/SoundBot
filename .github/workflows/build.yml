@@ -341,6 +341,7 @@ jobs:
           BACKEND_PATH="$APP_PATH/Contents/Resources/backend/soundbot-backend/soundbot-backend"
 
           export SOUNDBOT_PORT=18766
+          export SOUNDBOT_IPC_TOKEN="$(python -c 'import secrets; print(secrets.token_hex(24))')"
           export SOUNDBOT_USER_DATA_DIR="$RUNNER_TEMP/soundbot-release-$GITHUB_RUN_ID-macos-packaged"
           export PYTHONIOENCODING=utf-8
           "$BACKEND_PATH" > "$RUNNER_TEMP/packaged_macos_core.log" 2>&1 &
@@ -506,6 +507,7 @@ jobs:
           $originalPath = $env:PATH
           $env:PATH = Join-Path $env:SystemRoot 'System32'
           $env:SOUNDBOT_PORT = "18765"
+          $env:SOUNDBOT_IPC_TOKEN = (& $pythonExe -c "import secrets; print(secrets.token_hex(24))")
           $env:PYTHONIOENCODING = "utf-8"
           $env:SOUNDBOT_USER_DATA_DIR = Join-Path $env:RUNNER_TEMP "soundbot-release-$env:GITHUB_RUN_ID-dist"
           $exePath = Resolve-Path 'dist\backend\soundbot-backend\soundbot-backend.exe'

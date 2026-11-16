@@ -168,6 +168,24 @@ class CoreDeliveryTests(unittest.TestCase):
         self.assertEqual(self.import_folder(folder)["stage"], "done")
         self.assertEqual(self.items()["total"], 3)
 
+    def test_remove_nested_catalog_folder_keeps_other_paths_and_disk_sources(self):
+        root = self.root / "Library"
+        folder = root / "Sound % 龙头"
+        neighbor = root / "Sound % 龙头 2"
+        folder.mkdir(parents=True)
+        neighbor.mkdir()
+        removed = audio_file(folder / "tone.wav")
+        kept = audio_file(neighbor / "tone.wav")
+        self.import_folder(root)
+        path = "/api/v1/projects/default/catalog/remove-folder"
+        self.assertEqual(self.client.post(path, json={"path": "relative"}).status_code, 400)
+        self.assertEqual(self.client.post(path, json={"path": str(folder)}).raise_for_status().json(), {"removed": 1})
+        self.import_folder(root)
+        self.assertEqual([Path(file["path"]) for file in self.items()["files"]], [kept.resolve()])
+        self.assertTrue(removed.is_file())
+        self.client.post("/api/v1/projects/default/imports", json={"file_paths": [str(removed)]}).raise_for_status()
+        self.assertEqual(self.items()["total"], 2)
+
     def test_removing_source_blocks_in_flight_batch(self):
         folder = self.root / "source"
         folder.mkdir()

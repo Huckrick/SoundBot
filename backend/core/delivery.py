@@ -41,7 +41,8 @@ def sha256(path):
 
 
 def _sync_file(path):
-    with Path(path).open("rb") as handle:
+    # Windows FlushFileBuffers requires a handle opened for writing.
+    with Path(path).open("r+b") as handle:
         os.fsync(handle.fileno())
 
 
@@ -159,8 +160,8 @@ def backup_and_replace(stage, target, before_hash):
         backup.unlink(missing_ok=True)
         raise ValueError("源文件在渲染期间发生变化")
     _sync_directory(root)
-    os.chmod(stage, mode)
     _sync_file(stage)
+    os.chmod(stage, mode)
     if sha256(target) != before_hash:
         raise ValueError("源文件在渲染期间发生变化")
     with db.get_cursor() as cur:
@@ -184,8 +185,8 @@ def _restore_bytes(target, backup, expected):
         raise ValueError("目标文件已被其他程序修改，已保留备份")
     with staging(Path(target).parent) as stage:
         shutil.copyfile(backup, stage)
-        os.chmod(stage, stat.S_IMODE(Path(target).stat().st_mode))
         _sync_file(stage)
+        os.chmod(stage, stat.S_IMODE(Path(target).stat().st_mode))
         if sha256(target) != expected:
             raise ValueError("目标文件已被其他程序修改，已保留备份")
         os.replace(stage, target)

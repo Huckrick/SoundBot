@@ -664,6 +664,17 @@ def remove_source(db, project_id, source_id):
     return removed
 
 
+def remove_folder_items(db, project_id, folder):
+    lo, hi = path_bounds(canonicalize_path(folder))
+    with _WRITE_LOCK, db.get_cursor() as cur:
+        params = (project_id, lo, hi)
+        cur.execute("""INSERT OR IGNORE INTO library_exclusions(project_id,canonical_path)
+            SELECT project_id,canonical_path FROM files WHERE project_id=? AND canonical_path>=? AND canonical_path<?""",
+                    params)
+        return cur.execute("""DELETE FROM files WHERE project_id=? AND canonical_path>=? AND canonical_path<?""",
+                           params).rowcount
+
+
 def facets(db, project_id):
     with db.get_cursor() as cur:
         tags = [dict(row) for row in cur.execute("""WITH tags AS (
@@ -737,7 +748,12 @@ def folders(db, project_id, folder=None):
                 FROM files f WHERE project_id=? AND NOT EXISTS (
                     SELECT 1 FROM source_files sf WHERE sf.file_id=f.id)
                 GROUP BY soundbot_parent(canonical_path) ORDER BY 1""", (project_id,))
-            roots.extend(dict(row) for row in loose if row["path"] not in registered)
+            for row in loose:
+                path = row["path"]
+                if re.fullmatch(r"[a-z]:", path):
+                    path += "/"
+                if path not in registered:
+                    roots.append({"path": path, "count": row["count"]})
             return roots
         key = canonicalize_path(folder)
         lo, hi = path_bounds(key)

@@ -4,6 +4,14 @@ Release history for SoundBot. / SoundBot 版本记录。
 
 ## [Unreleased] / 未发布
 
+## [1.0.10] - 2026-11-16
+
+### Added / 新增
+
+- Open the folder context menu to remove cataloged sounds from subfolders and folders made up of individually imported files. Existing audio files stay on disk. / 子目录和由单独导入素材组成的目录均可通过右键菜单从当前音效库移除，原音频保留在磁盘。
+- Fix WAV delivery on Windows by syncing the rendered file through a writable handle. The waveform editor also offers a native drag control for whole sounds and selections. / 使用可写句柄同步成品文件，修复 Windows 的 WAV 交付。波形编辑器增加整段和选区的原生拖出入口。
+- Point the repository's main download link to the latest stable release. / 将仓库首页的下载入口指向最新稳定发行。
+
 ## [1.0.9] - 2026-11-15
 
 ### Added / 新增
@@ -260,7 +268,8 @@ Release history for SoundBot. / SoundBot 版本记录。
 - The Windows release gate starts the frozen backend with a clean `PATH` and no system FFmpeg, then requires the complete format matrix, exact waveforms, CLAP, Chroma, hybrid search, `win-unpacked`, and NSIS installer integrity checks to pass before publishing. / Windows 发布门禁会在干净 `PATH`、无系统 FFmpeg 下启动冻结后端，并要求全格式矩阵、精确波形、CLAP、Chroma、混合搜索、`win-unpacked` 与 NSIS 安装包完整性检查全部通过后才允许发布。
 - CI builds Windows x64 and macOS arm64 only on native runners and blocks release creation if any functional smoke test, model check, metadata check, package check, or installer check fails. / CI 仅在原生 runner 构建 Windows x64 与 macOS arm64，并在任一功能冒烟、模型、元数据、应用包或安装包检查失败时阻止创建 Release。
 
-[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.9...HEAD
+[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.10...HEAD
+[1.0.10]: https://github.com/Huckrick/SoundBot/compare/v1.0.9...v1.0.10
 [1.0.9]: https://github.com/Huckrick/SoundBot/compare/v1.0.8...v1.0.9
 [1.0.8]: https://github.com/Huckrick/SoundBot/compare/v1.0.7...v1.0.8
 [1.0.7]: https://github.com/Huckrick/SoundBot/compare/v1.0.6...v1.0.7

@@ -661,6 +661,19 @@ async def remove_library_source(project_id: str, source_id: str):
     return {"removed": removed}
 
 
+class RemoveCatalogFolder(BaseModel):
+    path: str = Field(min_length=1, max_length=32767)
+
+
+@app.post("/api/v1/projects/{project_id}/catalog/remove-folder")
+async def remove_catalog_folder(project_id: str, request: RemoveCatalogFolder):
+    if "\x00" in request.path or not Path(request.path).is_absolute():
+        raise SoundBotAPIError("invalid_folder_path", "请选择可用的素材目录")
+    removed = await asyncio.to_thread(catalog.remove_folder_items, _require_library(project_id),
+                                     project_id, request.path)
+    return {"removed": removed}
+
+
 class LibraryItemUpdate(BaseModel):
     ids: List[str]
     action: str
