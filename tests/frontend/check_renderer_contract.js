@@ -75,10 +75,9 @@ async function main() {
     'Wwise dock does not share the asset waveform workflow');
   assert(workspace.includes('desktop.startDrag(delivery)') && workspace.includes('preparedDrags.get(deliverySignature(drag.edit))'),
     'native drag does not use a prepared delivery');
-  assert(workspace.includes('bindAudioDrag(drag, rangeDrag)') && timeline.includes('ui.bindAudioDrag(wave'),
-    'source editor and dock do not share the DAW drag path');
-  assert(workspace.includes('document.body.setPointerCapture(event.pointerId)') && workspace.includes('outsideWindow(event) && leaveWithAudio(drag)'),
-    'plain gestures must route a clip indoors and hand off a real file at the window boundary');
+  assert(workspace.includes('bindAudioDrag(drag, rangeDrag)') && timeline.includes('ui.bindAudioDrag(wave') &&
+    workspace.includes("bindAudioDrag($('btnDawDrag'), selectedDelivery"),
+    'editor, dock, and DAW button must share the audio gesture');
   assert(timeline.includes('ui.browseCatalog(48, cursor') && workspace.includes('function catalogFilters()'),
     'the dock must use the same catalog filters and cursor protocol as the full library');
   assert(timeline.includes("desktop.desktopMedia('writeback', session)"), 'Wwise writeback is not wired');

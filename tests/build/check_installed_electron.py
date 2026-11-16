@@ -433,6 +433,9 @@ def _renderer_smoke_expression(
   );
   if (!folderJob?.job_id) throw new Error(`folder import returned no job: ${{JSON.stringify(folderJob)}}`);
   const folderJobResult = await waitForJob(folderJob.job_id);
+  const parentFolder = {json.dumps(str(folder_fixture.parent.parent.resolve()), ensure_ascii=False)};
+  const parentSource = await api.backendAPI.importFolderAsync(parentFolder, true, 'installed-overlap-smoke', 'default');
+  await waitForJob(parentSource.job_id);
 
   const listing = await requestJson('/files?project_id=default&limit=20');
   const expectedNames = [
@@ -634,19 +637,28 @@ def _renderer_smoke_expression(
 
   await workspace.switchWorkspace('library');
   const looseFolder = {json.dumps(str(wma_fixture.parent.resolve()), ensure_ascii=False)};
-  const treeEntry = path => [...document.querySelectorAll('#tree [data-folder]')].find(
+  const treeEntry = (path, scope = document.getElementById('tree')) => [...scope.querySelectorAll('[data-folder]')].find(
     row => workspace.folderKey(row.dataset.folder) === workspace.folderKey(path)
   );
-  for (const path of [folderFilter, looseFolder]) {{
-    await until(() => treeEntry(path), 'catalog folder row');
-    treeEntry(path).dispatchEvent(new MouseEvent('contextmenu', {{ bubbles: true, cancelable: true }}));
+  const removeTreeEntry = async (row, action) => {{
+    row.dispatchEvent(new MouseEvent('contextmenu', {{ bubbles: true, cancelable: true }}));
     const remove = [...document.querySelectorAll('#folderMenu [role="menuitem"]')].find(
-      node => node.textContent === SoundBotI18n.t('从音效库移除文件夹…')
+      node => node.textContent === SoundBotI18n.t(action)
     );
     if (!remove) throw new Error('Folder context menu has no remove action');
     remove.click();
     await until(() => document.getElementById('actionDialog').open, 'folder removal confirmation');
     document.getElementById('actionConfirm').click();
+  }};
+  await until(() => treeEntry(parentFolder) && treeEntry(folderFilter), 'both source registrations');
+  treeEntry(parentFolder).querySelector('.tree-expand').click();
+  const beneathParent = () => treeEntry(parentFolder)?.parentElement.querySelector('.tree-children');
+  await until(() => beneathParent() && treeEntry(folderFilter, beneathParent()), 'overlapping subfolder');
+  await removeTreeEntry(treeEntry(folderFilter, beneathParent()), '从音效库移除文件夹…');
+  await until(() => treeEntry(parentFolder) && !treeEntry(folderFilter), 'both overlapping rows removed');
+  for (const [path, action] of [[parentFolder, '撤销此来源目录的导入…'], [looseFolder, '从音效库移除文件夹…']]) {{
+    await until(() => treeEntry(path), 'catalog folder row');
+    await removeTreeEntry(treeEntry(path), action);
     await until(() => !treeEntry(path), 'catalog folder removed');
   }}
   const remaining = await workspace.browseCatalog(20);
@@ -898,7 +910,7 @@ def main() -> int:
         fixture_root / "单文件 导入 % # + (A)" / "tone 单文件 % # + (A).wav"
     )
     folder_fixture = (
-        fixture_root / "文件夹 导入 % # + (B)" / "tone 文件夹 % # + (B).wav"
+        fixture_root / "来源目录 (B)" / "文件夹 导入 % # + (B)" / "tone 文件夹 % # + (B).wav"
     )
     wma_fixture = (
         fixture_root / "压缩容器 导入 % # + (WMA)" / "tone 压缩容器 % # + (WMA).wma"

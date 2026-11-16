@@ -643,36 +643,49 @@ def sources(db, project_id):
             WHERE s.project_id=? GROUP BY s.id ORDER BY s.path COLLATE NOCASE""", (project_id,))]
 
 
+def _delete_source_registrations(cur, project_id, path_predicate, paths):
+    scoped = f"project_id=? AND {path_predicate}"
+    cur.execute(f"""DELETE FROM jobs WHERE id IN (SELECT job_id FROM catalog_imports WHERE source_id IN (
+        SELECT id FROM library_sources WHERE {scoped}))""", (project_id, *paths))
+    mappings = cur.execute("SELECT id,folder_path FROM imported_folder_mappings WHERE project_id=?",
+                           (project_id,)).fetchall()
+    matching = {row[0] for row in cur.execute(
+        f"SELECT canonical_path FROM library_sources WHERE {scoped}", (project_id, *paths))}
+    if matching:
+        cur.executemany("DELETE FROM imported_folder_mappings WHERE id=?", (
+            (row['id'],) for row in mappings if canonicalize_path(row['folder_path']) in matching))
+    cur.execute(f"DELETE FROM library_sources WHERE {scoped}", (project_id, *paths))
+
+
 def remove_source(db, project_id, source_id):
     with _WRITE_LOCK, db.get_cursor() as cur:
         cur.execute("BEGIN IMMEDIATE")
-        source = cur.execute("SELECT canonical_path FROM library_sources WHERE id=? AND project_id=?",
+        source = cur.execute("SELECT 1 FROM library_sources WHERE id=? AND project_id=?",
                              (source_id, project_id)).fetchone()
         if not source:
             return None
-        cur.execute("DELETE FROM jobs WHERE id IN (SELECT job_id FROM catalog_imports WHERE source_id=?)",
-                    (source_id,))
         removed = cur.execute("""DELETE FROM files WHERE project_id=? AND imported_individually=0 AND id IN (
             SELECT file_id FROM source_files WHERE source_id=?
         ) AND NOT EXISTS (SELECT 1 FROM source_files WHERE file_id=files.id AND source_id<>?)""",
             (project_id, source_id, source_id)).rowcount
-        mappings = cur.execute("SELECT id,folder_path FROM imported_folder_mappings WHERE project_id=?",
-                               (project_id,)).fetchall()
-        cur.executemany("DELETE FROM imported_folder_mappings WHERE id=?",
-                        ((row['id'],) for row in mappings if canonicalize_path(row['folder_path']) == source[0]))
-        cur.execute("DELETE FROM library_sources WHERE id=?", (source_id,))
+        _delete_source_registrations(cur, project_id, "id=?", (source_id,))
     return removed
 
 
 def remove_folder_items(db, project_id, folder):
-    lo, hi = path_bounds(canonicalize_path(folder))
+    key = canonicalize_path(folder)
+    lo, hi = path_bounds(key)
     with _WRITE_LOCK, db.get_cursor() as cur:
+        cur.execute("BEGIN IMMEDIATE")
         params = (project_id, lo, hi)
         cur.execute("""INSERT OR IGNORE INTO library_exclusions(project_id,canonical_path)
             SELECT project_id,canonical_path FROM files WHERE project_id=? AND canonical_path>=? AND canonical_path<?""",
                     params)
-        return cur.execute("""DELETE FROM files WHERE project_id=? AND canonical_path>=? AND canonical_path<?""",
-                           params).rowcount
+        removed = cur.execute("""DELETE FROM files WHERE project_id=? AND canonical_path>=? AND canonical_path<?""",
+                              params).rowcount
+        _delete_source_registrations(cur, project_id,
+                                     "(canonical_path=? OR (canonical_path>=? AND canonical_path<?))", (key, lo, hi))
+        return removed
 
 
 def facets(db, project_id):
@@ -743,7 +756,7 @@ def folders(db, project_id, folder=None):
     with db.get_cursor() as cur:
         if folder is None:
             roots = sources(db, project_id)
-            registered = {canonicalize_path(root["path"]) for root in roots}
+            registered = {canonicalize_path(root["path"]).rstrip("/"): root["recursive"] for root in roots}
             loose = cur.execute("""SELECT soundbot_parent(canonical_path) AS path, COUNT(*) AS count
                 FROM files f WHERE project_id=? AND NOT EXISTS (
                     SELECT 1 FROM source_files sf WHERE sf.file_id=f.id)
@@ -752,7 +765,12 @@ def folders(db, project_id, folder=None):
                 path = row["path"]
                 if re.fullmatch(r"[a-z]:", path):
                     path += "/"
-                if path not in registered:
+                # Individually imported assets already appear beneath a recursive source covering their path.
+                key = path.rstrip("/")
+                ancestors = key.split("/")
+                covered = any(registered.get("/".join(ancestors[:end]))
+                              for end in range(1, len(ancestors)))
+                if key not in registered and not covered:
                     roots.append({"path": path, "count": row["count"]})
             return roots
         key = canonicalize_path(folder)

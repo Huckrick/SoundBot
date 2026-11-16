@@ -8,6 +8,8 @@
 
 <p align="center"><strong><a href="https://github.com/Huckrick/SoundBot/releases/latest">最新版をダウンロード · 下载最新稳定版 · Download the latest stable release</a></strong></p>
 
+<p align="center"><a href="docs/release-history.md">過去のリリース · 历史发行档案 · Historical releases</a></p>
+
 ## 日本語
 
 SoundBot は、ゲームオーディオ制作向けの無料のオープンソースアプリです。ローカルの効果音を探して試聴し、波形を編集して、DAW やミドルウェアに渡すところまでを一つの画面で進められます。
@@ -41,7 +43,7 @@ SoundBot は、ゲームオーディオ制作向けの無料のオープンソ�
 
 下部の波形で範囲を選択し、フェードやゲインを調整できます。マウスホイールでポインターを中心に拡大・縮小し、Shift を押しながら回すと横に移動します。スペースキーで再生・一時停止できます。テキスト入力欄では通常どおり空白を入力できます。
 
-一覧やワークスペース下部の波形サムネイルをドラッグすると、素材全体を WAV として DAW に渡せます。選択範囲だけを渡す場合は波形エディターの選択範囲の上端をドラッグします。初回は DAW プロジェクトのメディアフォルダを指定し、WAV の準備ができたらもう一度ドラッグします。ミドルウェアのタイムラインに直接ドロップすると、編集可能なクリップを追加できます。ライブラリと下部パネルには同じフォルダー、カテゴリ、検索条件が反映されます。
+初回は DAW プロジェクトのメディアフォルダーを選択します。波形サムネイルからは素材全体を、波形エディターでは選択範囲の上端から選択部分をドラッグできます。WAV の準備中はマウスボタンを押したまま待つと、そのまま DAW にドロップできます。ミドルウェアのタイムラインに直接ドロップすると、編集可能なクリップを追加できます。ライブラリと下部パネルには同じフォルダー、カテゴリ、検索条件が反映されます。
 
 #### ミドルウェアワークスペース
 
@@ -50,7 +52,9 @@ SoundBot は、ゲームオーディオ制作向けの無料のオープンソ�
 | ミドルウェア | SoundBot からの反映方法 |
 | --- | --- |
 | Wwise | ローカルの WAAPI で接続し、読み込んだプロジェクトツリー全体を閲覧・検索できます。対応するモノラルまたはステレオの 16/24 ビット PCM WAV は、元ファイルをバックアップしてから同じパスに書き戻せます。 |
-| FMOD Studio、CRI Atom Craft | プロジェクトの素材フォルダに新しい WAV を書き出し、各ツールでインポートまたは登録します。 |
+| FMOD Studio、CRI Atom Craft | **実験的・実機未検証。** 素材フォルダーに新しい WAV を書き出す想定です。各ホストでのインポート・登録についてフィードバックをお待ちしています。 |
+
+Wwise で対象プロジェクトを開いてローカル WAAPI を有効にし、SoundBot から接続します。既定の接続先は `ws://127.0.0.1:8080/waapi` です。プロジェクトツリーで Sound SFX の音源を選び、別トラックにライブラリ素材を重ねます。書き戻し先は `Originals` 内の書き込み可能なモノラルまたはステレオの 16/24-bit PCM WAV です。共有された音源やループ・キューマーカーのあるファイルは保護されます。書き戻し後は Wwise で試聴し、必要に応じて変換や SoundBank の再生成を行います。元の WAV はクリーンアップ画面のバックアップから復元できます。
 
 [ミドルウェア別の手順と対応範囲](docs/middleware.md)
 
@@ -107,7 +111,7 @@ SoundBot 把音效查找、剪辑和交付放在同一个桌面应用里。素�
 
 ### 下载和安装
 
-当前源码版本为 **v1.0.10（稳定版）**。Windows 和 macOS 安装包及 SHA-256 校验清单以最新稳定版发行页为准。 [下载最新稳定版](https://github.com/Huckrick/SoundBot/releases/latest) · [更新日志](CHANGELOG.md)
+当前源码版本为 **v1.0.11（稳定版）**。Windows 和 macOS 安装包及 SHA-256 校验清单以最新稳定版发行页为准。 [下载最新稳定版](https://github.com/Huckrick/SoundBot/releases/latest) · [更新日志](CHANGELOG.md)
 
 | 平台 | 发行文件 | 安装方式 |
 | --- | --- | --- |
@@ -116,21 +120,34 @@ SoundBot 把音效查找、剪辑和交付放在同一个桌面应用里。素�
 
 从同一发行条目下载安装包和 `SHA256SUMS.txt`。在 macOS 使用 `shasum -a 256 <文件>`，在 PowerShell 使用 `Get-FileHash -Algorithm SHA256 <文件>`，将输出与该文件的记录比对。如果系统阻止打开，先查看该发行条目的签名状态。
 
-### 使用
+### 音效库管理
 
 在工作区按空格播放或暂停。文本输入区中的空格照常输入。
 
-1. 新建音效库并导入文件或目录。没有音效库时，可以从「导入」直接新建。右键来源目录可检查变更、重新定位或从库中移除。移除后，磁盘上的原音频会保留。
-2. 选择素材，可在底部波形框选。点击编辑器的「拖出到 DAW」准备整段或选区，首次使用需选择工程媒体目录。WAV 就绪后，把按钮或选区上沿拖到 DAW。
-3. 在中间件工作台编辑多轨。Wwise 通过本机 WAAPI 连接，可写回符合条件的 PCM WAV 并留存备份。FMOD Studio 和 CRI Atom Craft 接收渲染到工程素材目录的新 WAV，随后在宿主中导入或注册。 [宿主操作指南](docs/middleware.md)
+1. **建立音效库。** 从「导入」选择文件或文件夹，也可直接拖入。文件留在磁盘原位置，库内保存路径和检索数据。同一库按路径合并重复素材，读到的记录会随着后台导入逐步出现在检索结果里。可从任务面板查看进度、暂停和重试失败项。
+2. **维护来源目录。** 在左栏右键来源，选择「检查变更」重扫，移动过素材时可用「重定位」更新引用。重复登记了总目录中的小目录时，右键单独出现的条目，选「撤销此来源目录的导入」，素材仍由总目录收录。想把子目录内容从当前库中移除时，展开总目录后右键该子目录，选「从音效库移除文件夹」。两个入口都保留磁盘原件。
+3. **找素材。** 离线关键词检索覆盖文件名、描述、标签和 UCS，可结合目录、格式、时长和声道筛选。使用分组把不同路径的音效归到同一个项目集合，也可收藏常用素材。详情面板显示格式、时长、声道、采样率、源标签和嵌入封面。
+4. **试听和交付。** 选中音效后在波形上框选，调整淡入、淡出和增益。先选择 DAW 工程媒体目录，再从「拖出到 DAW」、缩略波形或选区上沿拖动。渲染时继续按住，看到系统拖拽图标后松手。SoundBot 将成品写入选定目录，便于 DAW 保持工程媒体引用。
 
 「标签 → 文件名分类」会根据素材原文件名识别脚步、门、天气等常见类别。名称含糊时保持未分类。手动标签和 UCS 分类继续保留。
 
 点击分类标题可收起或展开，右侧「↕」可调整分类顺序，或在分类内按名称和数量排序。在「标签夹」右侧点击「＋」新建，再右键标签选择要移入的标签夹。删除标签夹后，里面的标签会回到「自定义标签」。
 
-在底部波形上滚动鼠标滚轮，以光标位置为中心缩放。按住 Shift 滚动可横移。直接拖动主库或工作台底部的缩略波形，将整条素材交付为 WAV。拖动编辑器选区上沿可只交付选区。初次交付时选择 DAW 工程媒体目录，文件准备好后再拖一次。直接拖到「中间件工作台」或时间线，可继续编辑。已经拖出窗口的音频送回 SoundBot 时会取消交付。主库和底部音效库共享文件夹、分类和搜索条件。
+在底部波形上滚动鼠标滚轮，以光标位置为中心缩放。按住 Shift 滚动可横移。直接拖动主库或工作台底部的缩略波形，将整条素材交付为 WAV。直接拖到「中间件工作台」或时间线，可继续编辑。已经拖出窗口的音频送回 SoundBot 时会取消交付。主库和底部音效库共享文件夹、分类和搜索条件。
 
-Wwise 工程浏览器可浏览和搜索整个已读取的工程树。拖动标尺可定位播放头，拖动剪辑两侧下半部可裁剪。在剪辑上拖动淡化手柄，右键选择曲线。在立体声目标上开启「声像曲线」，直接在波形上添加、拖动或右键移除控制点。同轨相邻剪辑部分重叠时自动交叉淡化，可在交叉区单独选择曲线。
+### Wwise 中间件工作台
+
+在 Wwise Authoring 打开项目并启用本机 WAAPI，再在 SoundBot 的 **中间件工作台 → Wwise** 点击连接。默认地址是 `ws://127.0.0.1:8080/waapi`。左侧工程树展示读到的工作单元、文件夹、容器及 Sound SFX 源，并显示可取得的 Wwise 颜色。搜索音效后选择具体源，在右侧详情核对路径与规格。
+
+例如给冲击声补一点低频，可以把待修改的源放在基轨，然后从底部音效库拖一条合适的低频素材到另一轨。缩放时间线对齐起音，用剪辑增益、淡化曲线、交叉淡化和立体声声像微调。静音或独奏对比叠加前后。每轨可独立使用内置效果或第三方 VST3，试听和写回使用同一套混音参数。
+
+点「写回」前核对目标和输出规格。支持工程 `Originals` 中可写的单声道或立体声 16/24-bit PCM WAV，保留原采样率、声道和位深。SoundBot 会检查目标是否被多个源共享、是否已被外部修改、是否含循环或定位标记。通过后备份原件，替换原路径并核对 Wwise 对象绑定。可从清理中心的 Wwise 恢复备份撤回。回到 Wwise 确认实际试听，并按工程需要重新转换或生成 SoundBank。 [完整连接、编辑与故障排查步骤](docs/middleware.md#简体中文)
+
+**FMOD Studio 和 CRI Atom Craft 属于实验性集成，尚未在实际宿主里测试。** 当前实现按选定的素材目录浏览和导出 WAV，宿主里的导入或登记步骤是预期工作流。欢迎反馈操作系统、宿主版本和卡住的步骤。 [实验路径](docs/middleware.md#简体中文) · [讨论区](https://github.com/Huckrick/SoundBot/discussions)
+
+### 内置效果与 VST3
+
+内置参数均衡器、压缩器、混响、响度归一化和实时响度表。EQ 可展开频谱图，双击添加频段，拖点调节频率和增益，右键切换滤波器类型。用数值或旋钮细调频率、增益和 Q，需要时可复位至默认参数。
 
 打开 VST 面板时，SoundBot 自动查找标准安装目录中的 VST3。添加插件后会打开原生编辑窗口，点击插件名可再次打开。加载时显示进度提示。Windows 的插件编辑器在 SoundBot 主窗口附近打开，支持移动、最小化和关闭。原生编辑器支持时可拖动边缘调整尺寸。可在右侧效果链拖动排序、旁通或移除插件。安装新插件后，可在 **设置 → VST3** 重新扫描。
 
@@ -171,7 +188,7 @@ SoundBot supports **Simplified Chinese, Traditional Chinese, Japanese, English, 
 
 ### Download and install
 
-The current source version is **v1.0.10 (stable)**. The latest stable release lists the published Windows and macOS installers and their SHA-256 checksums. [Download the latest stable release](https://github.com/Huckrick/SoundBot/releases/latest) · [Changelog](CHANGELOG.md)
+The current source version is **v1.0.11 (stable)**. The latest stable release lists the published Windows and macOS installers and their SHA-256 checksums. [Download the latest stable release](https://github.com/Huckrick/SoundBot/releases/latest) · [Changelog](CHANGELOG.md)
 
 | Platform | Release file | Installation |
 | --- | --- | --- |
@@ -180,21 +197,34 @@ The current source version is **v1.0.10 (stable)**. The latest stable release li
 
 Download the installer and `SHA256SUMS.txt` from the same release. Run `shasum -a 256 <file>` on macOS or `Get-FileHash -Algorithm SHA256 <file>` in PowerShell and compare the result with the entry for that file. If your OS blocks the app, check the signing status in the release notes first.
 
-### Use SoundBot
+### Manage a sound library
 
 Press Space to play or pause in the workspace. In text fields, Space types a space.
 
-1. Create a library and import files or folders. If there are no libraries, you can create one from the Import menu. Right-click a source folder to check for changes, update its location, or remove it from the library. Its original audio stays on disk.
-2. Select a sound and optionally mark a range in the bottom waveform. Click **Drag to DAW** in the editor to prepare the whole sound or selection. On first use, choose the project's media folder. Once the WAV is ready, drag the button or the top of the selection into your DAW.
-3. Edit tracks in the middleware workspace. Wwise connects over local WAAPI and can write back eligible PCM WAV sources with a recovery backup. FMOD Studio and CRI Atom Craft receive a new WAV in their asset folder. Import or register it in the host. [Middleware guide](docs/middleware.md)
+1. **Import.** Add files or folders from the Import menu or drag them into the library. SoundBot indexes the original paths and shows results as batches finish. Open the import activity to check progress, pause, or retry failures.
+2. **Maintain sources.** Right-click a registered source to check for changes or relocate it after moving media. With overlapping source folders, removing the separately registered source leaves sounds indexed by the parent in the library. Removing the nested folder from the parent tree also removes its catalog entries and registrations. Original files stay on disk.
+3. **Find and organize.** Search filenames, descriptions, tags, and UCS categories offline. Narrow the results by folder, format, duration, or channels, and collect sounds with favorites and groups. The inspector shows audio properties, embedded metadata, and cover art when the file supplies it.
+4. **Audition and deliver.** Mark a range and adjust fades or gain. Choose the DAW project's media folder on first use. Drag the **Drag to DAW** control, the top of a selection, or a thumbnail waveform. While the WAV renders, keep holding the mouse button and drop when the system drag icon appears. The rendered file is delivered to the chosen media directory.
 
 Open **Tags → Filename categories** to browse common groups such as footsteps, doors, and weather. SoundBot uses the original filename and leaves ambiguous names uncategorized. Manual tags and UCS categories are preserved.
 
 Click a tag section heading to collapse or expand it. Use its arrow menu to move the section or sort its entries by name or count. Create a tag folder with **＋**, then right-click a tag to move it. Deleting the folder returns its tags to **Custom tags**.
 
-Scroll over the waveform editor to zoom around the pointer. Hold Shift while scrolling to pan. Drag a thumbnail waveform from either library view to deliver the entire sound as a WAV. Drag the upper edge of a selection to deliver just that range. On the first delivery, choose the DAW project's media folder and drag again once the WAV is ready. Drop directly on the middleware tab or timeline to keep editing the source as a clip. Returning an external drag to SoundBot cancels the handoff. The main library and the dock share folders, categories, and search filters.
+Scroll over the waveform editor to zoom around the pointer. Hold Shift while scrolling to pan. Drag a thumbnail waveform from either library view to deliver the entire sound as a WAV. Drop directly on the middleware tab or timeline to keep editing the source as a clip. Returning an external drag to SoundBot cancels the handoff. The main library and the dock share folders, categories, and search filters.
 
-Browse or search the full hierarchy loaded from Wwise. Drag the ruler to seek and the lower clip edges to trim. Drag a fade handle on the clip and right-click it to choose a curve. For stereo targets, turn on Pan curve to add, drag, or remove points on the waveform. Partial overlaps between adjacent clips on the same track crossfade automatically. Choose a curve for an individual overlap from its menu.
+### Wwise middleware workspace
+
+Open your project in Wwise Authoring and enable local WAAPI. In SoundBot, select **Middleware Workspace → Wwise → Connect**. The default address is `ws://127.0.0.1:8080/waapi`. Browse or search the loaded work units, folders, containers, and Sound SFX sources. Select a source and verify its path and audio format in the inspector.
+
+For example, to give an impact more low end, drag a low-frequency layer from the dock onto a second track, zoom in to align the attacks, and compare using mute and solo. Trim with a clip's lower edges, adjust gain and fade curves on the clip, and set a crossfade for each overlap when automatic crossfades are enabled. Stereo targets support pan curves. Each track has its own effects settings, and the preview uses the same mix as writeback.
+
+For writeback, confirm the target and format. Eligible sources are writable mono or stereo 16/24-bit PCM WAVs inside the project's `Originals` directory. SoundBot retains the original audio format and checks for shared sources, outside edits, and loop or cue markers. It backs up the WAV before replacing it at the same path and verifying the object binding. The Cleanup Center lists recovery backups. Audition the result in Wwise and run conversion or rebuild SoundBanks as needed. [Full Wwise guide](docs/middleware.md#english)
+
+**FMOD Studio and CRI Atom Craft are experimental and untested in the actual hosts.** SoundBot has folder browsing and WAV export paths. Importing or registering the WAV in each host is the expected workflow and needs real-project feedback. Include the OS, host version, and the step you tried. [Experimental workflows](docs/middleware.md#english) · [Discussions](https://github.com/Huckrick/SoundBot/discussions)
+
+### Built-in effects and VST3
+
+Built-in effects include parametric EQ, compression, reverb, and loudness normalization, with real-time loudness meters. Expand EQ to see the spectrum, double-click to add a band, and drag a point or use the controls for frequency, gain, and Q. Right-click a band to choose its filter type. Use Reset to restore an effect's defaults.
 
 SoundBot searches the standard VST3 folders when you open the VST panel. Adding a plug-in opens its native editor. Click its name to reopen it. SoundBot shows a loading indicator until the editor is ready. On Windows, the owned editor opens near the main window and can be moved, minimized, and closed. Drag its edges to resize when supported by the plug-in. Drag to reorder plug-ins in the effects rack, or use the bypass and remove buttons. Rescan in **Settings → VST3** after installing a plug-in.
 

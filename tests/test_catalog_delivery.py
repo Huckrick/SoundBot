@@ -186,6 +186,37 @@ class CoreDeliveryTests(unittest.TestCase):
         self.client.post("/api/v1/projects/default/imports", json={"file_paths": [str(removed)]}).raise_for_status()
         self.assertEqual(self.items()["total"], 2)
 
+    def test_overlapping_sources_can_be_detached_or_excluded_as_a_subtree(self):
+        parent = self.root / "Total"
+        child = parent / "Extra"
+        child.mkdir(parents=True)
+        shared = audio_file(child / "shared.wav")
+        kept = audio_file(parent / "neighbor.wav")
+        prefix = "/api/v1/projects/default"
+        parent_job = self.import_folder(parent)
+        child_job = self.import_folder(child)
+        original_ids = {item["filename"]: item["id"] for item in self.items()["files"]}
+
+        self.assertEqual(len(self.client.get(prefix + "/catalog/folders").json()), 2)
+        self.client.delete(prefix + "/sources/" + child_job["source_id"]).raise_for_status()
+        self.assertEqual([row["id"] for row in self.client.get(prefix + "/catalog/folders").json()],
+                         [parent_job["source_id"]])
+        self.assertEqual({item["filename"]: item["id"] for item in self.items()["files"]}, original_ids)
+
+        loose = audio_file(child / "individually-added.wav")
+        self.client.post(prefix + "/imports", json={"file_paths": [str(loose)]}).raise_for_status()
+        self.assertEqual(len(self.client.get(prefix + "/catalog/folders").json()), 1)
+        self.import_folder(child)
+        self.assertEqual(self.client.post(prefix + "/catalog/remove-folder", json={"path": str(child)})
+                         .raise_for_status().json(), {"removed": 2})
+        self.assertEqual([row["id"] for row in self.client.get(prefix + "/catalog/folders").json()],
+                         [parent_job["source_id"]])
+        self.assertEqual(self.client.get(prefix + "/catalog/folders", params={"folder": str(parent)}).json(), [])
+        self.import_folder(parent)
+        self.assertEqual([item["id"] for item in self.items()["files"]], [original_ids[kept.name]])
+        self.assertTrue(shared.is_file())
+        self.assertTrue(loose.is_file())
+
     def test_removing_source_blocks_in_flight_batch(self):
         folder = self.root / "source"
         folder.mkdir()

@@ -42,9 +42,11 @@
     let activeJobs = [];
     const preparedDrags = new Map();
     let preparingDrag;
+    let dawPicker;
     let deliveryRevision = 0;
     let audioPress;
     let clipDrag;
+    const dawWaitingMessage = '正在准备 DAW 音频，请继续按住鼠标…';
     let refreshRowsAfterDrag = false;
     let libraryPanel = 'tabDetail';
     let wwisePanel = 'tabDetail';
@@ -105,12 +107,13 @@
         drag.classList.toggle('ready', Boolean(request && preparedDrags.has(deliverySignature(request))));
         const native = $('btnDawDrag');
         const edit = selectedDelivery();
-        native.disabled = !edit;
+        native.disabled = Boolean(state.dawDirectory && !edit);
+        native.textContent = t(state.dawDirectory ? '拖出到 DAW' : '选择 DAW 目录');
         const signature = edit && deliverySignature(edit);
         const ready = Boolean(signature && preparedDrags.has(signature));
         native.classList.toggle('ready', ready);
         native.setAttribute('aria-busy', String(Boolean(signature && preparingDrag?.signature === signature)));
-        native.title = t(ready ? '音频已就绪，请拖到 DAW' : '点击准备音频，再拖到 DAW');
+        native.title = t(state.dawDirectory ? '拖出到 DAW' : '选择 DAW 工程媒体目录');
     }
 
     function invalidateDelivery() {
@@ -587,16 +590,7 @@
             moveBy(state.range, (event.key === 'ArrowLeft' ? -1 : 1) * (event.shiftKey ? 0.1 : 0.01));
         };
         bindAudioDrag(drag, rangeDrag);
-        const daw = $('btnDawDrag');
-        daw.onclick = () => attempt(() => prepareAudioDrag(selectedDelivery));
-        daw.ondragstart = event => {
-            event.preventDefault();
-            const edit = selectedDelivery();
-            if (!edit) return;
-            const delivery = preparedDrags.get(deliverySignature(edit));
-            if (delivery) desktop.startDrag(delivery);
-            else attempt(() => prepareAudioDrag(selectedDelivery));
-        };
+        bindAudioDrag($('btnDawDrag'), selectedDelivery, null, true);
         const timeAt = (event, duration = waveDuration()) => {
             const rect = canvas.getBoundingClientRect();
             const fraction = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
@@ -1470,7 +1464,8 @@
                 await refreshJobs(libraryRevision, true);
             }], [t('重定位…'), () => relocateItem({ source_id: item.id }, true)]);
         }
-        actions.push([t('从音效库移除文件夹…'), () => removeFolderSource(item, library)]);
+        const removeLabel = item.id ? '撤销此来源目录的导入…' : '从音效库移除文件夹…';
+        actions.push([t(removeLabel), () => removeFolderSource(item, library)]);
         actions.push([t('在文件管理器中显示'), () => desktop.revealFile(item.path)]);
         openTreeMenu(anchor, actions, event, t('文件夹操作'));
     }
@@ -1685,8 +1680,12 @@
 
     async function removeFolderSource(item, library) {
         const name = item.path.split(/[/\\]/).filter(Boolean).at(-1) || item.path;
-        const accepted = await confirm(t(item.id ? '移除来源文件夹「{name}」？原音频文件会保留。'
-            : '从音效库移除「{name}」下的素材？原音频文件会保留。', { name }));
+        const accepted = await actionDialog({
+            message: t(item.id ? '撤销「{name}」的来源目录登记？' : '从音效库移除文件夹「{name}」？', { name }),
+            detail: t(item.id ? '仍由其他来源收录的素材和单独导入的素材会保留。磁盘文件不会删除。'
+                : '会移除夹内的库记录和来源登记。磁盘文件不会删除。'),
+            confirm: t('移除')
+        });
         if (!accepted || state.library?.id !== library) return;
         if (item.id) await api.delete(route(`/sources/${encodeURIComponent(item.id)}`, library));
         else await api.post(route('/catalog/remove-folder', library), { path: item.path });
@@ -1852,14 +1851,18 @@
             $('dawRate').value, $('dawChannels').value, $('dawBits').value, name]);
     }
 
-    async function chooseDaw() {
-        const directory = await desktop.chooseDawDirectory();
-        if (!directory) return null;
-        state.dawDirectory = directory;
-        $('btnDawDirectory').textContent = directory.split(/[/\\]/).filter(Boolean).at(-1) || directory;
-        $('btnDawDirectory').title = directory;
-        invalidateDelivery();
-        return directory;
+    function chooseDaw() {
+        if (!dawPicker) {
+            dawPicker = desktop.chooseDawDirectory().then(directory => {
+                if (!directory) return null;
+                state.dawDirectory = directory;
+                $('btnDawDirectory').textContent = directory.split(/[/\\]/).filter(Boolean).at(-1) || directory;
+                $('btnDawDirectory').title = directory;
+                invalidateDelivery();
+                return directory;
+            }).finally(() => { dawPicker = null; });
+        }
+        return dawPicker;
     }
 
     function finishClipDrag() {
@@ -1872,6 +1875,10 @@
         drag.lane?.classList.remove('drop-target');
         if (document.body.hasPointerCapture(drag.pointer)) document.body.releasePointerCapture(drag.pointer);
         $('mainWorkspace').classList.remove('library-dragging');
+        if (drag.waiting && $('toast').textContent === t(dawWaitingMessage)) {
+            clearTimeout(toastTimer);
+            $('toast').classList.remove('show');
+        }
         if (refreshRowsAfterDrag) renderRows();
         timeline()?.refreshDockRows();
     }
@@ -1879,38 +1886,54 @@
     const outsideWindow = event => event.clientX < 0 || event.clientY < 0 ||
         event.clientX >= innerWidth || event.clientY >= innerHeight;
 
-    function leaveWithAudio(drag) {
-        drag.leftWindow = true;
-        const delivery = preparedDrags.get(deliverySignature(drag.edit));
-        if (!delivery) {
-            drag.ghost.hidden = true;
-            drag.lane?.classList.remove('drop-target');
-            drag.lane = null;
-            return false;
-        }
+    function startPreparedDrag(drag, delivery) {
+        if (!delivery || clipDrag !== drag || drag.library !== state.library?.id ||
+            (!drag.outside && (drag.leftWindow || !drag.dawOnly)) ||
+            !document.body.hasPointerCapture(drag.pointer)) return;
         finishClipDrag();
         desktop.startDrag(delivery);
-        return true;
     }
 
-    function bindAudioDrag(handle, editForDrag, openEditor) {
+    function requestDawDrag(drag) {
+        if (drag.waiting || !state.dawDirectory) return;
+        const ready = preparedDrags.get(deliverySignature(drag.edit));
+        if (ready) { startPreparedDrag(drag, ready); return; }
+        drag.waiting = true;
+        say(t(dawWaitingMessage));
+        attempt(async () => {
+            try { startPreparedDrag(drag, await prepareAudioDrag(drag)); }
+            finally { drag.waiting = false; }
+        });
+    }
+
+    function leaveForDaw(drag) {
+        drag.outside = drag.leftWindow = true;
+        drag.ghost.hidden = true;
+        drag.lane?.classList.remove('drop-target');
+        drag.lane = null;
+        clearTimeout(drag.tabHover);
+        drag.tabHover = null;
+        requestDawDrag(drag);
+    }
+
+    function bindAudioDrag(handle, editForDrag, openEditor, dawOnly = false) {
         handle.dataset.audioDrag = '';
-        handle.title = t('拖动音频到 DAW 或工作台');
+        handle.title = t(dawOnly ? '拖出到 DAW' : '拖动音频到 DAW 或工作台');
         handle.setAttribute('aria-label', handle.title);
         handle.ondragstart = event => event.preventDefault();
         handle.onpointerdown = event => {
             if (event.button !== 0 || !event.isPrimary || clipDrag) return;
             const edit = editForDrag();
             if (edit && state.library) audioPress = {
-                edit, editForDrag, library: state.library.id, pointer: event.pointerId,
+                edit, dawOnly, library: state.library.id, pointer: event.pointerId,
                 x: event.clientX, y: event.clientY
             };
         };
         handle.onclick = event => {
             if (openEditor) return attempt(openEditor);
-            if (event.detail !== 0) return;
+            if (!dawOnly && event.detail !== 0) return;
             event.stopPropagation();
-            attempt(() => prepareAudioDrag(editForDrag));
+            if (!state.dawDirectory) attempt(chooseDaw);
         };
     }
 
@@ -1931,9 +1954,15 @@
             }
             if (!document.body.hasPointerCapture(event.pointerId)) document.body.setPointerCapture(event.pointerId);
             const drag = clipDrag;
-            if (outsideWindow(event) && leaveWithAudio(drag)) return;
+            drag.outside = outsideWindow(event);
+            if (drag.outside) { leaveForDaw(drag); return; }
+            drag.ghost.hidden = false;
+            drag.ghost.style.transform = `translate(${event.clientX - 10}px,${event.clientY - 10}px)`;
+            if (drag.dawOnly) {
+                if (!drag.leftWindow) requestDawDrag(drag);
+                return;
+            }
             const node = drag.leftWindow ? null : hit(event);
-            if (node) drag.ghost.style.transform = `translate(${event.clientX - 10}px,${event.clientY - 10}px)`;
             if (isLibrary() && overTab(node)) {
                 drag.tabHover ??= setTimeout(() => {
                     if (clipDrag === drag) attempt(() => switchWorkspace('wwise'));
@@ -1955,8 +1984,8 @@
             const node = drag && !drag.leftWindow && !outsideWindow(event) ? hit(event) : null;
             finishClipDrag();
             if (!drag || drag.library !== state.library?.id) return;
-            if (drag.leftWindow) {
-                if (outsideWindow(event)) attempt(() => prepareAudioDrag(drag.editForDrag));
+            if (drag.leftWindow || drag.dawOnly) {
+                if (!state.dawDirectory && (drag.dawOnly || outsideWindow(event))) attempt(chooseDaw);
                 return;
             }
             if (overTab(node)) {
@@ -1968,8 +1997,15 @@
         const cancel = event => { if (audioPress?.pointer === event.pointerId) finishClipDrag(); };
         document.addEventListener('pointercancel', cancel);
         document.body.addEventListener('lostpointercapture', event => {
-            if (!event.buttons) cancel(event);
-            else if (clipDrag?.pointer === event.pointerId && outsideWindow(event)) leaveWithAudio(clipDrag);
+            const drag = clipDrag;
+            if (drag?.pointer !== event.pointerId || !(event.buttons & 1) || !outsideWindow(event)) {
+                cancel(event);
+                return;
+            }
+            // Chromium may release capture at the edge of the native content view.
+            // Reacquire it while the pointer is still down so an outside release cancels the pending render handoff.
+            document.body.setPointerCapture(event.pointerId);
+            leaveForDaw(drag);
         });
         document.addEventListener('keydown', event => {
             if (event.key !== 'Escape' || !audioPress) return;
@@ -1979,40 +2015,41 @@
         window.addEventListener('blur', event => { if (event.target === window) finishClipDrag(); });
     }
 
-    async function prepareAudioDrag(editForDrag) {
-        if (preparingDrag) return;
-        const edit = editForDrag();
-        const library = state.library?.id;
-        if (!edit || !library || preparedDrags.has(deliverySignature(edit))) return;
-        const pending = preparingDrag = { signature: deliverySignature(edit) };
-        updateDragHandle();
-        say(t('正在准备 DAW 音频…'));
-        try {
-            const selection = JSON.stringify(edit.clip);
-            const directory = state.dawDirectory || await chooseDaw();
-            const stillValid = () => library === state.library?.id && directory === state.dawDirectory &&
-                selection === JSON.stringify(editForDrag()?.clip);
-            if (!directory || !stillValid()) return;
-            await fx().finishEditing([libraryEffects || []]);
-            if (!stillValid()) return;
-            const signature = pending.signature = deliverySignature(editForDrag());
-            updateDragHandle();
-            const result = await desktop.desktopMedia('prepare', {
-                project_id: library,
-                source_fingerprint: edit.item.source_fingerprint || null,
-                clip: { ...edit.clip, effects: libraryEffects ? fx().enabled(libraryEffects) : [] },
-                rate: Number($('dawRate').value) || null,
-                channels: Number($('dawChannels').value) || null,
-                bits: Number($('dawBits').value),
-                name: editForDrag()?.name || null
-            });
-            if (!stillValid() || signature !== deliverySignature(editForDrag())) return;
+    async function prepareAudioDrag(drag) {
+        const { edit, library } = drag;
+        await fx().finishEditing([libraryEffects || []]);
+        const signature = deliverySignature(edit);
+        const valid = () => library === state.library?.id && signature === deliverySignature(edit);
+        while (preparingDrag) {
+            if (preparingDrag.signature === signature) return preparingDrag.promise;
+            await preparingDrag.promise.catch(() => {});
+        }
+        if (clipDrag !== drag || !valid()) return;
+        const ready = preparedDrags.get(signature);
+        if (ready) return ready;
+        const pending = preparingDrag = { signature };
+        pending.promise = renderDawDelivery(edit, library).then(result => {
+            if (!valid()) return;
             rememberPreview(preparedDrags, signature, result.id, 24);
-            say(t('音频已就绪，请再次拖到 DAW'));
-        } finally {
+            return result.id;
+        }).finally(() => {
             preparingDrag = null;
             updateDragHandle();
-        }
+        });
+        updateDragHandle();
+        return pending.promise;
+    }
+
+    function renderDawDelivery(edit, library) {
+        return desktop.desktopMedia('prepare', {
+            project_id: library,
+            source_fingerprint: edit.item.source_fingerprint || null,
+            clip: { ...edit.clip, effects: libraryEffects ? fx().enabled(libraryEffects) : [] },
+            rate: Number($('dawRate').value) || null,
+            channels: Number($('dawChannels').value) || null,
+            bits: Number($('dawBits').value),
+            name: edit.name || null
+        });
     }
 
     function showInspector(tabId) {
