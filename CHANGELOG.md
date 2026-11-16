@@ -1,6 +1,6 @@
 # Changelog / 更新日志
 
-Release history for SoundBot. / SoundBot 版本记录。
+Release history for SoundBot. Download current Windows and macOS installers from the latest stable release. / SoundBot 版本记录。当前 Windows 和 macOS 安装包以最新稳定版发行页为准。 [最新稳定版 / Latest stable release](https://github.com/Huckrick/SoundBot/releases/latest)
 
 ## [Unreleased] / 未发布
 
@@ -137,6 +137,8 @@ Release history for SoundBot. / SoundBot 版本记录。
 - Made external keyword workbooks optional and local. / 分类关键词表由用户自行在本地配置。
 
 ## [0.2.1-beta.3] - 2026-08-14 (Prerelease / 预发布)
+
+This historical prerelease is available as a source tag. The public release listing carries current installers. / 此历史预发布保留源码标签，当前安装包请从官方稳定版下载。 [最新稳定版 / Latest stable release](https://github.com/Huckrick/SoundBot/releases/latest)
 
 ### Added / 新增
 

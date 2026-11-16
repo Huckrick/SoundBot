@@ -2,7 +2,7 @@
 
 <h1 align="center">SoundBot</h1>
 
-<p align="center"><strong>日本語</strong> · <a href="README.md#简体中文">简体中文</a> · <a href="README.md#english">English</a> · <a href="https://github.com/Huckrick/SoundBot/releases">リリース</a></p>
+<p align="center"><strong>日本語</strong> · <a href="README.md#简体中文">简体中文</a> · <a href="README.md#english">English</a> · <a href="https://github.com/Huckrick/SoundBot/releases/latest">最新安定版をダウンロード</a></p>
 
 SoundBot は、ゲームオーディオ制作向けの無料のオープンソースアプリです。ローカルの効果音を探して試聴し、波形を編集して、DAW やミドルウェアに渡すところまでを一つの画面で進められます。
 
@@ -12,7 +12,7 @@ SoundBot は、ゲームオーディオ制作向けの無料のオープンソ�
 
 ## ダウンロードとインストール
 
-安定版のインストーラーと SHA-256 チェックサムは、GitHub の同じリリースからダウンロードできます。以前のバージョンはリリース一覧から入手できます。 [最新リリース](https://github.com/Huckrick/SoundBot/releases/latest) · [リリース一覧](https://github.com/Huckrick/SoundBot/releases) · [変更履歴](CHANGELOG.md)
+最新安定版のページに、Windows と macOS のインストーラーおよび SHA-256 チェックサムが揃っています。旧版の情報は変更履歴にあります。 [最新安定版](https://github.com/Huckrick/SoundBot/releases/latest) · [変更履歴](CHANGELOG.md)
 
 | 対応環境 | ダウンロードするファイル | インストール方法 |
 | --- | --- | --- |

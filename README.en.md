@@ -2,17 +2,17 @@
 
 [日本語](README.ja.md) · [简体中文](README.md#简体中文) · [English](README.md#english)
 
-An open-source sound library manager for game audio. Search and edit your local sounds, then deliver them to middleware projects.
+Huckrick’s free, open-source sound library manager for game audio, with offline keyword search, waveform editing, Wwise writeback, and WAV export.
 
-The current source version is **v1.0.10 (stable)**. Published installers and their checksums are listed together in each release. [GitHub Releases](https://github.com/Huckrick/SoundBot/releases)
+The current source version is **v1.0.10 (stable)**. The latest stable release lists the published Windows and macOS installers and their SHA-256 checksums. [Download the latest stable release](https://github.com/Huckrick/SoundBot/releases/latest)
 
 SoundBot is a local sound library, waveform editor, and middleware workspace for macOS Apple Silicon and Windows x64. The main README covers installation, workflow, permissions, and troubleshooting in English. [English user guide](README.md#english) · [Changelog](CHANGELOG.md)
 
 The interface supports Simplified Chinese, Traditional Chinese, Japanese, English, Brazilian Portuguese, and Spanish. Change the language in **Settings → General → Language**. [Interface language details](README.md#interface-languages)
 
-## What’s new in v1.0.10
+## Editing and delivery
 
-Right-click a folder in the library to remove its cataloged sounds while keeping the originals on disk. In the waveform editor, use **Drag to DAW** to prepare a whole sound or a selection, then drag the rendered WAV into your project. This release fixes WAV delivery on Windows. [Latest stable release](https://github.com/Huckrick/SoundBot/releases/latest) · [Release history](CHANGELOG.md)
+Right-click a folder in the library to remove its cataloged sounds while keeping the originals on disk. In the waveform editor, use **Drag to DAW** to prepare a whole sound or a selection, then drag the rendered WAV into your project. [Release history](CHANGELOG.md)
 
 ## Support and feedback
 

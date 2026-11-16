@@ -37,10 +37,10 @@ Package checks cover frozen audio decoding, installed license notices, desktop s
 
 macOS 待审构建默认使用本地临时签名。使用正式签名时，在受控构建机显式配置 `CSC_NAME` 和签名凭据，随后核验公证结果。 / macOS review builds use ad hoc signing by default. Set `CSC_NAME` explicitly with the publisher credentials on a controlled build machine and verify the notarization result.
 
-## 后续检索扩展 / Optional search extensions
+## 当前关键词检索与研发方向 / Current keyword search and future work
 
-关键词检索以当前库为范围。向量索引可作为独立模块接入，按库、素材 UUID、内容指纹和模型版本管理派生数据。更新素材时仅重建受影响的索引。缺少模型或索引时，关键词检索照常工作。
+当前稳定版在选定的音效库内执行离线关键词检索。向量索引和语义音频检索属于后续研发方向。向量索引可单独维护，按库、素材 UUID、内容指纹和模型版本管理派生数据。
 
 本地助手沿用独立的对话接口。模型输出只表达检索意图，应用校验关键词与筛选条件后执行搜索。用分语种的查询集分别评估关键词、向量和混合检索，再决定默认策略。
 
-Keyword search stays scoped to the current library. An optional vector index can track derived data by library, asset ID, source fingerprint, and model version. A local assistant can propose search intent, with the application validating keywords and filters before retrieval. Compare keyword, vector, and hybrid search on the same multilingual query set.
+The current stable app searches the selected library using offline keywords. A separate vector index and semantic audio search are future work. A vector index could track derived data by library, asset ID, source fingerprint, and model version. A local assistant could propose search intent, with the application validating keywords and filters before retrieval. Compare keyword, vector, and hybrid search on the same multilingual query set.

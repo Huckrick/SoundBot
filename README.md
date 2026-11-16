@@ -2,9 +2,11 @@
 
 <h1 align="center">SoundBot</h1>
 
-<p align="center"><a href="#日本語">日本語</a> · <a href="#简体中文">简体中文</a> · <a href="#english">English</a> · <strong><a href="https://github.com/Huckrick/SoundBot/releases/latest">最新版 · 最新稳定版 · Latest stable release</a></strong></p>
+<p align="center"><a href="#日本語">日本語</a> · <a href="#简体中文">简体中文</a> · <a href="#english">English</a></p>
 
-<p align="center">ゲームオーディオ向けのオープンソース効果音ライブラリ管理ツール。素材の検索、波形編集、ミドルウェアへの反映を一つのアプリで。<br>面向游戏音频的开源音效库管理器。在本地查找和剪辑音效，并交付到中间件工程。<br>An open-source sound library manager for game audio. Search and edit your local sounds, then deliver them to middleware projects.</p>
+<p align="center">Huckrick が開発するゲームオーディオ向けの無料・オープンソース効果音ライブラリ。オフラインのキーワード検索、波形編集、Wwise への書き戻し、WAV 書き出しに対応。<br>由 Huckrick 开发的免费开源游戏音效库，支持离线关键词检索、波形编辑、Wwise 写回和 WAV 导出。<br>Huckrick’s free, open-source sound library manager for game audio, with offline keyword search, waveform editing, Wwise writeback, and WAV export.</p>
+
+<p align="center"><strong><a href="https://github.com/Huckrick/SoundBot/releases/latest">最新版をダウンロード · 下载最新稳定版 · Download the latest stable release</a></strong></p>
 
 ## 日本語
 
@@ -16,7 +18,7 @@ SoundBot は、ゲームオーディオ制作向けの無料のオープンソ�
 
 ### ダウンロードとインストール
 
-安定版のインストーラーと SHA-256 チェックサムは、GitHub の同じリリースからダウンロードできます。以前のバージョンはリリース一覧から入手できます。 [最新リリース](https://github.com/Huckrick/SoundBot/releases/latest) · [リリース一覧](https://github.com/Huckrick/SoundBot/releases) · [変更履歴](CHANGELOG.md)
+最新安定版のページに、Windows と macOS のインストーラーおよび SHA-256 チェックサムが揃っています。旧版の情報は変更履歴にあります。 [最新安定版](https://github.com/Huckrick/SoundBot/releases/latest) · [変更履歴](CHANGELOG.md)
 
 | 対応環境 | ダウンロードするファイル | インストール方法 |
 | --- | --- | --- |
@@ -105,7 +107,7 @@ SoundBot 把音效查找、剪辑和交付放在同一个桌面应用里。素�
 
 ### 下载和安装
 
-当前源码版本为 **v1.0.10（稳定版）**。安装包的发布状态以 GitHub Releases 为准。旧版保留在发行记录中，供查阅和回退。 [发行页](https://github.com/Huckrick/SoundBot/releases) · [更新日志](CHANGELOG.md)
+当前源码版本为 **v1.0.10（稳定版）**。Windows 和 macOS 安装包及 SHA-256 校验清单以最新稳定版发行页为准。 [下载最新稳定版](https://github.com/Huckrick/SoundBot/releases/latest) · [更新日志](CHANGELOG.md)
 
 | 平台 | 发行文件 | 安装方式 |
 | --- | --- | --- |
@@ -169,7 +171,7 @@ SoundBot supports **Simplified Chinese, Traditional Chinese, Japanese, English, 
 
 ### Download and install
 
-The current source version is **v1.0.10 (stable)**. GitHub Releases shows which installers have been published. Older releases remain in the archive for reference and rollback. [Releases](https://github.com/Huckrick/SoundBot/releases) · [Changelog](CHANGELOG.md)
+The current source version is **v1.0.10 (stable)**. The latest stable release lists the published Windows and macOS installers and their SHA-256 checksums. [Download the latest stable release](https://github.com/Huckrick/SoundBot/releases/latest) · [Changelog](CHANGELOG.md)
 
 | Platform | Release file | Installation |
 | --- | --- | --- |
