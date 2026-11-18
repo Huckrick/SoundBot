@@ -4,7 +4,7 @@
 
 Huckrick’s free, open-source sound library manager for game audio, with offline keyword search, waveform editing, Wwise writeback, and WAV export.
 
-The current source version is **v1.0.15 (stable)**. The latest stable release lists the published Windows and macOS installers and their SHA-256 checksums. [Download the latest stable release](https://github.com/Huckrick/SoundBot/releases/latest) · [Historical releases](docs/release-history.md)
+The current source version is **v1.0.16 (stable)**. The latest stable release lists the published Windows and macOS installers and their SHA-256 checksums. [Download the latest stable release](https://github.com/Huckrick/SoundBot/releases/latest) · [Historical releases](docs/release-history.md)
 
 SoundBot is a local sound library, waveform editor, and middleware workspace for macOS Apple Silicon and Windows x64. The main README covers installation, workflow, permissions, and troubleshooting in English. [English user guide](README.md#english) · [Changelog](CHANGELOG.md)
 

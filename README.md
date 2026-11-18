@@ -113,7 +113,7 @@ SoundBot 把音效查找、剪辑和交付放在同一个桌面应用里。素�
 
 ### 下载和安装
 
-当前源码版本为 **v1.0.15（稳定版）**。Windows 和 macOS 安装包及 SHA-256 校验清单以最新稳定版发行页为准。 [下载最新稳定版](https://github.com/Huckrick/SoundBot/releases/latest) · [更新日志](CHANGELOG.md)
+当前源码版本为 **v1.0.16（稳定版）**。Windows 和 macOS 安装包及 SHA-256 校验清单以最新稳定版发行页为准。 [下载最新稳定版](https://github.com/Huckrick/SoundBot/releases/latest) · [更新日志](CHANGELOG.md)
 
 | 平台 | 发行文件 | 安装方式 |
 | --- | --- | --- |
@@ -194,7 +194,7 @@ SoundBot supports **Simplified Chinese, Traditional Chinese, Japanese, English, 
 
 ### Download and install
 
-The current source version is **v1.0.15 (stable)**. The latest stable release lists the published Windows and macOS installers and their SHA-256 checksums. [Download the latest stable release](https://github.com/Huckrick/SoundBot/releases/latest) · [Changelog](CHANGELOG.md)
+The current source version is **v1.0.16 (stable)**. The latest stable release lists the published Windows and macOS installers and their SHA-256 checksums. [Download the latest stable release](https://github.com/Huckrick/SoundBot/releases/latest) · [Changelog](CHANGELOG.md)
 
 | Platform | Release file | Installation |
 | --- | --- | --- |

@@ -4,7 +4,7 @@ Release history for SoundBot. Download current Windows and macOS installers from
 
 ## [Unreleased] / 未发布
 
-## [1.0.15] - 2026-11-18
+## [1.0.16] - 2026-11-18
 
 ### Fixed / 修复
 
@@ -15,6 +15,16 @@ Release history for SoundBot. Download current Windows and macOS installers from
 
 - The VST panel meters the processed audition signal before monitor volume, with Momentary, Integrated, LRA and True Peak. Readings remain for 60 seconds after playback stops. Red peak warnings clear on click or after the signal recovers. / VST 栏在监听音量控制前测量效果处理后的试听信号，显示瞬时响度、综合响度、LRA 和真峰值。停止后保留 60 秒读数，峰值超限标红，可点击清除或等信号恢复后自动消退。
 - Keep source Integrated, LRA and True Peak visible in the sound library's VST panel. Mono playback retains its channel count when switching between original and processed audition. / 音效库 VST 栏常显原文件综合响度、LRA 和真峰值。单声道素材切换原音和处理后试听时保持正确的计量声道数。
+
+### Packaging / 打包
+
+- Pin the build tools to a dependency tree that removes the affected picomatch package and uses patched glob and minimatch versions. The release audit remains required. / 锁定打包工具依赖，移除受影响的 picomatch，并使用已修复的 glob 和 minimatch 版本。发布仍需通过依赖审计。
+
+## [1.0.15] - 2026-11-18
+
+### Release status / 发行状态
+
+- The tag was retained for traceability. The packaging dependency audit stopped the build before any installers were published. The search and loudness changes reached the stable release in v1.0.16. / 保留标签供追溯。打包依赖审计拦截了构建，未发布安装包。检索和响度改动随 v1.0.16 交付。
 
 ## [1.0.14] - 2026-11-16
 
@@ -332,7 +342,8 @@ This historical prerelease is available as a source tag. The public release list
 - The Windows release gate starts the frozen backend with a clean `PATH` and no system FFmpeg, then requires the complete format matrix, exact waveforms, CLAP, Chroma, hybrid search, `win-unpacked`, and NSIS installer integrity checks to pass before publishing. / Windows 发布门禁会在干净 `PATH`、无系统 FFmpeg 下启动冻结后端，并要求全格式矩阵、精确波形、CLAP、Chroma、混合搜索、`win-unpacked` 与 NSIS 安装包完整性检查全部通过后才允许发布。
 - CI builds Windows x64 and macOS arm64 only on native runners and blocks release creation if any functional smoke test, model check, metadata check, package check, or installer check fails. / CI 仅在原生 runner 构建 Windows x64 与 macOS arm64，并在任一功能冒烟、模型、元数据、应用包或安装包检查失败时阻止创建 Release。
 
-[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.15...HEAD
+[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.16...HEAD
+[1.0.16]: https://github.com/Huckrick/SoundBot/compare/v1.0.15...v1.0.16
 [1.0.15]: https://github.com/Huckrick/SoundBot/compare/v1.0.14...v1.0.15
 [1.0.14]: https://github.com/Huckrick/SoundBot/compare/v1.0.13...v1.0.14
 [1.0.13]: https://github.com/Huckrick/SoundBot/compare/v1.0.12...v1.0.13
