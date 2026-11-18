@@ -4,7 +4,7 @@
 
 Huckrick’s free, open-source sound library manager for game audio, with offline keyword search, waveform editing, Wwise writeback, and WAV export.
 
-The current source version is **v1.0.14 (stable)**. The latest stable release lists the published Windows and macOS installers and their SHA-256 checksums. [Download the latest stable release](https://github.com/Huckrick/SoundBot/releases/latest) · [Historical releases](docs/release-history.md)
+The current source version is **v1.0.15 (stable)**. The latest stable release lists the published Windows and macOS installers and their SHA-256 checksums. [Download the latest stable release](https://github.com/Huckrick/SoundBot/releases/latest) · [Historical releases](docs/release-history.md)
 
 SoundBot is a local sound library, waveform editor, and middleware workspace for macOS Apple Silicon and Windows x64. The main README covers installation, workflow, permissions, and troubleshooting in English. [English user guide](README.md#english) · [Changelog](CHANGELOG.md)
 
@@ -23,6 +23,8 @@ Connect to an open Wwise project over local WAAPI, select an AudioFileSource und
 **FMOD Studio and CRI Atom Craft are experimental and untested in the actual hosts.** The implemented path browses an asset folder and exports a new WAV. Import or registration in the host awaits real-project feedback. Please include your OS, host version, and the step you tested. [Experimental workflows](docs/middleware.md#english) · [Discussions](https://github.com/Huckrick/SoundBot/discussions)
 
 ## Effects and VST3
+
+The VST panel measures the processed audition before monitor volume. It shows Momentary, Integrated, LRA and True Peak for 60 seconds after playback stops. Click the red peak warning to clear it, or let it clear when the signal recovers. The library also shows the selected source file's Integrated, LRA and True Peak for comparison.
 
 Use the built-in parametric EQ, compressor, reverb, and loudness tools, or select a plug-in discovered in your system's VST3 folders. Group the picker by developer or effect type. SoundBot skips declared instruments and generators and lists plug-ins without type metadata under Unclassified plug-ins. Open the plug-in's editor by clicking its name. Reorder, bypass, or remove it in the rack. The library shares a master chain across sounds and renders it into DAW delivery. In the workspace, settings belong to individual tracks and reset after successful delivery. SoundBot shows the rendered waveform and preview tails. An effect error during audition can bypass the affected plug-in. A render error stops delivery and keeps your edits. [Effects guide](README.md#built-in-effects-and-vst3)
 

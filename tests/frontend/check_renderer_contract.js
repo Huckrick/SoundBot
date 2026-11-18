@@ -17,6 +17,64 @@ const moduleSources = Object.fromEntries(
   moduleNames.map(name => [name, read(`assets/renderer/${name}.js`)])
 );
 
+function checkLoudnessMeter() {
+  let Meter;
+  const messages = [];
+  const sampleRate = 48000;
+  vm.runInNewContext(read('assets/renderer/loudness-meter.js'), {
+    sampleRate,
+    AudioWorkletProcessor: class {
+      constructor() { this.port = { postMessage: message => messages.push(message) }; }
+    },
+    registerProcessor: (name, processor) => { Meter = processor; }
+  });
+  const meter = new Meter();
+  const control = (command, epoch) => meter.port.onmessage({ data: { command, epoch } });
+  const tone = (duration, level, frequency = 1000, phase = 0, stereo = true) => {
+    const frames = Math.round(duration * sampleRate);
+    const gain = 10 ** (level / 20);
+    for (let start = 0; start < frames; start += 128) {
+      const samples = Float32Array.from({ length: Math.min(128, frames - start) }, (_, i) =>
+        gain * Math.sin(2 * Math.PI * frequency * (start + i) / sampleRate + phase));
+      meter.process([stereo ? [samples, samples] : [samples]]);
+    }
+  };
+  const approx = (value, expected, tolerance = 0.1) =>
+    assert(Number.isFinite(value) && Math.abs(value - expected) <= tolerance, `expected ${expected}, measured ${value}`);
+
+  // EBU 3341 reference tone, then the 10 LU contrast from EBU 3342.
+  control('start', 1);
+  tone(0.3, -23);
+  assert.strictEqual(messages.at(-1).integrated, null);
+  tone(0.7, -23);
+  approx(messages.at(-1).integrated, -23);
+  assert.strictEqual(messages.at(-1).range, null);
+  tone(4, -23);
+  tone(5, -33);
+  control('stop', 1);
+  approx(messages.at(-1).range, 10);
+  assert.strictEqual(messages.at(-1).overload, 0);
+
+  control('start', 2);
+  tone(1, -23, 1000, 0, false);
+  approx(messages.at(-1).integrated, -26.01);
+  control('stop', 2);
+
+  // At fs/4 with a 45 degree phase, the peak lies between samples.
+  control('start', 3);
+  tone(0.2, 0.5, sampleRate / 4, Math.PI / 4, false);
+  approx(messages.at(-1).truePeak, 0.5, 0.2);
+  assert(messages.some(message => message.epoch === 3 && message.overload === 3));
+  control('stop', 3);
+
+  // A single full-scale PCM sample still reaches the indicator before 100 ms.
+  control('start', 4);
+  meter.process([[new Float32Array([32767 / 32768])]]);
+  control('stop', 4);
+  assert.strictEqual(messages.at(-1).overload, 3);
+  assert.strictEqual(messages.at(-1).integrated, null);
+}
+
 async function main() {
   assert(!/wavesurfer/i.test(indexHtml), 'renderer still references WaveSurfer');
   assert(!/playbackWebSocket|connectPlaybackWebSocket|disconnectPlaybackWebSocket/.test(indexHtml), 'backend playback WebSocket remains');
@@ -85,6 +143,7 @@ async function main() {
   assert(wetPeaks.peakBetween(1.041, 1.042) > 0.39, 'wet tail lost its alignment');
   wetPeaks.truncate(1.04);
   assert.strictEqual(wetPeaks.peakBetween(1.041, 1.042), -1, 'waveform retained stale tail data after seeking');
+  checkLoudnessMeter();
   assert(workspace.includes('visiblePreviews()') && workspace.includes('[...waves].slice(0, 2)'),
     'thumbnail generation is not bounded to visible assets');
   assert(timeline.includes('ui.openDockEditor(item)') && timeline.includes('ui.miniCanvas(item)'),

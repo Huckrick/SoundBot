@@ -225,6 +225,7 @@ class AIChatRequest(BaseModel):
     project_id: str = Field(default="default", description="搜索所属工程 ID")
     history: Optional[List[Dict[str, str]]] = Field(default_factory=list, description="对话历史")
     locale: Optional[UILocale] = Field(default=None, description="Preferred language for conversational replies")
+    catalog_view: bool = Field(default=False, description="Return the query for the paginated library catalog")
     top_k: int = Field(default=20, ge=1, le=100, description="返回结果数量")
     threshold: float = Field(default=0.1, ge=0.0, le=1.0, description="相似度阈值")
 

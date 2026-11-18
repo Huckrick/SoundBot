@@ -58,6 +58,16 @@ def _write_fixture(path: Path, frequency: float) -> None:
         output.writeframes(frames)
 
 
+def _write_loudness_fixture(path: Path) -> None:
+    rate = 48_000
+    gain = 32767 * 10 ** (-23 / 20)
+    period = b"".join(struct.pack("<h", round(gain * math.sin(2 * math.pi * frame / 48)))
+                      for frame in range(48))
+    with wave.open(str(path), "wb") as output:
+        output.setparams((1, 2, rate, 0, "NONE", "not compressed"))
+        output.writeframes(period * (rate * 6 // 48))
+
+
 def _discover_main_target(port: int, deadline: float) -> tuple[str, list[str]]:
     observed_urls: list[str] = []
     endpoint = f"http://127.0.0.1:{port}/json/list"
@@ -581,10 +591,11 @@ def _renderer_smoke_expression(
       throw new Error('equalizer must start bypassed');
     }}
     await until(() => workspace.playback.levels().some(level => level > 0.01) &&
-      Number.isFinite(workspace.playback.momentary), `live meter for ${{filename}}`);
+      Number.isFinite(workspace.playback.meterReading().values.truePeak), `live meter for ${{filename}}`);
     document.getElementById('btnStop').click();
-    if (workspace.playback.levels().some(Boolean) || workspace.playback.momentary !== null) {{
-      throw new Error('playback meters must clear on stop');
+    if (workspace.playback.levels().some(Boolean) ||
+        !Number.isFinite(workspace.playback.meterReading().values.truePeak)) {{
+      throw new Error('Stopping must clear the live level bars and hold the measured loudness');
     }}
     return ms;
   }};
@@ -755,6 +766,124 @@ def _renderer_smoke_expression(
   }};
 }})()
 """
+
+
+def _exercise_catalog_meter(client: _DevToolsClient, directory: Path, source: Path) -> dict:
+    directory.mkdir()
+    for index in range(131):
+        shutil.copyfile(source, directory / f"Footstep_{index:03d}.wav")
+    _write_loudness_fixture(directory / "Meter reference mono.wav")
+    return client.evaluate(r"""
+(async () => {
+  const workspace = window.SoundBotWorkspace;
+  const { $, playback, state } = workspace;
+  const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const until = async (check, label) => {
+    const end = Date.now() + 15000;
+    while (Date.now() < end) {
+      if (await check()) return;
+      await delay(50);
+    }
+    throw Error(`Timed out waiting for ${label}. ${$('toast').textContent}`);
+  };
+  const job = await workspace.desktop.backendAPI.importFolderAsync(
+    FIXTURE_DIR, true, 'installed-catalog-meter', state.library.id
+  );
+  if (!job?.job_id) throw Error('Search and meter fixture folder did not import');
+  await until(async () => {
+    const progress = await workspace.api.get('/api/v1/jobs/' + job.job_id);
+    if (['failed', 'cancelled'].includes(progress.state)) throw Error('Fixture import failed');
+    return progress.state === 'completed';
+  }, 'fixture catalog import');
+
+  const search = $('searchInput');
+  search.value = '脚步声';
+  search.dispatchEvent(new InputEvent('input', { isComposing: true }));
+  if (state.search === search.value) throw Error('Unconfirmed IME input changed the query');
+  search.dispatchEvent(new CompositionEvent('compositionend', { data: search.value }));
+  await until(() => state.search === '脚步声' && state.total === 131 && state.items.length === 120,
+              'IME search results');
+  $('tabAi').click();
+  $('aiInput').value = '腳步聲';
+  $('aiSend').click();
+  await until(() => state.search === '腳步聲' && state.total === 131 &&
+    $('aiMsgs').lastElementChild?.textContent === SoundBotI18n.t('相关素材：{count}', { count: 131 }),
+    'assistant results in the central catalog');
+  if ($('aiMsgs').querySelector('button')) throw Error('Assistant duplicated results in the chat panel');
+  const rows = $('rows');
+  rows.scrollTop = rows.scrollHeight;
+  rows.dispatchEvent(new Event('scroll'));
+  await until(() => state.items.length === 131 && !state.cursor, 'catalog cursor continuation');
+  const [firstResult, secondResult] = state.items;
+
+  search.value = 'Meter reference';
+  search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+  await until(() => state.total === 1 && state.items[0]?.filename === 'Meter reference mono.wav',
+              'immediate search on Enter');
+  const meterSource = state.items[0];
+  const originalFetch = globalThis.fetch;
+  const analyzed = [];
+  let finishFirstAnalysis;
+  const remainPending = new Promise(resolve => { finishFirstAnalysis = resolve; });
+  globalThis.fetch = async (url, options) => {
+    if (String(url).includes('/loudness?')) {
+      analyzed.push(String(url));
+      if (analyzed.length === 1) await remainPending;
+    }
+    return originalFetch(url, options);
+  };
+  const number = id => Number($(id).textContent);
+  const closeTo = (value, expected) => Math.abs(value - expected) < 0.3;
+  try {
+    $('tabVst').click();
+    await workspace.select(firstResult);
+    await until(() => analyzed.length !== 0, 'first source-analysis request');
+    if (analyzed.length !== 1) throw Error('Source analysis did not start');
+    void workspace.select(secondResult);
+    await workspace.select(meterSource);
+    finishFirstAnalysis();
+    await until(() => closeTo(number('lufsI'), -26) && closeTo(number('lufsTp'), -23) &&
+      closeTo(number('lufsLra'), 0), 'source analysis without opening a disclosure');
+    if (analyzed.length !== 2 || !analyzed[1].includes(meterSource.id)) {
+      throw Error('Source analysis queued stale selections');
+    }
+  } finally {
+    finishFirstAnalysis();
+    globalThis.fetch = originalFetch;
+  }
+  playback.setVolume(0, true);
+  $('clipGain').value = '6';
+  workspace.togglePlay();
+  await until(() => closeTo(number('liveIntegrated'), -20) && closeTo(number('liveTruePeak'), -17) &&
+    closeTo(number('liveLra'), 0), 'live mono metrics after applying +6 dB');
+  workspace.stop(true);
+  await delay(120);
+  if (!closeTo(number('liveIntegrated'), -20) || !closeTo(number('lufsI'), -26)) {
+    throw Error('Stopping changed held or source measurements');
+  }
+  const stopped = performance.now();
+  try {
+    Object.defineProperty(performance, 'now', { configurable: true, value: () => stopped + 59000 });
+    await delay(100);
+    if (!closeTo(number('liveIntegrated'), -20)) throw Error('Loudness hold ended early');
+    Object.defineProperty(performance, 'now', { configurable: true, value: () => stopped + 61000 });
+    await until(() => $('liveIntegrated').textContent === '—', 'loudness hold expiry');
+  } finally {
+    delete performance.now;
+  }
+  $('clipGain').value = '24';
+  workspace.togglePlay();
+  const clipped = () => $('truePeakMetric').classList.contains('overload');
+  await until(clipped, 'peak warning on full-scale audition');
+  $('peakWarning').click();
+  await until(() => !clipped() && $('peakWarning').disabled, 'click clears the warning');
+  await delay(200);
+  if (clipped()) throw Error('Warning returned during the same overload');
+  workspace.stop(true);
+  return { keywordResults: 131, assistantPagination: true, sourceIntegrated: -26, wetIntegrated: -20,
+           truePeakReset: true, holdSeconds: 60 };
+})()
+""".replace("FIXTURE_DIR", json.dumps(str(directory.resolve()), ensure_ascii=False)))
 
 
 def _exercise_vst(client: _DevToolsClient, root_pid: int, fixture: Path) -> dict:
@@ -1104,6 +1233,7 @@ def main() -> int:
             result["nativeDialogs"] = native_dialogs
             if args.vst_fixture:
                 result["vst3"] = _exercise_vst(client, process.pid, args.vst_fixture)
+            result["catalogMeter"] = _exercise_catalog_meter(client, fixture_root / "检索与响度", file_fixture)
             try:
                 client.evaluate(
                     "(async () => { await window.electronAPI.windowControl.close(); "

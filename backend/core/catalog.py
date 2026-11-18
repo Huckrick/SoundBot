@@ -250,7 +250,6 @@ def _ucs_processor():
 
 
 def _search_expression(query):
-
     def expression(text):
         parts = []
         for word in _WORDS.findall(unicodedata.normalize("NFKC", text).casefold()):
@@ -261,8 +260,9 @@ def _search_expression(query):
                 parts.append(f'"{word}"*')
         return " AND ".join(parts)
 
-    expanded = _ucs_processor().expand_query_with_tokenization(query)
-    expressions = dict.fromkeys(filter(None, (expression(value) for value in [query, *expanded[:12]])))
+    normalized = unicodedata.normalize("NFKC", query)
+    expanded = _ucs_processor().expand_query_with_tokenization(normalized) if _CJK.search(normalized) else []
+    expressions = dict.fromkeys(filter(None, (expression(value) for value in [normalized, *expanded[:12]])))
     return " OR ".join(f"({item})" for item in expressions)
 
 

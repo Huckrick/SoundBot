@@ -18,7 +18,7 @@
   --acc-dim:rgba(255,255,255,.07); --acc-dim2:rgba(255,255,255,.13);
   --acc-glow:rgba(255,255,255,.20);
   --wave-dim:rgba(255,255,255,.15);
-  --meter-track:#000000;
+  --meter-track:#000000; --meter-overload:#ff8185;
   --overlay:rgba(0,0,0,.6);
   --thumb:#2c2c2c;
 }
@@ -31,7 +31,7 @@
   --acc-dim:rgba(0,0,0,.055); --acc-dim2:rgba(0,0,0,.10);
   --acc-glow:rgba(0,0,0,.10);
   --wave-dim:rgba(0,0,0,.14);
-  --meter-track:#f0f0f0;
+  --meter-track:#f0f0f0; --meter-overload:#ae292e;
   --overlay:rgba(0,0,0,.28);
   --thumb:#d4d4d4;
 }
@@ -156,16 +156,25 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
 .zoom-bar .z{font-size:10px;color:var(--tx3);min-width:34px;text-align:center}
 .wave-times{display:flex;justify-content:space-between;font-size:10px;color:var(--tx3);padding:5px 10px;border-top:1px solid var(--line)}
 .trim-actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
-.loud-panel{display:flex;gap:18px;align-items:stretch;margin-top:4px}
-.loud-nums{flex:1;display:flex;flex-direction:column;gap:10px;justify-content:center}
-.loud-num .k{font-size:10px;color:var(--tx3);letter-spacing:.5px}
-.loud-num .v{font-size:22px;font-weight:600;line-height:1.2}
-.loud-num .v small{font-size:11px;font-weight:400;color:var(--tx2);margin-left:3px}
-.meters{display:flex;gap:7px;align-items:flex-end;padding:4px 0}
-.meter{width:14px;height:118px;background:var(--meter-track);border:1px solid var(--line);border-radius:5px;position:relative;overflow:hidden}
+.loud-panel{display:flex;flex-wrap:wrap;gap:12px;align-items:stretch;margin-top:4px}
+.loud-nums{flex:1 1 142px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.loud-num{min-width:0;padding:6px 7px;background:var(--bg2);border:1px solid var(--line);border-radius:var(--r-sm)}
+.loud-num .k{font-size:10px;color:var(--tx2);line-height:1.25;overflow-wrap:anywhere}
+.loud-num .v{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 3px;font-size:17px;font-weight:650;line-height:1.25}
+.loud-num .v small{font-size:9px;font-weight:400;color:var(--tx2)}
+.peak-reading{width:100%;text-align:start}
+.peak-reading:disabled{cursor:default}
+.loud-num.overload{border-color:var(--meter-overload);background:color-mix(in srgb,var(--meter-overload) 12%,var(--bg2))}
+.loud-num.overload .v,.loud-num.overload .v small{color:var(--meter-overload)}
+.meters{display:flex;gap:5px;align-items:stretch;min-height:108px;padding:4px 0}
+.meter{width:12px;background:var(--meter-track);border:1px solid var(--line);border-radius:5px;position:relative;overflow:hidden}
 .meter .fill{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to top,var(--tx3),var(--tx1));height:4%;transition:height .08s linear}
 .meter .peak{position:absolute;left:0;right:0;height:2px;background:var(--tx1);bottom:40%;box-shadow:0 0 6px var(--acc-glow)}
-.meter-scale{display:flex;flex-direction:column;justify-content:space-between;font-size:9px;color:var(--tx3);padding:2px 0}
+.meter.overload::after{content:"";position:absolute;inset:0 0 auto;height:5px;background:var(--meter-overload)}
+.meter-scale{position:relative;width:19px;font-size:9px;color:var(--tx2);line-height:1}
+.meter-scale span{position:absolute;top:var(--tick);transform:translateY(-50%)}
+.meter-scale span:first-child{transform:none}
+.meter-scale span:last-child{transform:translateY(-100%)}
 .gr-bar{height:8px;border-radius:4px;background:var(--meter-track);border:1px solid var(--line);overflow:hidden;margin-top:6px}
 .gr-fill{height:100%;width:0%;background:var(--tx1);transition:width .1s}
 
@@ -663,10 +672,10 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
 .fx-reset{font-size:10px;padding:3px 6px}
 .fx-toolbar{display:flex;align-items:center;gap:4px;flex-wrap:wrap;justify-content:flex-end}
 .fx-toolbar .ghost-btn{font-size:10px;padding:4px 7px}
-#fileLoudness{margin-top:12px;font-size:11px;color:var(--tx2)}
-#fileLoudness summary{cursor:pointer}
-.file-loudness-results{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin:8px 0}
-.file-loudness-results span{display:block;font-size:9px}
+#fileLoudness{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:11px;color:var(--tx2)}
+.file-loudness-results{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:6px}
+.file-loudness-results span{display:block;font-size:10px;line-height:1.25;overflow-wrap:anywhere}
+.file-loudness-results b{color:var(--tx1);font-weight:600}
 .file-loudness-results small{font-size:9px}
 .eq-editor{margin-top:12px;min-width:0}
 .eq-plot{height:164px;position:relative;background:linear-gradient(180deg,var(--bg2),var(--bg1));border:1px solid var(--line);border-radius:var(--r-sm);overflow:hidden;cursor:crosshair}
@@ -740,7 +749,7 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
     <select class="proj-pill" id="contextPill" aria-label="当前音效库"></select>
     <div class="searchbox">
 
-      <input id="searchInput" type="text" placeholder="搜索音效、标签、UCS…" aria-label="搜索当前工作台">
+      <input id="searchInput" type="text" maxlength="300" placeholder="搜索音效、标签、UCS…" aria-label="搜索当前工作台">
           </div>
     <div class="top-actions">
       <div class="menu-wrap">
@@ -924,23 +933,30 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
           <div class="loud-panel">
             <div class="loud-nums">
               <div class="loud-num"><div class="k">瞬时响度</div><div class="v"><span id="lufsM">−∞</span><small>LUFS</small></div></div>
-              <div class="loud-num"><div class="k">采样峰值</div><div class="v"><span id="samplePeak">−∞</span><small>dBFS</small></div></div>
+              <div class="loud-num" title="综合响度至少需要 0.4 秒的音频。"><div class="k">综合响度</div><div class="v"><span id="liveIntegrated">—</span><small>LUFS</small></div></div>
+              <div class="loud-num" title="LRA 至少需要 3 秒的音频。"><div class="k">LRA</div><div class="v"><span id="liveLra">—</span><small>LU</small></div></div>
+              <div class="loud-num" id="truePeakMetric">
+                <div class="k">真峰值</div>
+                <button type="button" class="v peak-reading" id="peakWarning" title="清除峰值超限提示" aria-label="清除峰值超限提示" disabled>
+                  <span id="liveTruePeak">−∞</span><small>dBTP</small>
+                </button>
+              </div>
             </div>
             <div class="meters" aria-label="试听电平">
               <div class="meter"><div class="fill" id="mL"></div><div class="peak" id="pL"></div></div>
               <div class="meter"><div class="fill" id="mR"></div><div class="peak" id="pR"></div></div>
-              <div class="meter-scale"><span>0</span><span>-12</span><span>-24</span><span>-48</span><span>-∞</span></div>
+              <div class="meter-scale"><span style="--tick:0%">0</span><span style="--tick:20%">−12</span><span style="--tick:40%">−24</span><span style="--tick:80%">−48</span><span style="--tick:100%">−60</span></div>
             </div>
           </div>
-          <details id="fileLoudness">
-            <summary>原文件响度分析</summary>
+          <div id="fileLoudness" aria-labelledby="fileLoudnessLabel">
+            <div class="sec-label" id="fileLoudnessLabel">原文件响度分析</div>
             <div class="file-loudness-results">
               <div><span>综合响度</span><b id="lufsI">—</b><small> LUFS</small></div>
               <div><span>真峰值</span><b id="lufsTp">—</b><small> dBTP</small></div>
               <div><span>LRA</span><b id="lufsLra">—</b><small> LU</small></div>
             </div>
             <span id="fileLoudnessStatus" role="status"></span>
-          </details>
+          </div>
         </div>
         <div class="insp-sec">
           <div class="fx-header"><span class="sec-label" id="fxChainLabel">效果器</span><div class="fx-toolbar"><button class="ghost-btn" id="btnResetEffects">复位全部</button><button class="ghost-btn" id="btnAddEffect">添加插件</button></div></div>
@@ -1017,7 +1033,7 @@ dialog::backdrop{background:var(--overlay)} dialog.modal{color:var(--tx1);margin
           <select id="miniFolder" aria-label="文件夹"></select>
           <select id="miniCategory" aria-label="分类"></select>
         </div>
-        <div class="mini-search"><input id="miniSearch" placeholder="搜索停靠音效库" aria-label="搜索停靠音效库"></div>
+        <div class="mini-search"><input id="miniSearch" maxlength="300" placeholder="搜索停靠音效库" aria-label="搜索停靠音效库"></div>
         <div class="dock-head-actions">
           <button class="icon-btn" id="btnMiniExpand" aria-label="展开完整音效库" title="展开完整音效库">↗</button>
           <button class="icon-btn" id="btnMiniClose" aria-label="收起音效库" title="收起音效库" aria-expanded="true">⌄</button>

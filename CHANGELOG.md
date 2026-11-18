@@ -4,6 +4,18 @@ Release history for SoundBot. Download current Windows and macOS installers from
 
 ## [Unreleased] / 未发布
 
+## [1.0.15] - 2026-11-18
+
+### Fixed / 修复
+
+- Run keyword searches after IME composition ends or when Enter is pressed. Built-in aliases let queries such as 脚步声, 腳步聲 and 足音 find English-named audio offline. / 中文等输入法确认后自动检索，按回车可立即搜索。脚步声、腳步聲、足音等内置关键词可离线匹配英文命名的素材。
+- Show assistant search results in the central catalog with the full result count and cursor pagination. Keyword fallback works without a model or API key. / 助手检索统一走中间列表，显示总数并支持翻页。关键词回退可在无模型、无 API 密钥的环境下使用。
+
+### Changed / 变更
+
+- The VST panel meters the processed audition signal before monitor volume, with Momentary, Integrated, LRA and True Peak. Readings remain for 60 seconds after playback stops. Red peak warnings clear on click or after the signal recovers. / VST 栏在监听音量控制前测量效果处理后的试听信号，显示瞬时响度、综合响度、LRA 和真峰值。停止后保留 60 秒读数，峰值超限标红，可点击清除或等信号恢复后自动消退。
+- Keep source Integrated, LRA and True Peak visible in the sound library's VST panel. Mono playback retains its channel count when switching between original and processed audition. / 音效库 VST 栏常显原文件综合响度、LRA 和真峰值。单声道素材切换原音和处理后试听时保持正确的计量声道数。
+
 ## [1.0.14] - 2026-11-16
 
 ### Added / 新增
@@ -320,7 +332,8 @@ This historical prerelease is available as a source tag. The public release list
 - The Windows release gate starts the frozen backend with a clean `PATH` and no system FFmpeg, then requires the complete format matrix, exact waveforms, CLAP, Chroma, hybrid search, `win-unpacked`, and NSIS installer integrity checks to pass before publishing. / Windows 发布门禁会在干净 `PATH`、无系统 FFmpeg 下启动冻结后端，并要求全格式矩阵、精确波形、CLAP、Chroma、混合搜索、`win-unpacked` 与 NSIS 安装包完整性检查全部通过后才允许发布。
 - CI builds Windows x64 and macOS arm64 only on native runners and blocks release creation if any functional smoke test, model check, metadata check, package check, or installer check fails. / CI 仅在原生 runner 构建 Windows x64 与 macOS arm64，并在任一功能冒烟、模型、元数据、应用包或安装包检查失败时阻止创建 Release。
 
-[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.14...HEAD
+[Unreleased]: https://github.com/Huckrick/SoundBot/compare/v1.0.15...HEAD
+[1.0.15]: https://github.com/Huckrick/SoundBot/compare/v1.0.14...v1.0.15
 [1.0.14]: https://github.com/Huckrick/SoundBot/compare/v1.0.13...v1.0.14
 [1.0.13]: https://github.com/Huckrick/SoundBot/compare/v1.0.12...v1.0.13
 [1.0.12]: https://github.com/Huckrick/SoundBot/compare/v1.0.11...v1.0.12

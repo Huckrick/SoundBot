@@ -45,7 +45,7 @@
     const pluginNames = new Map();
     let draggedPlugin;
     let current;
-    let analysis;
+    let analyzingSource = false;
     let peak = [0, 0];
     let paintSpectrum;
     let spectrumWasActive;
@@ -587,8 +587,7 @@
     }
 
     function resetLoudness() {
-        analysis?.abort();
-        analysis = null;
+        playback.resetMeterReading();
         for (const id of ['lufsI', 'lufsTp', 'lufsLra']) $(id).textContent = '—';
         setText($('fileLoudnessStatus'), '');
         void measure();
@@ -596,50 +595,61 @@
 
     async function measure() {
         const file = state.selected;
-        if (!$('fileLoudness').open || $('vstPanel').classList.contains('hidden') ||
-            state.workspace !== 'library' || !file || file.missing || analysis) return;
-        const key = JSON.stringify([state.library.id, file.id, file.source_fingerprint]);
+        const library = state.library?.id;
+        if ($('vstPanel').classList.contains('hidden') || state.workspace !== 'library' ||
+            !library || !file || file.missing) return;
+        const key = JSON.stringify([library, file.id, file.source_fingerprint]);
+        const stillSelected = () => state.workspace === 'library' && state.library?.id === library && state.selected === file;
         const display = result => {
             for (const [metric, id] of [['integrated', 'lufsI'], ['true_peak', 'lufsTp'], ['range', 'lufsLra']]) {
                 const value = metric === 'integrated' && result.true_peak == null ? null : result[metric];
                 $(id).textContent = value?.toFixed(1) ?? '−∞';
             }
+            setText($('fileLoudnessStatus'), '');
         };
         if (loudnessCache.has(key)) return display(loudnessCache.get(key));
-        const request = analysis = new AbortController();
         setText($('fileLoudnessStatus'), () => t('分析中…'));
-        const path = `/api/v1/files/${encodeURIComponent(file.id)}/loudness?project_id=${encodeURIComponent(state.library.id)}`;
+        // The server may still be decoding after a client abort. Keep a single
+        // in-flight analysis and pick up the latest selection when it finishes.
+        if (analyzingSource) return;
+        analyzingSource = true;
+        const path = `/api/v1/files/${encodeURIComponent(file.id)}/loudness?project_id=${encodeURIComponent(library)}`;
         try {
-            const result = await api.get(path, { signal: request.signal });
-            if (request.signal.aborted) return;
+            const result = await api.get(path);
             if (loudnessCache.size >= 64) loudnessCache.delete(loudnessCache.keys().next().value);
             loudnessCache.set(key, result);
-            display(result);
-            setText($('fileLoudnessStatus'), '');
+            if (stillSelected()) display(result);
         } catch {
-            if (!request.signal.aborted) setText($('fileLoudnessStatus'), () => t('无法分析原文件'));
+            if (stillSelected()) setText($('fileLoudnessStatus'), () => t('无法分析原文件'));
         } finally {
-            if (analysis === request) analysis = null;
+            analyzingSource = false;
+            if (!stillSelected()) void measure();
         }
     }
 
     function meters(levels = [0, 0]) {
         const visible = !$('vstPanel').classList.contains('hidden');
+        const { values, clipping } = playback.meterReading();
         for (const [i, name] of ['L', 'R'].entries()) {
             const amplitude = levels[i] || 0;
             const percent = Math.min(100, Math.max(0, (20 * Math.log10(amplitude) + 60) / 60 * 100));
             peak[i] = playback.active ? Math.max(percent, peak[i] - 1.1) : 0;
             if (visible) {
                 $(`m${name}`).style.height = `${percent}%`;
+                $(`m${name}`).parentElement.classList.toggle('overload', Boolean(clipping & (1 << i)));
                 $(`p${name}`).style.bottom = `${peak[i]}%`;
             }
             $(`ch${name}`).style.height = `${percent}%`;
             $(`chP${name}`).style.bottom = `${peak[i]}%`;
         }
         if (!visible) return;
-        const amplitude = Math.max(...levels);
-        $('lufsM').textContent = playback.momentary?.toFixed(1) ?? '−∞';
-        $('samplePeak').textContent = amplitude > 0 ? (20 * Math.log10(amplitude)).toFixed(1) : '−∞';
+        $('lufsM').textContent = values.momentary?.toFixed(1) ?? '−∞';
+        $('liveIntegrated').textContent = values.integrated?.toFixed(1) ?? '—';
+        $('liveLra').textContent = values.range?.toFixed(1) ?? '—';
+        $('liveTruePeak').textContent = Math.abs(values.truePeak) < 0.05 && values.truePeak != null
+            ? '0.0' : values.truePeak?.toFixed(1) ?? '−∞';
+        $('truePeakMetric').classList.toggle('overload', Boolean(clipping));
+        $('peakWarning').disabled = !clipping;
         if (paintSpectrum) {
             const spectrum = playback.spectrum();
             if (spectrum || spectrumWasActive) paintSpectrum(spectrum);
@@ -656,7 +666,7 @@
         };
         $('btnAddEffect').onclick = () => attempt(pick);
         $('btnClosePlugins').onclick = () => $('pluginDialog').close();
-        $('fileLoudness').ontoggle = () => { if ($('fileLoudness').open) void measure(); };
+        $('peakWarning').onclick = () => playback.clearPeakWarning();
         $('btnScanPlugins').onclick = () => attempt(() => settings(true));
         new MutationObserver(() => redraw.forEach(paint => paint()))
             .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });

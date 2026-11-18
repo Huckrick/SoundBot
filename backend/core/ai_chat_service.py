@@ -106,22 +106,18 @@ class AIChatService:
         threshold: float = 0.1,
         project_id: Optional[str] = None,
         locale: Optional[UILocale] = None,
+        *,
+        catalog_view: bool = False,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         bound_project = self._resolve_project(project_id)
         try:
             yield {"type": "thinking", "content": "..."}
-            if self.llm_client.is_available:
-                try:
+            intent = IntentResult(type="search", keywords=[message])
+            try:
+                if self.llm_client.is_available:
                     intent = await self._ask_llm(message, conversation_history)
-                except Exception as exc:
-                    logger.warning("意图模型不可用，直接搜索原始查询: %s", exc)
-                    intent = IntentResult(
-                        type="search", keywords=[message], response=f"正在搜索: {message}"
-                    )
-            else:
-                intent = IntentResult(
-                    type="search", keywords=[message], response=f"正在搜索: {message}"
-                )
+            except Exception as exc:
+                logger.warning("意图模型不可用，直接搜索原始查询: %s", exc)
 
             if intent.type == "chat":
                 response = await self._generate_chat_response(message, conversation_history, locale=locale)
@@ -132,6 +128,10 @@ class AIChatService:
                 return
 
             query = " ".join(intent.keywords).strip() or message
+            if catalog_view:
+                yield {"type": "catalog_query", "query": query[:300], "project_id": bound_project}
+                return
+
             yield {
                 "type": "searching",
                 "query": query,

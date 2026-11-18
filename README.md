@@ -62,6 +62,8 @@ Wwise で対象プロジェクトを開いてローカル WAAPI を有効にし�
 
 パラメトリック EQ、コンプレッサー、リバーブ、ラウドネス正規化、リアルタイムのラウドネスメーターを内蔵しています。EQ の **展開** を押すと、試聴しながら大きなグラフでスペクトラムと周波数特性を確認できます。グラフをダブルクリックしてバンドを追加し、ポイントをドラッグして周波数とゲインを調整します。右クリックでフィルターの種類を変更でき、周波数、ゲイン、Q は対応するノブや数値欄でも調整できます。
 
+VST パネルでは、エフェクト適用後の瞬間・統合ラウドネス、LRA、トゥルーピークをモニター音量の手前で測定します。試聴停止後も値を 60 秒間表示します。赤いピーク警告はクリックで消去でき、ピークが範囲内に戻ると自動で消えます。ライブラリでは、選択した元ファイルの統合ラウドネス、LRA、トゥルーピークも常に表示されます。
+
 VST パネルを開くと、標準のインストール先から VST3 が検出されます。追加したプラグインの名前をクリックすると、プラグイン固有のエディターを開けます。エディターの準備ができるまで読み込み状況を表示します。Windows ではメインウィンドウの近くに子ウィンドウを開き、移動・最小化・閉じる操作ができます。プラグインが対応している場合は、ウィンドウの端をドラッグしてサイズを調整できます。エフェクトチェーン内での並べ替え、バイパス、削除もできます。新しいプラグインをインストールしたら **設定 → 外部エフェクト** から再スキャンできます。追加画面では開発元別や種類別に表示できます。音源とジェネレーターは除外し、種類が宣言されていないプラグインは「種類未確認のプラグイン」に表示します。
 
 ライブラリの試聴には共通のマスターエフェクトを使います。素材を切り替えても設定は維持され、選択範囲を DAW に渡すときはその効果を WAV に反映します。ワークスペースではトラックごとにエフェクトと設定を保持し、書き出しや書き戻しが成功するとリセットします。試聴と WAV の書き出しでは、聞こえるエフェクトの余韻をミックスあたり最大 30 秒保持します。波形には処理済みの音声が順に表示され、選択範囲は元の素材を基準とします。プラグインの処理に失敗した場合、試聴では警告を表示してそのプラグインをバイパスし、書き出しでは処理を中断して編集内容を保持します。
@@ -111,7 +113,7 @@ SoundBot 把音效查找、剪辑和交付放在同一个桌面应用里。素�
 
 ### 下载和安装
 
-当前源码版本为 **v1.0.14（稳定版）**。Windows 和 macOS 安装包及 SHA-256 校验清单以最新稳定版发行页为准。 [下载最新稳定版](https://github.com/Huckrick/SoundBot/releases/latest) · [更新日志](CHANGELOG.md)
+当前源码版本为 **v1.0.15（稳定版）**。Windows 和 macOS 安装包及 SHA-256 校验清单以最新稳定版发行页为准。 [下载最新稳定版](https://github.com/Huckrick/SoundBot/releases/latest) · [更新日志](CHANGELOG.md)
 
 | 平台 | 发行文件 | 安装方式 |
 | --- | --- | --- |
@@ -148,6 +150,8 @@ SoundBot 把音效查找、剪辑和交付放在同一个桌面应用里。素�
 ### 内置效果与 VST3
 
 内置参数均衡器、压缩器、混响、响度归一化和实时响度表。EQ 可展开频谱图，双击添加频段，拖点调节频率和增益，右键切换滤波器类型。用数值或旋钮细调频率、增益和 Q，需要时可复位至默认参数。
+
+VST 栏在监听音量控制前测量处理后的试听信号，显示瞬时响度、综合响度、LRA 和真峰值。停止后保留读数 60 秒。达到数字满幅时，红色峰值提示可点击清除，信号恢复后也会自动消退。音效库同时常显当前素材的原文件综合响度、LRA 和真峰值。
 
 打开 VST 面板时，SoundBot 自动查找标准安装目录中的 VST3。添加插件后会打开原生编辑窗口，点击插件名可再次打开。加载时显示进度提示。Windows 的插件编辑器在 SoundBot 主窗口附近打开，支持移动、最小化和关闭。原生编辑器支持时可拖动边缘调整尺寸。可在右侧效果链拖动排序、旁通或移除插件。安装新插件后，可在 **设置 → 第三方效果器** 重新扫描。
 
@@ -190,7 +194,7 @@ SoundBot supports **Simplified Chinese, Traditional Chinese, Japanese, English, 
 
 ### Download and install
 
-The current source version is **v1.0.14 (stable)**. The latest stable release lists the published Windows and macOS installers and their SHA-256 checksums. [Download the latest stable release](https://github.com/Huckrick/SoundBot/releases/latest) · [Changelog](CHANGELOG.md)
+The current source version is **v1.0.15 (stable)**. The latest stable release lists the published Windows and macOS installers and their SHA-256 checksums. [Download the latest stable release](https://github.com/Huckrick/SoundBot/releases/latest) · [Changelog](CHANGELOG.md)
 
 | Platform | Release file | Installation |
 | --- | --- | --- |
@@ -227,6 +231,8 @@ For writeback, confirm the target and format. Eligible sources are writable mono
 ### Built-in effects and VST3
 
 Built-in effects include parametric EQ, compression, reverb, and loudness normalization, with real-time loudness meters. Expand EQ to see the spectrum, double-click to add a band, and drag a point or use the controls for frequency, gain, and Q. Right-click a band to choose its filter type. Use Reset to restore an effect's defaults.
+
+The VST panel shows Momentary, Integrated, LRA and True Peak for the processed audition before monitor volume. Readings remain for 60 seconds after playback stops. Click the red peak warning to clear it, or let it clear when the signal recovers. In the sound library, the selected source file's Integrated, LRA and True Peak are also visible for comparison.
 
 SoundBot searches the standard VST3 folders when you open the VST panel. Adding a plug-in opens its native editor. Click its name to reopen it. SoundBot shows a loading indicator until the editor is ready. On Windows, the owned editor opens near the main window and can be moved, minimized, and closed. Drag its edges to resize when supported by the plug-in. Drag to reorder plug-ins in the effects rack, or use the bypass and remove buttons. Rescan in **Settings → Third-party effects** after installing a plug-in. Group the picker by developer or effect type. SoundBot skips declared instruments and generators and lists plug-ins without type metadata under Unclassified plug-ins.
 

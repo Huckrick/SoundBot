@@ -43,8 +43,6 @@ _PACKAGE_REL_NS = 'http://schemas.openxmlformats.org/package/2006/relationships'
 try:
     import jieba
     _jieba_available = True
-    # 初始化 jieba（预加载词典）
-    jieba.initialize()
 except ImportError:
     logger.warning("jieba 未安装，中文分词功能受限。请运行: pip install jieba")
     _jieba_available = False
@@ -250,6 +248,27 @@ SUBCATEGORY_KEYWORDS = {
     "撞击": ["hit", "impact", "crash", "collision", "strike"],
     "掉落": ["fall", "drop", "impact", "crash", "thud"],
     "破碎": ["break", "shatter", "crack", "smash", "crash"],
+    "脚步": ["footstep", "footsteps", "feet"],
+    "腳步": ["footstep", "footsteps", "feet"],
+    "足音": ["footstep", "footsteps", "feet"],
+    "爆炸": ["explosion", "explode", "blast", "detonation"],
+    "门铃": ["doorbell", "door bell"],
+    "門鈴": ["doorbell", "door bell"],
+    "开门": ["door open", "dooropening"],
+    "開門": ["door open", "dooropening"],
+    "关门": ["door close", "door shut", "door slam", "doorslam"],
+    "關門": ["door close", "door shut", "door slam", "doorslam"],
+    "雨声": ["rain", "rainfall", "downpour"],
+    "雨聲": ["rain", "rainfall", "downpour"],
+    "风声": ["wind", "gust"],
+    "風聲": ["wind", "gust"],
+    "水声": ["water", "splash", "stream"],
+    "水聲": ["water", "splash", "stream"],
+    "枪声": ["gunshot", "gun fire", "gunfire"],
+    "槍聲": ["gunshot", "gun fire", "gunfire"],
+    "篝火": ["campfire", "fire crackle", "bonfire"],
+    "鸟叫": ["bird call", "birdsong", "chirp"],
+    "鳥叫": ["bird call", "birdsong", "chirp"],
 }
 
 
@@ -269,8 +288,6 @@ def expand_query_with_ucs(query: str) -> List[str]:
         扩展后的查询列表（包含英文同义词）
     """
     ucs_map = get_ucs_keywords()
-    if not ucs_map:
-        return [query]
     
     expanded = [query]  # 保留原始查询
     matched_keywords = set()
@@ -389,14 +406,12 @@ class UCSKeywordProcessor:
         has_chinese = bool(re.search(r'[\u4e00-\u9fff]', text))
 
         if has_chinese and _jieba_available:
-            # 使用 jieba 分词
-            tokens = list(jieba.cut(text))
-        else:
-            # 英文或其他语言，按空格和常见分隔符分词
-            tokens = [t.strip() for t in re.split(r'[\s_\-\.,]+', text) if t.strip()]
+            try:
+                return [token for token in jieba.cut(text) if len(token.strip()) > 1]
+            except (OSError, ValueError):
+                logger.warning("无法使用中文分词，继续使用关键词匹配")
 
-        # 过滤单字符和空字符串
-        return [t for t in tokens if len(t) > 1]
+        return [token for token in re.split(r'[\s_\-\.,]+', text) if len(token) > 1]
 
     def expand_query_with_tokenization(self, query: str) -> List[str]:
         """

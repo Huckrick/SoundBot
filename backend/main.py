@@ -1581,20 +1581,22 @@ async def ai_chat(request: schemas.AIChatRequest):
     """
     AI 对话 - 自然语言搜索
     
-    支持流式响应，前端需要使用 EventSource 接收。
+    使用 SSE 流式响应。
     
     请求格式：
     - **message**: 用户消息
     - **history**: 对话历史（可选）
-    - **top_k**: 返回结果数量（默认 20）
-    - **threshold**: 相似度阈值（默认 0.1）
+    - **catalog_view**: 将查询交给支持分页的音效库列表
+    - **top_k**: 兼容旧客户端的返回数量（默认 20）
+    - **threshold**: 兼容旧客户端的相似度参数
     - **locale**: 首选对话语言（可选）
     
     SSE 流式响应：
     - thinking: 正在分析
     - analyzing: 分析完成
     - searching: 正在搜索
-    - results: 搜索结果
+    - catalog_query: 用于音效库目录 API 的查询
+    - results: 兼容旧客户端的搜索结果
     - error: 错误
     - done: 完成
     """
@@ -1618,6 +1620,7 @@ async def ai_chat(request: schemas.AIChatRequest):
                 threshold=request.threshold,
                 project_id=project_id,
                 locale=request.locale,
+                catalog_view=request.catalog_view,
             )),
             media_type="text/event-stream",
             headers={

@@ -18,6 +18,8 @@
         dawDirectory: null, jobs: [], facets: null, dockEditing: false
     };
     let toastTimer;
+    let searchTimer;
+    let assistantRequest;
     let listRequest = null;
     let listQueryKey;
     let listWindowStart = null;
@@ -738,6 +740,8 @@
             return;
         }
         const revision = ++libraryRevision;
+        assistantRequest?.abort();
+        clearTimeout(searchTimer);
         listRequest?.abort();
         previewBatch?.abort();
         await select(null);
@@ -785,7 +789,7 @@
 
     function catalogFilters() {
         const grouped = state.groupByFolder && !state.search.trim();
-        const params = new URLSearchParams({ q: state.search, sort: grouped ? 'folder' : state.sort, ...state.filter });
+        const params = new URLSearchParams({ q: state.search.trim(), sort: grouped ? 'folder' : state.sort, ...state.filter });
         if (state.view === 'fav') params.set('favorite', 'true');
         if ($('filterFormat').value) params.set('format', $('filterFormat').value);
         if ($('filterChannels').value) params.set('channels', $('filterChannels').value);
@@ -2187,6 +2191,8 @@
     async function switchWorkspace(which) {
         if (state.workspace === which) return;
         if (timeline()?.isBusy()) return say(t('中间件工作台正在处理当前操作'));
+        assistantRequest?.abort();
+        clearTimeout(searchTimer);
         previewRevision++;
         if (isLibrary()) {
             keepClip();
@@ -2446,58 +2452,88 @@
     }
 
     async function askAssistant() {
-        if (!state.library) return;
+        if (!isLibrary() || !state.library) return;
         const input = $('aiInput');
         const message = input.value.trim();
         if (!message) return;
         input.value = '';
-        try {
-            await desktop.aiConfig.prepareChat();
-        } catch (error) {
-            if (!input.value) input.value = message;
-            throw error;
-        }
-        $('aiMsgs').append(el('div', message, 'ai-msg user'));
+        assistantRequest?.abort();
+        const request = assistantRequest = new AbortController();
+        const library = state.library.id;
+        const messages = $('aiMsgs');
         const bubble = el('div', null, 'ai-msg bot');
         setText(bubble, () => t('正在检索…'));
-        $('aiMsgs').append(bubble);
-        const library = state.library.id;
-        const result = await api.fetch('/api/v1/ai/chat', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message, project_id: library, locale: i18n.language })
-        });
-        if (!result.ok) throw new Error('助手请求失败');
-        const reader = result.body.pipeThrough(new TextDecoderStream()).getReader();
-        let pending = '';
-        while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
-            pending += value;
-            let lineEnd;
-            while ((lineEnd = pending.indexOf('\n')) >= 0) {
-                const line = pending.slice(0, lineEnd);
-                pending = pending.slice(lineEnd + 1);
-                if (!line.startsWith('data:')) continue;
-                const data = line.slice(5).trim();
-                if (data === '[DONE]') continue;
-                const event = JSON.parse(data);
-                if (event.type === 'searching') setText(bubble, () => t('正在搜索：{query}', { query: event.query }));
-                if (event.type === 'chat') setText(bubble, event.content);
-                if (event.type === 'error') setText(bubble, () => `${t('助手请求失败')} · ${t('使用关键词搜索仍可查找素材。')}`);
-                if (event.type === 'results') {
-                    setText(bubble, '');
-                    const summary = el('div');
-                    setText(summary, () => event.count ? t('相关素材：{count}', { count: event.count }) : t('找不到相关素材'));
-                    bubble.append(summary);
-                    for (const item of event.results) {
-                        bubble.append(button(item.filename, () => {
-                            if (state.library?.id === library) return select(item, true);
-                            say(t('请切回结果所属的音效库'));
-                        }, 'view-item'));
-                    }
-                }
-                $('aiMsgs').scrollTop = $('aiMsgs').scrollHeight;
+        messages.append(el('div', message, 'ai-msg user'), bubble);
+        messages.scrollTop = messages.scrollHeight;
+        const current = () => !request.signal.aborted && state.library?.id === library && isLibrary();
+        const showResults = async text => {
+            if (!current()) return;
+            const query = Array.from(text.trim()).slice(0, 300).join('');
+            const viewChanged = state.view !== 'folder';
+            clearTimeout(searchTimer);
+            state.search = $('searchInput').value = query;
+            state.view = 'folder';
+            for (const id of ['filterFormat', 'filterChannels', 'filterDuration']) $(id).value = '';
+            const listing = setFilter({});
+            const key = catalogKey();
+            await Promise.all([listing, viewChanged && renderTree()]);
+            if (!current()) return;
+            if (listQueryKey !== key || key !== catalogKey()) {
+                bubble.remove();
+                return;
             }
+            const count = state.total;
+            setText(bubble, () => count ? t('相关素材：{count}', { count }) : t('找不到相关素材'));
+        };
+        let reader;
+        try {
+            try {
+                await desktop.aiConfig.prepareChat();
+            } catch {
+                await showResults(message);
+                return;
+            }
+            if (!current()) return;
+            const response = await api.fetch('/api/v1/ai/chat', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: request.signal,
+                body: JSON.stringify({ message, project_id: library, locale: i18n.language, catalog_view: true })
+            });
+            if (!response.ok) throw new Error('助手请求失败');
+            reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+            let pending = '';
+            while (current()) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                pending += value;
+                let lineEnd;
+                while ((lineEnd = pending.indexOf('\n')) >= 0) {
+                    const line = pending.slice(0, lineEnd);
+                    pending = pending.slice(lineEnd + 1);
+                    if (!line.startsWith('data:')) continue;
+                    const data = line.slice(5).trim();
+                    if (data === '[DONE]') break;
+                    const event = JSON.parse(data);
+                    if (event.type === 'catalog_query' && event.project_id === library) {
+                        await showResults(event.query);
+                        return;
+                    }
+                    if (event.type === 'chat' && current()) {
+                        setText(bubble, event.content);
+                        return;
+                    }
+                    if (event.type === 'error') throw new Error('助手请求失败');
+                }
+            }
+            if (current()) throw new Error('助手请求失败');
+        } catch (error) {
+            if (!current()) return;
+            setText(bubble, () => `${t('助手请求失败')} · ${t('使用关键词搜索仍可查找素材。')}`);
+            throw error;
+        } finally {
+            if (!current()) bubble.remove();
+            if (assistantRequest === request) assistantRequest = null;
+            messages.scrollTop = messages.scrollHeight;
+            await reader?.cancel().catch(() => {});
         }
     }
 
@@ -2564,17 +2600,24 @@
         bindRail();
         labelInspector();
         syncBottomStage();
-        let searchTimer;
-        $('searchInput').oninput = event => {
+        const searchInput = $('searchInput');
+        const updateSearch = (delay = 170) => {
             clearTimeout(searchTimer);
-            if (event.isComposing) return;
             if (!isLibrary()) {
-                $('wwiseFilter').value = event.target.value;
-                timeline()?.renderTree();
+                const filter = $('wwiseFilter');
+                filter.value = searchInput.value;
+                filter.dispatchEvent(new Event('input'));
                 return;
             }
-            state.search = event.target.value;
-            searchTimer = setTimeout(() => attempt(() => loadItems(true)), 170);
+            assistantRequest?.abort();
+            state.search = searchInput.value;
+            listRequest?.abort();
+            searchTimer = setTimeout(() => attempt(() => loadItems(true)), delay);
+        };
+        searchInput.oninput = event => { if (!event.isComposing) updateSearch(); };
+        searchInput.addEventListener('compositionend', () => updateSearch());
+        searchInput.onkeydown = event => {
+            if (event.key === 'Enter' && !event.isComposing) updateSearch(0);
         };
         for (const id of ['filterFormat', 'filterChannels', 'filterDuration']) $(id).onchange = () => attempt(() => loadItems(true));
         on('groupToggle', async () => {

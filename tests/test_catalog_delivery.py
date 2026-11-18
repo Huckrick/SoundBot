@@ -644,6 +644,37 @@ class CoreDeliveryTests(unittest.TestCase):
         self.assertTrue(first.is_file())
         self.assertFalse({"torch", "chromadb", "transformers"} & sys.modules.keys())
 
+    def test_assistant_keyword_query_uses_catalog_pagination_without_a_workbook(self):
+        folder = self.root / "input"
+        folder.mkdir()
+        source = audio_file(folder / "Footstep_000.wav")
+        contents = source.read_bytes()
+        for index in range(1, 131):
+            (folder / f"Footstep_{index:03d}.wav").write_bytes(contents)
+        (folder / "Explosion_001.wav").write_bytes(contents)
+        self.import_folder(folder)
+
+        from core.ai_chat_service import get_ai_chat_service
+
+        assistant = get_ai_chat_service("default")
+        with patch.object(assistant, "_llm_client") as llm:
+            llm.is_available = False
+            response = self.client.post("/api/v1/ai/chat", json={
+                "message": "腳步聲", "project_id": "default", "catalog_view": True, "top_k": 20,
+            }).raise_for_status()
+        events = [json.loads(line[6:]) for line in response.text.splitlines() if line.startswith("data: {")]
+        self.assertEqual(events[-1], {"type": "catalog_query", "query": "腳步聲", "project_id": "default"})
+
+        first = self.items(q=events[-1]["query"], limit=120)
+        self.assertEqual(first["total"], 131)
+        self.assertEqual(len(first["files"]), 120)
+        second = self.items(q=events[-1]["query"], limit=120, cursor=json.dumps(first["next_cursor"]))
+        self.assertEqual(len(second["files"]), 11)
+        self.assertIsNone(second["next_cursor"])
+        self.assertEqual(len({item["id"] for item in first["files"] + second["files"]}), 131)
+        self.assertEqual(self.items(q="脚步声")["total"], 131)
+        self.assertEqual(self.items(q="爆炸")["files"][0]["filename"], "Explosion_001.wav")
+
     def test_loose_assets_share_one_directory_and_can_join_and_leave_groups(self):
         assets = [str(audio_file(self.root / name)) for name in ("one.wav", "two.wav")]
         self.client.post("/api/v1/projects/default/imports", json={"file_paths": assets}).raise_for_status()

@@ -104,7 +104,7 @@ class InstalledElectronSmokeTests(unittest.TestCase):
         self.assertIn("getWaveformById", expression)
         self.assertIn("keyword_score", expression)
         self.assertIn("workspace.playback.levels()", expression)
-        self.assertIn("workspace.playback.momentary", expression)
+        self.assertIn("workspace.playback.meterReading().values.truePeak", expression)
         self.assertIn("searchAudio", expression)
         self.assertIn("transcoded_wav", expression)
 

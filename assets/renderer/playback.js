@@ -2,12 +2,22 @@
 (() => {
     const audio = new Audio();
     let context;
+    let mediaInput;
+    let signal;
     let master;
     let splitter;
     let analysisBus;
     let loudnessNode;
+    let meterReady;
     let meterEpoch = 0;
-    let momentary = null;
+    let measuredEpoch = null;
+    let meterValues = {};
+    let meterHoldUntil = 0;
+    let reportedOverload = 0;
+    let dismissedOverload = 0;
+    const peakWarningUntil = [0, 0];
+    const meterHoldMs = 60000;
+    const peakWarningMs = 2000;
     let analyzers = [];
     let samples;
     let spectra;
@@ -68,18 +78,61 @@
     }
 
     function stop() {
+        if (session && measuredEpoch === meterEpoch) {
+            meterHoldUntil = performance.now() + meterHoldMs;
+            loudnessNode.port.postMessage({ command: 'stop', epoch: measuredEpoch });
+        }
         session?.abort.abort();
         session = null;
-        momentary = null;
         meterEpoch++;
-        loudnessNode?.port.postMessage(meterEpoch);
         audio.pause();
+        mediaInput?.disconnect();
         if (audio.hasAttribute('src')) {
             audio.removeAttribute('src');
             audio.load();
         }
-        for (const node of nodes) node.stop();
+        for (const node of nodes) {
+            node.onended = null;
+            node.stop();
+            node.disconnect();
+        }
         nodes.clear();
+    }
+
+    function resetMeterReading() {
+        measuredEpoch = null;
+        meterValues = {};
+        meterHoldUntil = reportedOverload = dismissedOverload = 0;
+        peakWarningUntil.fill(0);
+    }
+
+    function startMeter() {
+        if (!loudnessNode) return;
+        measuredEpoch = meterEpoch;
+        loudnessNode.port.postMessage({ command: 'start', epoch: measuredEpoch });
+    }
+
+    function acceptMeterReading({ epoch, overload, momentary, integrated, range, truePeak }) {
+        if (epoch !== measuredEpoch) return;
+        meterValues = { momentary, integrated, range, truePeak };
+        reportedOverload = overload;
+        dismissedOverload &= overload;
+        const limit = performance.now() + peakWarningMs;
+        for (let channel = 0; channel < peakWarningUntil.length; channel++) {
+            if ((overload & ~dismissedOverload) & (1 << channel)) peakWarningUntil[channel] = limit;
+        }
+    }
+
+    function meterReading() {
+        const now = performance.now();
+        const clipping = (now < peakWarningUntil[0] ? 1 : 0) | (now < peakWarningUntil[1] ? 2 : 0);
+        const visible = session || now < meterHoldUntil;
+        return { values: visible ? meterValues : {}, clipping: visible ? clipping : 0 };
+    }
+
+    function clearPeakWarning() {
+        dismissedOverload = reportedOverload;
+        peakWarningUntil.fill(0);
     }
 
     function setVolume(value, silent) {
@@ -95,14 +148,16 @@
     function ensureContext() {
         if (context) return;
         context = new AudioContext();
+        signal = context.createGain();
         master = context.createGain();
+        signal.connect(master);
         master.connect(context.destination);
         audio.crossOrigin = 'anonymous';
-        context.createMediaElementSource(audio).connect(master);
+        mediaInput = context.createMediaElementSource(audio);
         analysisBus = context.createGain();
         analysisBus.channelCount = 2;
         analysisBus.channelCountMode = 'explicit';
-        master.connect(analysisBus);
+        signal.connect(analysisBus);
         splitter = context.createChannelSplitter(2);
         analysisBus.connect(splitter);
         analyzers = [0, 1].map(channel => {
@@ -114,19 +169,18 @@
         });
         samples = new Float32Array(analyzers[0].fftSize);
         spectra = analyzers.map(node => new Float32Array(node.frequencyBinCount));
-        context.audioWorklet.addModule(new URL('loudness-meter.js', scriptURL)).then(() => {
-            loudnessNode = new AudioWorkletNode(context, 'soundbot-loudness', { numberOfOutputs: 0 });
-            loudnessNode.port.onmessage = ({ data }) => {
-                if (data.epoch === meterEpoch) momentary = data.lufs;
-            };
-            loudnessNode.port.postMessage(meterEpoch);
-            analysisBus.connect(loudnessNode);
+        meterReady = context.audioWorklet.addModule(new URL('loudness-meter.js', scriptURL)).then(() => {
+            loudnessNode = new AudioWorkletNode(context, 'soundbot-loudness', {
+                numberOfOutputs: 0, channelCount: 2, channelCountMode: 'clamped-max'
+            });
+            loudnessNode.port.onmessage = ({ data }) => acceptMeterReading(data);
+            signal.connect(loudnessNode);
         }).catch(error => console.warn('SoundBot loudness meter:', error.message));
         setVolume(volume, muted);
     }
 
     function levels() {
-        if (!session || !samples || muted) return [0, 0];
+        if (!session || !samples) return [0, 0];
         return analyzers.map(analyser => {
             analyser.getFloatTimeDomainData(samples);
             let peak = 0;
@@ -136,24 +190,28 @@
     }
 
     function spectrum() {
-        if (!session || !spectra || muted) return null;
+        if (!session || !spectra) return null;
         for (const [index, analyser] of analyzers.entries()) analyser.getFloatFrequencyData(spectra[index]);
         return { channels: spectra, hzPerBin: context.sampleRate / analyzers[0].fftSize };
     }
 
     async function playSource(url, offset, onEnd) {
         stop();
+        resetMeterReading();
         const active = { abort: new AbortController(), clock: () => audio.currentTime };
         session = active;
         try {
             ensureContext();
-            const resumed = context.resume();
+            await Promise.all([context.resume(), meterReady]);
+            if (session !== active) return;
+            startMeter();
+            mediaInput.connect(signal);
             audio.src = url;
             if (offset > 0) audio.currentTime = offset;
             audio.addEventListener('ended', () => {
                 if (session === active) { stop(); onEnd(); }
             }, { once: true, signal: active.abort.signal });
-            await Promise.all([resumed, audio.play()]);
+            await audio.play();
         } catch (error) {
             if (session === active) stop();
             throw error;
@@ -162,6 +220,7 @@
 
     async function playPCM(url, options, offset, onEnd, onStream, onRendered) {
         stop();
+        resetMeterReading();
         const active = { abort: new AbortController(), clock: () => offset };
         session = active;
         try {
@@ -222,9 +281,14 @@
                     remaining = remaining.slice(consumed);
                     if (pcm) onRendered?.(buffer, offset + receivedBytes / (channels * 2 * rate));
                     receivedBytes += consumed;
+                    if (origin === undefined) {
+                        await meterReady;
+                        if (session !== active) break;
+                        startMeter();
+                    }
                     const node = context.createBufferSource();
                     node.buffer = buffer;
-                    node.connect(master);
+                    node.connect(signal);
                     nodes.add(node);
                     node.onended = () => { nodes.delete(node); node.disconnect(); };
                     scheduled = Math.max(scheduled, context.currentTime + 0.015);
@@ -255,7 +319,7 @@
 
     const scriptURL = document.currentScript.src;
     window.SoundBotPlayback = { playSource, playPCM, setVolume, currentTime, levels, spectrum, stop, renderedPeaks,
+        meterReading, resetMeterReading, clearPeakWarning,
         get generation() { return meterEpoch; },
-        get momentary() { return session && !muted ? momentary : null; },
         get active() { return !!session; } };
 })();

@@ -1573,11 +1573,17 @@
             renderTree();
         };
         let searchTimer;
-        $('miniSearch').oninput = event => {
+        const miniSearch = $('miniSearch');
+        const updateSearch = (delay = 160) => {
             clearTimeout(searchTimer);
-            if (event.isComposing) return;
-            state.search = event.target.value;
-            searchTimer = setTimeout(() => attempt(loadDock), 160);
+            state.search = miniSearch.value;
+            dockRequest?.abort();
+            searchTimer = setTimeout(() => attempt(loadDock), delay);
+        };
+        miniSearch.oninput = event => { if (!event.isComposing) updateSearch(); };
+        miniSearch.addEventListener('compositionend', () => updateSearch());
+        miniSearch.onkeydown = event => {
+            if (event.key === 'Enter' && !event.isComposing) updateSearch(0);
         };
         $('gridPrecision').onchange = () => { grid = Number($('gridPrecision').value); render(); };
         document.querySelectorAll('#snapMode button').forEach(node => {
